@@ -1,0 +1,63 @@
+/* frontend/src/paages/Trading.css */
+.trading-page {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 0.5rem;
+}
+
+.page-header p {
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.trading-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 2rem;
+  grid-template-areas:
+    "chart controls"
+    "market market";
+}
+
+.chart-section {
+  grid-area: chart;
+}
+
+.controls-section {
+  grid-area: controls;
+}
+
+.market-section {
+  grid-area: market;
+}
+
+@media (max-width: 1024px) {
+  .trading-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "chart"
+      "controls"
+      "market";
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+  
+  .trading-layout {
+    gap: 1rem;
+  }
+}

@@ -1,0 +1,372 @@
+# backend/src/api/routes.py
+
+from fastapi import APIRouter, HTTPException
+from src.core.deriv_api import deriv
+from src.trading.order_executor import order_executor, position_manager
+from src.trading.bot import trading_bot
+from src.utils.logger import logger
+from src.config.settings import settings
+from src.db.repositories.trade_history_repo import TradeHistoryRepo
+from src.db.session import SessionLocal
+from src.db.models.trade import Trade
+from src.db.models.contract import Contract
+from datetime import datetime, timedelta
+import asyncio
+
+router = APIRouter(prefix="/api", tags=["Trading API"])
+
+# ============================================================
+# BASIC BOT STATUS
+# ============================================================
+@router.get("/status")
+async def status():
+    return {"bot": "running", "symbol": settings.SYMBOL}
+
+@router.get("/balance")
+async def balance():
+    current_balance = await deriv.get_balance()
+    return {"balance": current_balance}
+
+@router.post("/manual/{side}")
+async def manual(side: str):
+    trade_id = await order_executor.place_trade(
+        side.upper(), 
+        settings.TRADE_AMOUNT, 
+        settings.SYMBOL,
+        duration=5,  # Changed from 1 to 5
+        duration_unit="t"
+    )
+    return {"trade_id": trade_id}
+
+
+# ============================================================
+# BOT CONTROL ENDPOINTS
+# ============================================================
+@router.post("/start")
+async def start_bot():
+    """Start the trading bot"""
+    try:
+        if not trading_bot.running:
+            asyncio.create_task(trading_bot.run())
+            return {"status": "Bot started"}
+        return {"status": "Bot already running"}
+    except Exception as e:
+        logger.error(f"Failed to start bot: {e}")
+        raise HTTPException(500, f"Failed to start bot: {e}")
+
+@router.post("/stop")
+async def stop_bot():
+    """Stop the trading bot"""
+    try:
+        trading_bot.running = False
+        return {"status": "Bot stopped"}
+    except Exception as e:
+        logger.error(f"Failed to stop bot: {e}")
+        raise HTTPException(500, f"Failed to stop bot: {e}")
+
+# ============================================================
+# SIGNALS ENDPOINT
+# ============================================================
+@router.get("/trades/signals")
+async def get_signals(limit: int = 10):
+    """Get recent trading signals"""
+    # For now, return empty array - you can implement this later
+    return {"signals": []}
+
+# ============================================================
+# MARKET DATA
+# ============================================================
+@router.get("/market/data")
+async def get_market_data():
+    """Get current market data"""
+    try:
+        # You can implement actual price fetching here
+        return {
+            "symbol": settings.SYMBOL,
+            "price": 0,  # Placeholder
+            "status": "unknown"
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get market data: {e}")
+
+# ============================================================
+# TRADE HISTORY
+# ============================================================
+@router.get("/trades")
+async def get_trades(limit: int = 100, offset: int = 0):
+    trades = TradeHistoryRepo.get_all_trades(limit=limit, offset=offset)
+    return {
+        "trades": trades,
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "total": len(trades)
+        }
+    }
+
+@router.get("/trades/{trade_id}")
+async def get_trade(trade_id: str):
+    trade = TradeHistoryRepo.get_trade_by_id(trade_id)
+    if not trade:
+        raise HTTPException(404, "Trade not found")
+    return trade
+
+@router.get("/trades/status/{status}")
+async def get_trades_by_status(status: str, limit: int = 100):
+    valid_statuses = ["PENDING", "ACTIVE", "WON", "LOST", "ERROR"]
+    if status.upper() not in valid_statuses:
+        raise HTTPException(
+            400, 
+            f"Status must be one of: {valid_statuses}"
+        )
+
+    trades = TradeHistoryRepo.get_trades_by_status(
+        status.upper(), limit=limit
+    )
+    return {"trades": trades}
+
+@router.get("/trades/stats/summary")
+async def get_trading_stats():
+    return TradeHistoryRepo.get_trading_stats()
+
+@router.get("/trades/date-range")
+async def get_trades_by_date_range(start_date: str, end_date: str):
+    try:
+        trades = TradeHistoryRepo.get_trades_by_date_range(start_date, end_date)
+        return {
+            "trades": trades,
+            "date_range": {
+                "start_date": start_date,
+                "end_date": end_date
+            }
+        }
+    except ValueError as e:
+        raise HTTPException(400, f"Invalid date format: {e}")
+
+
+# ============================================================
+# DEBUG ENDPOINTS
+# ============================================================
+@router.get("/debug/positions")
+async def debug_positions():
+    return {
+        "open_positions": position_manager.get_open_count(),
+        "active_positions": position_manager.active_positions
+    }
+
+@router.get("/debug/bot")
+async def debug_bot():
+    return {
+        "bot_running": trading_bot.running,
+        "strategies": [s.name for s in trading_bot.strategies],
+        "symbol": settings.SYMBOL,
+        "trade_amount": settings.TRADE_AMOUNT
+    }
+
+
+# ============================================================
+# PERFORMANCE + RISK METRICS
+# ============================================================
+@router.get("/performance/metrics")
+async def get_performance_metrics():
+    return trading_bot.get_bot_metrics()
+
+@router.get("/risk/metrics")
+async def get_risk_metrics():
+    return trading_bot.risk.get_risk_metrics()
+
+@router.post("/risk/reset")
+async def reset_risk():
+    trading_bot.risk.reset_streak()
+    return {"status": "Risk streaks reset"}
+
+
+# ============================================================
+# STRATEGY PERFORMANCE
+# ============================================================
+@router.get("/strategies/performance")
+async def get_strategies_performance():
+    return trading_bot.strategy_performance
+
+
+# ============================================================
+# ML CONSENSUS STATUS
+# ============================================================
+@router.get("/ml/status")
+async def get_ml_status():
+    return {
+        "ml_enabled": settings.ML_CONSENSUS_ENABLED,
+        "model_trained": trading_bot.consensus.ml_consensus.is_trained,
+        "training_samples": len(trading_bot.consensus.ml_consensus.training_data)
+    }
+
+
+# ============================================================
+# RECOVERY SYSTEM ENDPOINTS
+# ============================================================
+@router.post("/recovery/reset")
+async def reset_recovery():
+    trading_bot.risk.reset_streak()
+    return {
+        "status": "Recovery system reset",
+        "next_amount": trading_bot.risk.get_next_trade_amount()
+    }
+
+@router.get("/recovery/status")
+async def get_recovery_status():
+    return trading_bot.risk.get_recovery_metrics()
+
+@router.get("/recovery/simulate")
+async def simulate_recovery(
+    initial_loss: float = 10.0,
+    max_streak: int = 3
+):
+    sequence = trading_bot.risk.simulate_recovery_sequence(
+        initial_loss, max_streak
+    )
+    return {
+        "simulation": sequence,
+        "settings": {
+            "recovery_mode": settings.RECOVERY_MODE,
+            "multiplier": settings.RECOVERY_MULTIPLIER,
+            "max_streak": settings.MAX_RECOVERY_STREAK,
+            "smart_recovery": settings.SMART_RECOVERY
+        }
+    }
+
+@router.post("/recovery/configure")
+async def configure_recovery(
+    enabled: bool = None,
+    multiplier: float = None,
+    max_streak: int = None,
+    smart: bool = None,
+    mode: str = None
+):
+    risk = trading_bot.risk
+
+    if enabled is not None:
+        risk.recovery_enabled = enabled
+
+    if multiplier is not None and 1.0 <= multiplier <= 5.0:
+        risk.recovery_multiplier = multiplier
+
+    if max_streak is not None and 1 <= max_streak <= 10:
+        risk.max_recovery_streak = max_streak
+
+    if smart is not None:
+        risk.smart_recovery = smart
+
+    if mode in ["MARTINGALE", "FIBONACCI"]:
+        risk.recovery_mode = mode
+
+    return {
+        "status": "Recovery configuration updated",
+        "current": risk.get_recovery_metrics()
+    }
+
+@router.post("/trades/manual-settle/{trade_id}")
+async def manual_settle_trade(trade_id: str, result: str = None, payout: float = None):
+    """Manually settle a stuck trade"""
+    db = SessionLocal()
+    try:
+        trade = db.query(Trade).filter(Trade.id == trade_id).first()
+        if not trade:
+            raise HTTPException(404, "Trade not found")
+        
+        # If result not provided, determine based on payout
+        if result is None:
+            if payout is None:
+                result = "LOST"
+                payout = 0.0
+            else:
+                result = "WON" if payout > 0 else "LOST"
+        
+        # Update trade
+        trade.status = result
+        trade.updated_at = datetime.utcnow() if hasattr(trade, "updated_at") else None
+        
+        # Update contract if exists
+        contract = db.query(Contract).filter(Contract.trade_id == trade_id).first()
+        if contract:
+            contract.profit = payout
+            contract.is_sold = "1"
+            contract.sell_time = datetime.utcnow()
+        
+        db.commit()
+        
+        # Update risk manager and performance
+        from src.trading.order_executor import order_executor
+        from src.trading.performance import performance
+        
+        order_executor.risk.update_trade_outcome(result, trade.amount)
+        profit = payout - trade.amount if payout is not None else -trade.amount
+        performance.add_trade({
+            "id": trade_id,
+            "symbol": trade.symbol,
+            "side": trade.side,
+            "amount": trade.amount,
+            "profit": profit,
+            "result": result,
+            "closed_at": datetime.utcnow()
+        })
+        
+        return {
+            "status": "Trade manually settled",
+            "trade_id": trade_id,
+            "result": result,
+            "payout": payout
+        }
+    finally:
+        db.close()
+
+@router.post("/trades/auto-settle-expired")
+async def auto_settle_expired_trades():
+    """Automatically settle trades that should have expired"""
+    db = SessionLocal()
+    try:
+        cutoff = datetime.utcnow() - timedelta(minutes=3)
+        expired_trades = db.query(Trade).filter(
+            Trade.status == "ACTIVE",
+            Trade.created_at < cutoff
+        ).all()
+        
+        settled = []
+        for trade in expired_trades:
+            trade.status = "LOST"
+            contract = db.query(Contract).filter(Contract.trade_id == trade.id).first()
+            if contract:
+                contract.profit = 0.0
+                contract.is_sold = "1"
+                contract.sell_time = datetime.utcnow()
+            
+            from src.trading.order_executor import order_executor
+            from src.trading.performance import performance
+            
+            order_executor.risk.update_trade_outcome("LOST", trade.amount)
+            performance.add_trade({
+                "id": trade.id,
+                "symbol": trade.symbol,
+                "side": trade.side,
+                "amount": trade.amount,
+                "profit": -trade.amount,
+                "result": "LOST",
+                "closed_at": datetime.utcnow()
+            })
+            
+            settled.append(trade.id)
+            logger.info(f"Auto-settled expired trade {trade.id} as LOST")
+        
+        db.commit()
+        
+        from src.trading.position_manager import position_manager
+        for contract_id in list(position_manager.active_positions.keys()):
+            pos = position_manager.active_positions.get(contract_id)
+            if pos and pos.get("trade_id") in settled:
+                position_manager.mark_closed(contract_id, "LOST", 0)
+        
+        return {
+            "settled_count": len(settled),
+            "settled_trades": settled
+        }
+    finally:
+        db.close()

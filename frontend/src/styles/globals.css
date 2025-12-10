@@ -1,0 +1,6 @@
+/* frontend/src/styles/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Your existing global styles from index.css can go here */

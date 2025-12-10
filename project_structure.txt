@@ -1,0 +1,170 @@
+# project structure
+
+deriv-trading-suite/
+├── backend/                    (Python FastAPI backend)
+│   ├── src/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── api/
+│   │   │   ├── __init__.py
+│   │   │   ├── routes.py
+│   │   │   ├── websocket.py
+│   │   │   └── middleware.py
+│   │   ├── config/
+│   │   │   ├── __init__.py
+│   │   │   ├── settings.py
+│   │   │   └── strategies.py
+│   │   ├── core/
+│   │   │   ├── __init__.py
+│   │   │   ├── deriv_api.py
+│   │   │   ├── signal_consensus.py
+│   │   │   └── risk_manager.py
+│   │   ├── indicators/
+│   │   │   ├── __init__.py
+│   │   │   ├── technical.py
+│   │   │   ├── volatility.py
+│   │   │   └── sentiment.py
+│   │   ├── strategies/
+│   │   │   ├── __init__.py
+│   │   │   ├── base_strategy.py
+│   │   │   ├── mean_reversion.py
+│   │   │   ├── breakout.py
+│   │   │   └── momentum.py
+│   │   ├── trading/
+│   │   │   ├── __init__.py
+│   │   │   ├── position_manager.py
+│   │   │   ├── order_executor.py
+│   │   │   ├── bot.py
+│   │   │   └── performance.py
+│   │   ├── db/
+│   │   │   ├── __init__.py
+│   │   │   ├── models/
+│   │   │   |   ├── __init__.py
+│   │   │   |   ├── contract.py
+│   │   │   |   ├── trade.py
+│   │   │   |   └── proposal.py
+│   │   │   ├── repository/
+│   │   │   |   ├── __init__.py
+│   │   │   |   ├── contract_repo.py
+│   │   │   |   ├── trade_repo.py
+│   │   │   |   └── proposal_repo.py
+│   │   │   ├── base.py
+│   │   │   └── session.py
+│   │   └── utils/
+│   │       ├── __init__.py
+│   │       ├── logger.py
+│   │       ├── helpers.py
+│   │       └── data_processor.py
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── test_indicators.py
+│   │   ├── test_strategies.py
+│   │   └── test_consensus.py
+│   ├── data/
+│   │   ├── historical/
+│   │   └── realtime/
+│   ├── logs/
+│   ├── requirements.txt
+│   ├── config.json
+│   └── README.md
+├── frontend/                   (ReactJS frontend)
+│   ├── public/
+│   │   ├── favicon.ico
+│   │   └── manifest.json
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── Dashboard/
+│   │   │   │   ├── StatCards.jsx
+│   │   │   │   ├── BotControls.jsx
+│   │   │   │   ├── SignalIndicator.jsx
+│   │   │   │   ├── Dashboard.css
+│   │   │   │   └── index.js
+│   │   │   ├── Trading/
+│   │   │   │   ├── TradingChart.jsx
+│   │   │   │   ├── TradeControls.jsx
+│   │   │   │   └── index.js
+│   │   │   ├── Layout/
+│   │   │   │   ├── MainLayout.jsx
+│   │   │   │   ├── Footer.jsx
+│   │   │   │   └── index.js
+│   │   │   ├── Analytics/
+│   │   │   │   ├── PerformanceChart.jsx
+│   │   │   │   ├── SignalAnalysis.jsx
+│   │   │   │   └── index.js
+│   │   │   ├── Settings/
+│   │   │   │   ├── TradingSettings/
+│   │   │   │   │   ├── TradeLimits.jsx
+│   │   │   │   │   ├── RiskParameters.jsx
+│   │   │   │   │   └── index.js
+│   │   │   │   ├── NotificationSettings/
+│   │   │   │   │   ├── Alerts.jsx
+│   │   │   │   │   ├── EmailNotifications.jsx
+│   │   │   │   │   └── index.js
+│   │   │   │   ├── AccountSettings/
+│   │   │   │   │   ├── Profile.jsx
+│   │   │   │   │   ├── APIKeys.jsx
+│   │   │   │   │   └── index.js
+│   │   │   │   └── index.js
+│   │   │   ├── Common/
+│   │   │   │   ├── Header.jsx
+│   │   │   │   ├── Sidebar.jsx
+│   │   │   │   ├── LoadingSpinner.jsx
+│   │   │   │   └── index.js
+│   │   │   ├── Charts/
+│   │   │   │   ├── CandlestickChart.jsx
+│   │   │   │   ├── OHLCChart.jsx
+│   │   │   │   └── index.js
+│   │   │   └── Widgets/
+│   │   │       ├── BalanceWidget.jsx
+│   │   │       ├── MarketStatusWidget.jsx
+│   │   │       ├── SignalWidget.jsx
+│   │   │       └── index.js
+│   │   ├── pages/
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── Trading.jsx
+│   │   │   ├── Analytics.jsx
+│   │   │   ├── Settings.jsx
+│   │   │   └── index.js
+│   │   ├── services/
+│   │   │   ├── api.js
+│   │   │   ├── websocket.js
+│   │   │   └── derivService.js
+│   │   ├── hooks/
+│   │   │   ├── useWebSocket.js
+│   │   │   ├── useTrading.js
+│   │   │   ├── useMarketData.js
+│   │   │   └── index.js
+│   │   ├── context/
+│   │   │   ├── TradingContext.jsx
+│   │   │   ├── AppContext.jsx
+│   │   │   └── index.js
+│   │   ├── utils/
+│   │   │   ├── constants.js
+│   │   │   ├── formatters.js
+│   │   │   └── helpers.js
+│   │   ├── styles/
+│   │   │   ├── globals.css
+│   │   │   ├── variables.css
+│   │   │   └── components.css
+│   │   ├── App.jsx
+│   │   ├── App.css
+│   │   ├── main.jsx
+│   │   └── index.css
+│   ├── package.json
+│   ├── eslint.config.js
+│   ├── postcss.config.js
+│   ├── tailwind.config.js
+│   ├── index.html
+│   ├── vite.config.js (or webpack.config.js)
+│   └── README.md
+├── shared/                     (Shared types and utilities)
+│   ├── types.js
+│   └── constants.js
+├── docs/
+│   ├── api.md
+│   └── deployment.md
+├── docker-compose.yml
+├── Dockerfile.backend
+├── Dockerfile.frontend
+├── package.json (root for scripts)
+└── README.md
