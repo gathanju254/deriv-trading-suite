@@ -1,11 +1,11 @@
 // frontend/src/pages/Analytics.jsx
 import React from 'react';
-import PerformanceChart from '../components/Analytics/PerformanceChart/PerformanceChart';
-import SignalAnalysis from '../components/Analytics/SignalAnalysis/SignalAnalysis';
-import RecoveryMetrics from '../components/Analytics/RecoveryMetrics/RecoveryMetrics';
-import TradingHistory from '../components/Analytics/TradingHistory/TradingHistory';
-import LoadingSpinner from '../components/Common/LoadingSpinner';
-import { useTrading } from '../context/TradingContext';
+import PerformanceChart from '../../components/Analytics/PerformanceChart/PerformanceChart';
+import SignalAnalysis from '../../components/Analytics/SignalAnalysis/SignalAnalysis';
+import RecoveryMetrics from '../../components/Analytics/RecoveryMetrics/RecoveryMetrics';
+import TradingHistory from '../../components/Analytics/TradingHistory/TradingHistory';
+import LoadingSpinner from '../../components/Common/LoadingSpinner/LoadingSpinner';
+import { useTrading } from '../../context/TradingContext';
 import './Analytics.css';
 
 const Analytics = () => {

@@ -1,1 +1,358 @@
 /* frontend/src/components/Dashboard/SignalIndicator/SignalIndicator.css */
+/* frontend/src/components/Dashboard/SignalIndicator/SignalIndicator.css */
+
+.signal-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Signal Strength Section */
+.signal-strength {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.strength-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.strength-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.strength-header span {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.sentiment-bullish {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.sentiment-bearish {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.sentiment-neutral {
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Strength Meter */
+.strength-meter {
+  margin-bottom: 24px;
+}
+
+.meter-background {
+  height: 8px;
+  background: linear-gradient(to right, #ef4444, #94a3b8, #10b981);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* Strength Stats */
+.strength-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 8px;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.stat-value.bullish {
+  color: #10b981;
+}
+
+.stat-value.bearish {
+  color: #ef4444;
+}
+
+/* Signals List */
+.signals-list {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.signals-list h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin-bottom: 16px;
+}
+
+.no-signals {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #94a3b8;
+}
+
+.no-signals svg {
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+/* Signals Grid */
+.signals-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.signal-card {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-left: 4px solid;
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.signal-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.signal-buy {
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.signal-sell {
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.signal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.signal-direction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.direction-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.signal-buy .direction-text {
+  color: #10b981;
+}
+
+.signal-sell .direction-text {
+  color: #ef4444;
+}
+
+.signal-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.signal-symbol {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.signal-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Signal Body */
+.signal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.signal-message {
+  font-size: 0.875rem;
+  color: #f8fafc;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.signal-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.signal-price {
+  display: flex;
+  flex-direction: column;
+}
+
+.price-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.price-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+/* Confidence Bar */
+.signal-confidence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confidence-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.confidence-bar {
+  width: 60px;
+  height: 4px;
+  background-color: #374151;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.confidence-value {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #f8fafc;
+  min-width: 30px;
+  text-align: right;
+}
+
+/* Signal Actions */
+.signal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.action-follow {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(21, 128, 61, 0.3));
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.action-follow:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(21, 128, 61, 0.4));
+  transform: translateY(-2px);
+}
+
+.action-clear {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.3));
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.action-clear:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.4));
+  transform: translateY(-2px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .strength-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .signal-details {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .signal-actions {
+    flex-direction: column;
+  }
+}

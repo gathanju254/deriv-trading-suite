@@ -1,8 +1,9 @@
 // frontend/src/pages/Dashboard.jsx
+// frontend/src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useTrading } from '../../context/TradingContext';
 import { useToast } from '../../context/ToastContext';
-import LoadingSpinner from '../Common/LoadingSpinner';
+import LoadingSpinner from '../../components/Common/LoadingSpinner/LoadingSpinner';
 import { 
   RefreshCw, 
   Activity, 
@@ -15,8 +16,12 @@ import {
   StopCircle,
   Zap
 } from 'lucide-react';
-import StatCards from './StatCards/StatCards';
-import BotControls from './BotControls/BotControls';
+import StatCards from '../../components/Dashboard/StatCards/StatCards';
+import BotControls from '../../components/Dashboard/BotControls/BotControls';
+import MarketOverview from '../../components/Dashboard/MarketOverview/MarketOverview';
+import RecentTrades from '../../components/Dashboard/RecentTrades/RecentTrades';
+import StrategyPerformance from '../../components/Dashboard/StrategyPerformance/StrategyPerformance';
+import SignalIndicator from '../../components/Dashboard/SignalIndicator/SignalIndicator';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -31,7 +36,9 @@ const Dashboard = () => {
     startBot,
     stopBot,
     performance,
-    marketData 
+    marketData,
+    signals,
+    tradeHistory
   } = useTrading();
   const { addToast } = useToast();
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -222,7 +229,7 @@ const Dashboard = () => {
                 </div>
               )}
             </div>
-            {/* Add your MarketOverview component here */}
+            <MarketOverview />
           </div>
 
           {/* Bot Controls Detailed */}
@@ -254,21 +261,24 @@ const Dashboard = () => {
                 </div>
               )}
             </div>
-            {/* Add your PerformanceChart component here */}
+            <StrategyPerformance />
           </div>
 
-          {/* Recent Signals */}
+          {/* Recent Signals & Trades */}
           <div className="dashboard-section">
             <div className="section-header">
               <h2>
                 <AlertCircle size={20} />
-                Recent Signals
+                Recent Activity
               </h2>
               <div className="signal-count">
-                {signals?.length || 0} active
+                {signals?.length || 0} signals
               </div>
             </div>
-            {/* Add your SignalIndicator component here */}
+            <div className="activity-grid">
+              <SignalIndicator />
+              <RecentTrades />
+            </div>
           </div>
         </div>
       </div>

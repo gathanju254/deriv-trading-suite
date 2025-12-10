@@ -9,7 +9,7 @@ import {
   Bot,
   Wallet
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../../../context/AppContext';
 import './Sidebar.css';
 
 const Sidebar = () => {

@@ -1,9 +1,9 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React from 'react';
-import Header from '../../components/Common/Header/Header';
-import Sidebar from '../../components/Common/Sidebar/Sidebar';
-import Footer from './Footer';
-import { useApp } from '../../context/AppContext';
+import Header from '../../../components/Common/Header/Header';
+import Sidebar from '../../../components/Common/Sidebar/Sidebar';
+import Footer from '../Footer/Footer';
+import { useApp } from '../../../context/AppContext';
 import './MainLayout.css';
 
 const MainLayout = ({ children }) => {

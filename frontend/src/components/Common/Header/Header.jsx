@@ -1,8 +1,8 @@
 // frontend/src/components/Common/Header/Header.jsx
 import React from 'react';
 import { Bell, Settings, User, Menu } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
-import { useTrading } from '../../context/TradingContext';
+import { useApp } from '../../../context/AppContext';
+import { useTrading } from '../../../context/TradingContext';
 import './Header.css';
 
 const Header = () => {

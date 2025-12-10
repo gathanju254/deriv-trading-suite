@@ -1,8 +1,8 @@
 // frontend/src/pages/Trading.jsx
 import React from 'react';
-import TradingChart from '../components/Trading/TradingChart/TradingChart';
-import TradeControls from '../components/Trading/TradeControls/TradeControls';
-import MarketOverview from '../components/Trading/MarketOverview/MarketOverview';
+import TradingChart from '../../components/Trading/TradingChart/TradingChart';
+import TradeControls from '../../components/Trading/TradeControls/TradeControls';
+import MarketOverview from '../../components/Trading/MarketOverview/MarketOverview';
 import './Trading.css';
 
 const Trading = () => {

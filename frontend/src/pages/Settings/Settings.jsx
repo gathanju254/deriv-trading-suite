@@ -1,13 +1,13 @@
 // frontend/src/pages/Settings.jsx
 import React, { useState } from 'react';
-import Alerts from '../components/Settings/NotificationSettings/Alerts';
-import EmailNotifications from '../components/Settings/NotificationSettings/EmailNotifications';
-import APIKeys from '../components/Settings/AccountSettings/APIKeys';
-import Profile from '../components/Settings/AccountSettings/ProfileSetting';
-import RiskParameters from '../components/Settings/TradingSettings/RiskParameters';
-import TradingLimits from '../components/Settings/TradingSettings/TradeLimits'; 
+import Alerts from '../../components/Settings/NotificationSettings/Alerts';
+import EmailNotifications from '../../components/Settings/NotificationSettings/EmailNotifications';
+import APIKeys from '../../components/Settings/AccountSettings/APIKeys';
+import Profile from '../../components/Settings/AccountSettings/ProfileSetting';
+import RiskParameters from '../../components/Settings/TradingSettings/RiskParameters';
+import TradingLimits from '../../components/Settings/TradingSettings/TradingLimits';
 import { Save, RefreshCw } from 'lucide-react';
-import { useToast } from '../context/ToastContext';
+import { useToast } from '../../context/ToastContext';
 import './Settings.css';
 
 const Settings = () => {
