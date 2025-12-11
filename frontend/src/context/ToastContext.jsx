@@ -1,5 +1,4 @@
 // frontend/src/context/ToastContext.jsx
-// frontend/src/context/ToastContext.jsx
 import React, { createContext, useContext, useState } from 'react';
 
 const ToastContext = createContext();

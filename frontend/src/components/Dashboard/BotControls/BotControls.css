@@ -1,10 +1,57 @@
 /* frontend/src/components/Dashboard/BotControls/BotControls.css */
 
+/* frontend/src/components/Dashboard/BotControls/BotControls.css */
+
+/* Main Container */
 .bot-controls {
   background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
   border: 1px solid rgba(148, 163, 184, 0.1);
   border-radius: 12px;
   padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Status Info */
+.bot-status-info {
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.status-label {
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+.status-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.status-running {
+  color: #22c55e;
+}
+
+.status-stopped {
+  color: #ef4444;
+}
+
+.session-start {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed rgba(148, 163, 184, 0.1);
 }
 
 /* Session Timer */
@@ -12,7 +59,6 @@
   background: rgba(15, 23, 42, 0.5);
   border-radius: 8px;
   padding: 1rem;
-  margin-bottom: 1rem;
   border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
@@ -69,90 +115,10 @@
   50% { opacity: 0.5; }
 }
 
-/* Session Stats */
-.session-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: rgba(15, 23, 42, 0.5);
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.1);
-  transition: all 0.3s ease;
-}
-
-.stat-item:hover {
-  transform: translateY(-2px);
-  border-color: rgba(148, 163, 184, 0.3);
-  background: rgba(15, 23, 42, 0.7);
-}
-
-.stat-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  font-weight: 600;
-}
-
-.stat-icon.win {
-  background: rgba(34, 197, 94, 0.2);
-  color: #22c55e;
-}
-
-.stat-icon.loss {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
-}
-
-.stat-icon.total {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
-}
-
-.stat-icon.pnl {
-  background: rgba(168, 85, 247, 0.2);
-  color: #a855f7;
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  margin-bottom: 0.25rem;
-}
-
-.stat-value {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #f8fafc;
-}
-
-.stat-value.positive {
-  color: #22c55e;
-}
-
-.stat-value.negative {
-  color: #ef4444;
-}
-
-/* Controls */
+/* Control Buttons */
 .controls-container {
   display: flex;
   gap: 1rem;
-  margin-bottom: 1.5rem;
 }
 
 .control-btn {
@@ -171,6 +137,7 @@
   min-height: 44px;
 }
 
+/* Start Button */
 .btn-start {
   background: linear-gradient(135deg, #22c55e, #16a34a);
   color: white;
@@ -183,6 +150,7 @@
   box-shadow: 0 6px 20px rgba(34, 197, 94, 0.3);
 }
 
+/* Stop Button */
 .btn-stop {
   background: linear-gradient(135deg, #ef4444, #dc2626);
   color: white;
@@ -195,6 +163,7 @@
   box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
 }
 
+/* Reset Button */
 .btn-reset {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
@@ -207,57 +176,15 @@
   box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
 }
 
+/* Disabled */
 .control-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none !important;
 }
 
-/* Status Info */
-.bot-status-info {
-  padding-top: 1.5rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
-}
-
-.status-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.status-label {
-  font-size: 0.875rem;
-  color: #94a3b8;
-}
-
-.status-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.status-running {
-  color: #22c55e;
-}
-
-.status-stopped {
-  color: #ef4444;
-}
-
-.session-start {
-  font-size: 0.75rem;
-  color: #64748b;
-  margin-top: 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px dashed rgba(148, 163, 184, 0.1);
-}
-
-/* Responsive Design */
+/* Mobile */
 @media (max-width: 768px) {
-  .session-stats {
-    grid-template-columns: 1fr;
-  }
-  
   .controls-container {
     flex-direction: column;
   }

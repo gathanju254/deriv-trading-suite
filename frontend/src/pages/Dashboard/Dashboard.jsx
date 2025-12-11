@@ -1,5 +1,4 @@
 // frontend/src/pages/Dashboard.jsx
-// frontend/src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { useTrading } from '../../context/TradingContext';
 import { useToast } from '../../context/ToastContext';
@@ -8,13 +7,12 @@ import {
   RefreshCw, 
   Activity, 
   TrendingUp, 
-  AlertCircle,
   BarChart3,
   DollarSign,
   Clock,
-  Play,
-  StopCircle,
-  Zap
+  Zap,
+  Settings,
+  Bell
 } from 'lucide-react';
 import StatCards from '../../components/Dashboard/StatCards/StatCards';
 import BotControls from '../../components/Dashboard/BotControls/BotControls';
@@ -33,8 +31,6 @@ const Dashboard = () => {
     refreshPerformance,
     refreshTradeHistory,
     lastUpdateTime,
-    startBot,
-    stopBot,
     performance,
     marketData,
     signals,
@@ -47,7 +43,6 @@ const Dashboard = () => {
   useEffect(() => {
     if (autoRefresh) {
       const interval = setInterval(() => {
-        // Increment progress bar
         setRefreshProgress(prev => {
           if (prev >= 100) {
             refreshAllData();
@@ -55,7 +50,7 @@ const Dashboard = () => {
           }
           return prev + 1;
         });
-      }, 300); // Update progress every 300ms for 30 second total
+      }, 300);
 
       return () => {
         clearInterval(interval);
@@ -84,14 +79,6 @@ const Dashboard = () => {
     }
   };
 
-  const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
-
   const formatTimeSince = (timestamp) => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
     if (seconds < 60) return `${seconds}s ago`;
@@ -109,115 +96,76 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard">
-      {/* Header */}
-      <div className="dashboard-header">
-        <div className="header-main">
-          <h1>Trading Dashboard</h1>
-          <div className="header-subtitle">
-            <div className={`status-badge ${botStatus}`}>
+      {/* Top Bar - Status and Quick Actions */}
+      <div className="dashboard-top-bar">
+        <div className="top-bar-left">
+          <div className="dashboard-title">
+            <h1>Trading Dashboard</h1>
+            <div className="connection-status">
+              <div className={`status-dot status-${wsConnectionStatus}`} />
+              <span>{wsConnectionStatus === 'connected' ? 'Live Data' : wsConnectionStatus}</span>
+            </div>
+          </div>
+          <div className="status-indicators">
+            <div className={`status-indicator ${botStatus}`}>
               <Activity size={14} />
               <span>Bot: {botStatus}</span>
             </div>
-            <div className={`status-badge ${wsConnectionStatus}`}>
-              <Zap size={14} />
-              <span>WS: {wsConnectionStatus}</span>
+            <div className="status-indicator market-status">
+              <TrendingUp size={14} />
+              <span>Market: {marketData.symbol || 'R_100'}</span>
             </div>
           </div>
         </div>
 
-        <div className="header-controls">
-          {/* Bot Controls */}
-          <div className="bot-controls-quick">
-            <button
-              className={`btn btn-${botStatus === 'running' ? 'danger' : 'success'}`}
-              onClick={botStatus === 'running' ? stopBot : startBot}
-              disabled={loading}
-            >
-              {botStatus === 'running' ? (
-                <>
-                  <StopCircle size={16} />
-                  Stop Bot
-                </>
-              ) : (
-                <>
-                  <Play size={16} />
-                  Start Bot
-                </>
-              )}
+        <div className="top-bar-right">
+          <div className="quick-actions">
+            <button className="action-btn" title="Notifications">
+              <Bell size={18} />
             </button>
-          </div>
-
-          {/* Refresh Controls */}
-          <div className="refresh-controls">
-            <div className="last-update">
-              <Clock size={14} />
-              <span>Updated: {formatTimeSince(lastUpdateTime)}</span>
-            </div>
-            
-            <div className="refresh-options">
-              <div className="auto-refresh-toggle">
-                <input
-                  type="checkbox"
-                  id="auto-refresh"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                  disabled={loading}
-                />
-                <label htmlFor="auto-refresh">Auto-refresh</label>
-                {autoRefresh && (
-                  <div className="progress-bar">
-                    <div 
-                      className="progress-fill"
-                      style={{ width: `${refreshProgress}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="refresh-buttons">
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleManualRefresh('performance')}
-                  disabled={loading}
-                  title="Refresh performance only"
-                >
-                  <BarChart3 size={14} />
-                  Perf
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleManualRefresh('trades')}
-                  disabled={loading}
-                  title="Refresh trades only"
-                >
-                  <DollarSign size={14} />
-                  Trades
-                </button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => handleManualRefresh('all')}
-                  disabled={loading}
-                >
-                  <RefreshCw size={14} className={loading ? 'spinning' : ''} />
-                  Refresh All
-                </button>
-              </div>
+            <button className="action-btn" title="Settings">
+              <Settings size={18} />
+            </button>
+            <div className="refresh-indicator">
+              <button
+                className="refresh-btn"
+                onClick={() => handleManualRefresh('all')}
+                disabled={loading}
+                title="Refresh all data"
+              >
+                <RefreshCw size={16} className={loading ? 'spinning' : ''} />
+              </button>
+              <span className="last-update-text">
+                Updated {formatTimeSince(lastUpdateTime)}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="stats-overview">
-        <StatCards />
-      </div>
+      {/* Main Content */}
+      <div className="dashboard-main">
+        {/* Left Column - Controls and Market */}
+        <div className="dashboard-left-column">
+          {/* Quick Stats Row */}
+          <div className="quick-stats-row">
+            <StatCards />
+          </div>
 
-      {/* Main Content Grid */}
-      <div className="dashboard-grid">
-        <div className="dashboard-column">
+          {/* Bot Controls Card */}
+          <div className="dashboard-card">
+            <div className="card-header">
+              <h2>
+                <Activity size={20} />
+                Trading Controls
+              </h2>
+            </div>
+            <BotControls />
+          </div>
+
           {/* Market Overview */}
-          <div className="dashboard-section">
-            <div className="section-header">
+          <div className="dashboard-card">
+            <div className="card-header">
               <h2>
                 <TrendingUp size={20} />
                 Market Overview
@@ -225,58 +173,50 @@ const Dashboard = () => {
               {marketData.lastPrice && (
                 <div className="current-price">
                   <span>${parseFloat(marketData.lastPrice).toFixed(4)}</span>
-                  <span className="price-symbol">{marketData.symbol || 'R_100'}</span>
                 </div>
               )}
             </div>
             <MarketOverview />
           </div>
-
-          {/* Bot Controls Detailed */}
-          <div className="dashboard-section">
-            <div className="section-header">
-              <h2>
-                <Activity size={20} />
-                Trading Controls
-              </h2>
-              <div className={`control-status ${botStatus}`}>
-                {botStatus === 'running' ? 'Active' : 'Stopped'}
-              </div>
-            </div>
-            <BotControls />
-          </div>
         </div>
 
-        <div className="dashboard-column">
-          {/* Performance Chart */}
-          <div className="dashboard-section">
-            <div className="section-header">
+        {/* Right Column - Performance and Activity */}
+        <div className="dashboard-right-column">
+          {/* Performance Summary */}
+          <div className="dashboard-card performance-card">
+            <div className="card-header">
               <h2>
                 <BarChart3 size={20} />
-                Performance
+                Strategy Performance
               </h2>
               {performance.win_rate !== undefined && (
                 <div className="performance-badge">
-                  Win Rate: {performance.win_rate?.toFixed(1) || '0.0'}%
+                  {performance.win_rate?.toFixed(1) || '0.0'}% Win Rate
                 </div>
               )}
             </div>
             <StrategyPerformance />
           </div>
 
-          {/* Recent Signals & Trades */}
-          <div className="dashboard-section">
-            <div className="section-header">
-              <h2>
-                <AlertCircle size={20} />
-                Recent Activity
-              </h2>
-              <div className="signal-count">
-                {signals?.length || 0} signals
+          {/* Recent Activity Row */}
+          <div className="activity-row">
+            <div className="dashboard-card">
+              <div className="card-header">
+                <h2>Market Signals</h2>
+                <div className="signal-count">
+                  {signals?.length || 0} active
+                </div>
               </div>
-            </div>
-            <div className="activity-grid">
               <SignalIndicator />
+            </div>
+
+            <div className="dashboard-card">
+              <div className="card-header">
+                <h2>Recent Trades</h2>
+                <div className="trade-count">
+                  {tradeHistory?.length || 0} total
+                </div>
+              </div>
               <RecentTrades />
             </div>
           </div>
