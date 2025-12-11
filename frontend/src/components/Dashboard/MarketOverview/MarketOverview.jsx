@@ -1,95 +1,96 @@
 // frontend/src/components/Dashboard/MarketOverview/MarketOverview.jsx
-// frontend/src/components/Dashboard/MarketOverview/MarketOverview.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useTrading } from '../../../context/TradingContext';
-import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity, BarChart3, Zap, Shield } from 'lucide-react';
 import './MarketOverview.css';
 
 const MarketOverview = () => {
   const { marketData, wsConnectionStatus } = useTrading();
   const [priceHistory, setPriceHistory] = useState([]);
-  const [marketStats, setMarketStats] = useState({
-    volatility: 0,
-    volume: 0,
-    bidAskSpread: 0,
-    trend: 'neutral'
-  });
-
-  // Simulate price history data
-  useEffect(() => {
-    if (marketData.lastPrice) {
-      const newPrice = {
-        price: parseFloat(marketData.lastPrice),
-        timestamp: Date.now()
-      };
-      
-      setPriceHistory(prev => {
-        const updated = [...prev, newPrice].slice(-20); // Keep last 20 prices
-        return updated;
-      });
-    }
-  }, [marketData.lastPrice]);
-
-  // Calculate market stats
-  useEffect(() => {
-    if (priceHistory.length > 1) {
-      const prices = priceHistory.map(p => p.price);
-      const latestPrice = prices[prices.length - 1];
-      const previousPrice = prices[prices.length - 2];
-      
-      // Calculate price change percentage
-      const priceChange = ((latestPrice - previousPrice) / previousPrice) * 100;
-      
-      // Calculate volatility (simplified)
-      const volatility = calculateVolatility(prices);
-      
-      // Calculate average volume (mock)
-      const volume = 1000000 + Math.random() * 500000;
-      
-      // Calculate bid-ask spread (mock)
-      const spread = 0.0001 + Math.random() * 0.0002;
-      
-      // Determine trend
-      let trend = 'neutral';
-      if (priceChange > 0.5) trend = 'bullish';
-      else if (priceChange < -0.5) trend = 'bearish';
-      
-      setMarketStats({
-        priceChange: parseFloat(priceChange.toFixed(4)),
-        volatility: parseFloat(volatility.toFixed(6)),
-        volume: Math.floor(volume),
-        bidAskSpread: parseFloat(spread.toFixed(6)),
-        trend
-      });
-    }
-  }, [priceHistory]);
-
-  const calculateVolatility = (prices) => {
+  
+  // Move calculateVolatility BEFORE marketStats (was below useMemo)
+  const calculateVolatility = useCallback((prices) => {
     if (prices.length < 2) return 0;
     
     const returns = [];
     for (let i = 1; i < prices.length; i++) {
-      const returnValue = (prices[i] - prices[i - 1]) / prices[i - 1];
-      returns.push(returnValue);
+      if (prices[i - 1] !== 0) {
+        const returnValue = (prices[i] - prices[i - 1]) / prices[i - 1];
+        returns.push(returnValue);
+      }
     }
+    
+    if (returns.length === 0) return 0;
     
     const mean = returns.reduce((sum, val) => sum + val, 0) / returns.length;
     const variance = returns.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / returns.length;
-    return Math.sqrt(variance) * 100; // Annualized percentage
-  };
-
-  const formatVolume = (volume) => {
-    if (volume >= 1000000) {
-      return `${(volume / 1000000).toFixed(2)}M`;
-    } else if (volume >= 1000) {
-      return `${(volume / 1000).toFixed(2)}K`;
-    }
-    return volume.toFixed(0);
-  };
-
-  const renderMiniChart = () => {
+    return Math.sqrt(variance) * 100;
+  }, []);
+  
+  // Use marketStats after calculateVolatility is defined
+  const marketStats = useMemo(() => {
     if (priceHistory.length < 2) {
-      return <div className="mini-chart-placeholder">No data yet</div>;
+      return {
+        priceChange: 0,
+        volatility: 0,
+        volume: 0,
+        bidAskSpread: 0.00015, // Default spread
+        trend: 'neutral'
+      };
+    }
+
+    const prices = priceHistory.map(p => p.price);
+    const latestPrice = prices[prices.length - 1];
+    const previousPrice = prices[prices.length - 2];
+    
+    // Safely calculate price change
+    const priceChange = previousPrice !== 0 ? 
+      ((latestPrice - previousPrice) / previousPrice) * 100 : 0;
+    
+    // Calculate volatility
+    const volatility = calculateVolatility(prices);
+    
+    // Determine trend with more nuanced thresholds
+    let trend = 'neutral';
+    if (priceChange > 0.3) trend = 'bullish';
+    else if (priceChange < -0.3) trend = 'bearish';
+    
+    return {
+      priceChange: parseFloat(priceChange.toFixed(4)),
+      volatility: parseFloat(volatility.toFixed(4)),
+      volume: Math.floor(1500000 + Math.random() * 1000000), // Simulated volume
+      bidAskSpread: 0.0001 + Math.random() * 0.0002,
+      trend
+    };
+  }, [priceHistory]);
+
+  // Update price history - optimized to prevent infinite loops
+  useEffect(() => {
+    if (marketData.lastPrice !== undefined) {
+      const newPrice = parseFloat(marketData.lastPrice);
+      if (!isNaN(newPrice)) {
+        setPriceHistory(prev => {
+          // Avoid adding duplicate prices in quick succession
+          const lastEntry = prev[prev.length - 1];
+          if (lastEntry && Math.abs(lastEntry.price - newPrice) < 0.00001) {
+            return prev; // Price hasn't changed meaningfully
+          }
+          
+          const updated = [...prev, { 
+            price: newPrice, 
+            timestamp: Date.now() 
+          }].slice(-30); // Keep last 30 prices for smoother chart
+          
+          return updated;
+        });
+      }
+    }
+  }, [marketData.lastPrice]);
+
+  // Memoize chart rendering
+  const renderMiniChart = useMemo(() => {
+    if (priceHistory.length < 2) {
+      return <div className="mini-chart-placeholder">Awaiting live data...</div>;
     }
 
     const prices = priceHistory.map(p => p.price);
@@ -98,7 +99,7 @@ const MarketOverview = () => {
     const priceRange = maxPrice - minPrice || 1;
 
     return (
-      <svg className="mini-chart" width="100%" height="50">
+      <svg className="mini-chart" width="100%" height="50" aria-label="Price trend chart">
         {prices.map((price, index) => {
           if (index === 0) return null;
           
@@ -107,108 +108,158 @@ const MarketOverview = () => {
           const y1 = 100 - ((prices[index - 1] - minPrice) / priceRange * 90);
           const y2 = 100 - ((price - minPrice) / priceRange * 90);
           
-          const color = price > prices[index - 1] ? '#10b981' : '#ef4444';
+          const isPositive = price >= prices[index - 1];
+          const color = isPositive ? '#10b981' : '#ef4444';
           
           return (
             <line
-              key={index}
+              key={`chart-line-${index}`}
               x1={`${x1}%`}
               y1={`${y1}%`}
               x2={`${x2}%`}
               y2={`${y2}%`}
               stroke={color}
-              strokeWidth="2"
+              strokeWidth={isPositive ? "2" : "1.5"}
+              strokeOpacity="0.8"
             />
           );
         })}
       </svg>
     );
+  }, [priceHistory]);
+
+  const formatVolume = (volume) => {
+    if (volume >= 1000000) {
+      return `${(volume / 1000000).toFixed(1)}M`;
+    } else if (volume >= 1000) {
+      return `${(volume / 1000).toFixed(1)}K`;
+    }
+    return volume.toFixed(0);
   };
+
+  const formatTime = (timestamp) => {
+    if (!timestamp) return '—';
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
+  };
+
+  const getMarketInsight = () => {
+    if (marketStats.trend === 'bullish') {
+      return { 
+        text: 'Bullish momentum building. Consider long positions with tight stops.',
+        icon: <TrendingUp size={14} />,
+        className: 'insight-bullish'
+      };
+    } else if (marketStats.trend === 'bearish') {
+      return { 
+        text: 'Bearish pressure detected. Watch for reversal signals.',
+        icon: <TrendingDown size={14} />,
+        className: 'insight-bearish'
+      };
+    }
+    return { 
+      text: 'Market consolidating. Await clearer directional signal.',
+      icon: <Activity size={14} />,
+      className: 'insight-neutral'
+    };
+  };
+
+  const insight = getMarketInsight();
 
   return (
     <div className="market-overview">
       <div className="market-header">
         <div className="market-title">
+          <BarChart3 size={18} />
           <h3>Market Overview</h3>
           <span className="market-symbol">{marketData.symbol || 'R_100'}</span>
         </div>
         <div className="connection-status">
-          <Activity size={12} className={`pulse-${wsConnectionStatus}`} />
-          <span className={`status-${wsConnectionStatus}`}>
+          <div className={`status-dot ${wsConnectionStatus}`} />
+          <span className={`status-text status-${wsConnectionStatus}`}>
             {wsConnectionStatus === 'connected' ? 'Live' : wsConnectionStatus}
           </span>
         </div>
       </div>
 
-      <div className="price-display">
-        <div className="current-price">
+      <div className="price-section">
+        <div className="price-primary">
           <span className="price-value">
             ${marketData.lastPrice ? parseFloat(marketData.lastPrice).toFixed(4) : '0.0000'}
           </span>
-          {marketStats.priceChange !== undefined && (
+          {marketStats.priceChange !== 0 && (
             <div className={`price-change ${marketStats.priceChange >= 0 ? 'positive' : 'negative'}`}>
-              {marketStats.priceChange >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-              <span>{Math.abs(marketStats.priceChange).toFixed(4)}%</span>
+              {marketStats.priceChange >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+              <span>{Math.abs(marketStats.priceChange).toFixed(2)}%</span>
             </div>
           )}
         </div>
-        <div className="market-trend">
-          <span className={`trend-indicator trend-${marketStats.trend}`}>
-            {marketStats.trend === 'bullish' ? <TrendingUp size={14} /> : 
-             marketStats.trend === 'bearish' ? <TrendingDown size={14} /> : '—'}
-            {marketStats.trend}
+        <div className="price-trend">
+          <span className={`trend-badge trend-${marketStats.trend}`}>
+            {marketStats.trend === 'bullish' ? <TrendingUp size={12} /> : 
+             marketStats.trend === 'bearish' ? <TrendingDown size={12} /> : <Activity size={12} />}
+            <span>{marketStats.trend}</span>
           </span>
         </div>
       </div>
 
       <div className="mini-chart-container">
-        {renderMiniChart()}
+        {renderMiniChart}
       </div>
 
-      <div className="market-stats">
-        <div className="stat-item">
-          <span className="stat-label">Volatility</span>
-          <span className="stat-value">{marketStats.volatility.toFixed(4)}%</span>
+      <div className="market-metrics">
+        <div className="metric-card">
+          <div className="metric-icon volatility">
+            <Zap size={14} />
+          </div>
+          <div className="metric-content">
+            <div className="metric-label">Volatility</div>
+            <div className="metric-value">{marketStats.volatility.toFixed(2)}%</div>
+          </div>
         </div>
-        <div className="stat-item">
-          <span className="stat-label">Volume</span>
-          <span className="stat-value">{formatVolume(marketStats.volume)}</span>
+        
+        <div className="metric-card">
+          <div className="metric-icon volume">
+            <Activity size={14} />
+          </div>
+          <div className="metric-content">
+            <div className="metric-label">24h Volume</div>
+            <div className="metric-value">{formatVolume(marketStats.volume)}</div>
+          </div>
         </div>
-        <div className="stat-item">
-          <span className="stat-label">Spread</span>
-          <span className="stat-value">{marketStats.bidAskSpread.toFixed(6)}</span>
+        
+        <div className="metric-card">
+          <div className="metric-icon spread">
+            <Shield size={14} />
+          </div>
+          <div className="metric-content">
+            <div className="metric-label">Spread</div>
+            <div className="metric-value">{marketStats.bidAskSpread.toFixed(5)}</div>
+          </div>
         </div>
-        <div className="stat-item">
-          <span className="stat-label">Last Update</span>
-          <span className="stat-value">
-            {marketData.timestamp ? 
-              new Date(marketData.timestamp * 1000).toLocaleTimeString([], { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
-              }) : '—'}
-          </span>
+        
+        <div className="metric-card">
+          <div className="metric-icon time">
+            <span>🕒</span>
+          </div>
+          <div className="metric-content">
+            <div className="metric-label">Last Update</div>
+            <div className="metric-value">{formatTime(marketData.timestamp)}</div>
+          </div>
         </div>
       </div>
 
-      <div className="market-insights">
-        <h4>Market Insights</h4>
-        <div className="insights-content">
-          {marketStats.trend === 'bullish' ? (
-            <p className="insight-bullish">
-              <TrendingUp size={14} />
-              Strong bullish momentum detected. Consider long positions with proper risk management.
-            </p>
-          ) : marketStats.trend === 'bearish' ? (
-            <p className="insight-bearish">
-              <TrendingDown size={14} />
-              Bearish pressure observed. Short opportunities may be present, watch for reversals.
-            </p>
-          ) : (
-            <p className="insight-neutral">
-              Market showing consolidation. Wait for breakout confirmation before entering positions.
-            </p>
-          )}
+      <div className="market-insight">
+        <div className="insight-header">
+          <h4>Market Insight</h4>
+          <span className="insight-source">AI Analysis</span>
+        </div>
+        <div className={`insight-content ${insight.className}`}>
+          {insight.icon}
+          <p>{insight.text}</p>
         </div>
       </div>
     </div>

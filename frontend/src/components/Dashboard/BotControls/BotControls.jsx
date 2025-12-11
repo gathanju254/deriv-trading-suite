@@ -1,157 +1,221 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTrading } from '../../../context/TradingContext';
-import { useToast } from '../../../context/ToastContext';
-import { Play, StopCircle, RotateCcw, Clock, Activity } from 'lucide-react';
 import './BotControls.css';
 
 const BotControls = () => {
-  const { botStatus, startBot, stopBot, loading } = useTrading();
-  const { addToast } = useToast();
-  
-  const [sessionTime, setSessionTime] = useState(0);
-  const [isCounting, setIsCounting] = useState(false);
-  const timerRef = useRef(null);
-  const sessionStartTimeRef = useRef(null);
+  const {
+    botStatus,
+    loading,
+    startBot,
+    stopBot,
+    wsConnectionStatus,
+    refreshPerformance
+  } = useTrading();
 
-  // Format time display
-  const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
-  // Handle bot start
-  const handleStart = async () => {
-    try {
-      await startBot();
-      setIsCounting(true);
-      sessionStartTimeRef.current = Date.now();
-      addToast('🚀 Trading bot started', 'success');
-    } catch (error) {
-      console.error('Start bot error:', error);
-      addToast('❌ Failed to start bot', 'error');
-    }
-  };
-
-  // Handle bot stop
-  const handleStop = async () => {
-    try {
-      await stopBot();
-      setIsCounting(false);
-      addToast('✅ Trading bot stopped', 'success');
-    } catch (error) {
-      console.error('Stop bot error:', error);
-      addToast('❌ Failed to stop bot', 'error');
-    }
-  };
-
-  // Handle reset
-  const handleReset = () => {
-    setSessionTime(0);
-    setIsCounting(false);
-    sessionStartTimeRef.current = null;
-    addToast('🔄 Session timer reset', 'info');
-  };
-
-  // Timer effect
-  useEffect(() => {
-    if (isCounting) {
-      timerRef.current = setInterval(() => {
-        setSessionTime(prev => prev + 1);
-      }, 1000);
+  // Utility to show temporary messages
+  const showMessage = useCallback((message, type = 'success') => {
+    if (type === 'success') {
+      setSuccessMessage(message);
+      setError(null);
     } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      setError(message);
+      setSuccessMessage(null);
     }
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [isCounting]);
+    setTimeout(() => {
+      setSuccessMessage(null);
+      setError(null);
+    }, 3000);
+  }, []);
 
-  // Sync with bot status
-  useEffect(() => {
-    if (botStatus === 'running' && !isCounting) {
-      setIsCounting(true);
-      if (!sessionStartTimeRef.current) {
-        sessionStartTimeRef.current = Date.now();
+  // Start bot
+  const handleStartBot = useCallback(async () => {
+    try {
+      setError(null);
+      setSuccessMessage(null);
+
+      if (wsConnectionStatus !== 'connected') {
+        showMessage('⚠️ WebSocket not connected. Attempting to reconnect...', 'error');
+        return;
       }
-    } else if (botStatus === 'stopped' && isCounting) {
-      setIsCounting(false);
+
+      await startBot();
+      showMessage('✅ Trading bot started successfully!', 'success');
+
+      setTimeout(() => refreshPerformance(), 500);
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.message || err.message || 'Failed to start bot';
+
+      showMessage(`❌ ${errorMsg}`, 'error');
+      console.error('Start bot error:', err);
     }
-  }, [botStatus, isCounting]);
+  }, [startBot, wsConnectionStatus, showMessage, refreshPerformance]);
+
+  // Stop bot
+  const handleStopBot = useCallback(async () => {
+    try {
+      setError(null);
+      setSuccessMessage(null);
+
+      await stopBot();
+      showMessage('✅ Trading bot stopped successfully!', 'success');
+
+      setTimeout(() => refreshPerformance(), 500);
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.message || err.message || 'Failed to stop bot';
+
+      showMessage(`❌ ${errorMsg}`, 'error');
+      console.error('Stop bot error:', err);
+    }
+  }, [stopBot, showMessage, refreshPerformance]);
+
+  // UI state
+  const isRunning = botStatus === 'running';
+  const wsConnected = wsConnectionStatus === 'connected';
+
+  const isStartDisabled =
+    isRunning || loading || wsConnectionStatus !== 'connected';
+
+  const isStopDisabled = !isRunning || loading;
 
   return (
-    <div className="bot-controls">
-      {/* Status Information */}
-      <div className="bot-status-info">
-        <div className="status-row">
-          <span className="status-label">Bot Status:</span>
-          <span className={`status-value status-${botStatus}`}>
-            {botStatus === 'running' ? '🟢 RUNNING' : '🔴 STOPPED'}
-          </span>
-        </div>
-        {sessionStartTimeRef.current && (
-          <div className="session-start">
-            ⏰ Session started: {new Date(sessionStartTimeRef.current).toLocaleTimeString()}
-          </div>
-        )}
-      </div>
-
-      {/* Session Timer */}
-      <div className="session-timer">
-        <div className="timer-header">
-          <Clock size={16} />
-          <span>Session Timer</span>
-        </div>
-        <div className="timer-display">
-          <span className="time">{formatTime(sessionTime)}</span>
-          <div className="timer-status">
-            <div className={`timer-dot ${isCounting ? 'active' : 'inactive'}`} />
-            <span>{isCounting ? 'Active' : 'Paused'}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Control Buttons */}
-      <div className="controls-container">
-        <button
-          className={`control-btn ${botStatus === 'running' ? 'btn-stop' : 'btn-start'}`}
-          onClick={botStatus === 'running' ? handleStop : handleStart}
-          disabled={loading}
+    <motion.div
+      className="bot-controls"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      {/* HEADER */}
+      <div className="controls-header">
+        <motion.h2
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
         >
-          {botStatus === 'running' ? (
+          🤖 Bot Control
+        </motion.h2>
+
+        <motion.div
+          className={`ws-status ${wsConnected ? 'connected' : 'disconnected'}`}
+          animate={{
+            scale: wsConnected ? 1 : 1,
+            opacity: 1
+          }}
+          transition={{ duration: 0.3 }}
+        >
+          <span className="status-dot" />
+          <span className="status-text">
+            {wsConnected ? '🟢 Connected' : '🔴 Disconnected'}
+          </span>
+        </motion.div>
+      </div>
+
+      {/* BOT STATUS PANEL */}
+      <motion.div
+        className={`status-display ${isRunning ? 'running' : 'stopped'}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <div className="status-label">Current Status:</div>
+        <div className="status-value">
+          {isRunning ? '▶️ RUNNING' : '⏹️ STOPPED'}
+        </div>
+      </motion.div>
+
+      {/* MESSAGES */}
+      <AnimatePresence mode="popLayout">
+        {error && (
+          <motion.div
+            className="message error-message"
+            role="alert"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.25 }}
+          >
+            {error}
+          </motion.div>
+        )}
+
+        {successMessage && (
+          <motion.div
+            className="message success-message"
+            role="alert"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.25 }}
+          >
+            {successMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* BUTTONS */}
+      <div className="button-group">
+        <motion.button
+          whileTap={{ scale: 0.94 }}
+          className={`btn btn-start ${isRunning ? 'disabled' : ''}`}
+          onClick={handleStartBot}
+          disabled={isStartDisabled}
+        >
+          {loading && isStartDisabled ? (
             <>
-              <StopCircle size={18} />
-              Stop Trading
+              <span className="spinner" />
+              Starting...
             </>
           ) : (
-            <>
-              <Play size={18} />
-              Start Trading
-            </>
+            '▶️ START BOT'
           )}
-        </button>
+        </motion.button>
 
-        <button
-          className="control-btn btn-reset"
-          onClick={handleReset}
-          disabled={loading || botStatus === 'running'}
-          title="Reset session timer"
+        <motion.button
+          whileTap={{ scale: 0.94 }}
+          className={`btn btn-stop ${!isRunning ? 'disabled' : ''}`}
+          onClick={handleStopBot}
+          disabled={isStopDisabled}
         >
-          <RotateCcw size={18} />
-          Reset Timer
-        </button>
+          {loading && isStopDisabled ? (
+            <>
+              <span className="spinner" />
+              Stopping...
+            </>
+          ) : (
+            '⏹️ STOP BOT'
+          )}
+        </motion.button>
       </div>
-    </div>
+
+      {/* WS WARNING */}
+      {!wsConnected && (
+        <motion.div
+          className="warning-box"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <strong>⚠️ Connection Warning:</strong><br />
+          WebSocket is disconnected. Bot cannot operate.
+        </motion.div>
+      )}
+
+      {/* INFO BOX — simplified */}
+      <motion.div
+        className="info-box"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <strong>ℹ️ Quick Info:</strong>
+        <ul>
+          <li>• Start begins automated trading</li>
+          <li>• Stop ends the current session</li>
+        </ul>
+      </motion.div>
+    </motion.div>
   );
 };
 
