@@ -130,23 +130,14 @@ class TradeHistoryRepo:
             # Calculate win rate
             win_rate = (won_trades / (won_trades + lost_trades)) * 100 if (won_trades + lost_trades) > 0 else 0
             
-            # Calculate total profit from contracts - FIXED
-            total_profit_result = db.query(
-                func.sum(
-                    case(
-                        # FIX: pass each (condition, value) pair as a positional argument, not a list
-                        (Contract.profit.isnot(None), Contract.profit),
-                        (Trade.status == "WON", Trade.amount * 0.95),
-                        (Trade.status == "LOST", -Trade.amount),
-                        else_=0
-                    )
-                )
-            ).join(Trade, Contract.trade_id == Trade.id).scalar()
-            total_profit = total_profit_result or 0
+            # Simplified and robust profit calculation:
+            # Sum contract.profit (use COALESCE to treat NULL as 0)
+            total_profit_result = db.query(func.sum(func.coalesce(Contract.profit, 0.0))).scalar()
+            total_profit = total_profit_result or 0.0
             
             # Calculate total invested amount
             total_invested_result = db.query(func.sum(Trade.amount)).scalar()
-            total_invested = total_invested_result or 0
+            total_invested = total_invested_result or 0.0
             
             # Calculate ROI
             roi = ((total_profit / total_invested) * 100) if total_invested > 0 else 0

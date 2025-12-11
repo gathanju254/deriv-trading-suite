@@ -70,10 +70,15 @@ export const derivService = {
     try {
       const response = await api.get('/performance/metrics');
       
+      console.log('🔍 RAW PERFORMANCE RESPONSE:', response.data); // DEBUG LOG
+      
       // Validate response structure
       if (!response.data) {
         throw new Error('No data received from performance endpoint');
       }
+      
+      // Log the exact field names received
+      console.log('🔍 AVAILABLE KEYS:', Object.keys(response.data));
       
       return response.data;
     } catch (error) {

@@ -169,7 +169,22 @@ async def debug_bot():
 # ============================================================
 @router.get("/performance/metrics")
 async def get_performance_metrics():
-    return trading_bot.get_bot_metrics()
+    """Get current bot performance metrics"""
+    try:
+        metrics = await trading_bot.get_bot_metrics()
+        return metrics
+    except Exception as e:
+        logger.error(f"Error getting performance metrics: {e}")
+        return {
+            "running": trading_bot.running if hasattr(trading_bot, 'running') else False,
+            "total_trades": 0,
+            "win_rate": 0,
+            "pnl": 0,
+            "sharpe_ratio": 0,
+            "total_profit": 0,
+            "completed_trades": 0,
+            "winning_trades": 0
+        }
 
 @router.get("/risk/metrics")
 async def get_risk_metrics():

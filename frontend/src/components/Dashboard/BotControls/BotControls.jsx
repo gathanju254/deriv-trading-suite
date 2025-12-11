@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTrading } from '../../../context/TradingContext';
 import { useToast } from '../../../context/ToastContext';
-import { Play, StopCircle, RotateCcw, Clock, Trophy, AlertTriangle, Activity } from 'lucide-react';
+import { Play, StopCircle, RotateCcw, Clock, Trophy, AlertTriangle, Activity, TrendingUp } from 'lucide-react';
 import './BotControls.css';
 
 const BotControls = () => {
@@ -13,26 +13,56 @@ const BotControls = () => {
   const [isCounting, setIsCounting] = useState(false);
   const timerRef = useRef(null);
   const sessionStartTimeRef = useRef(null);
+  const sessionTradesRef = useRef([]);
 
-  // Calculate session statistics
+  // Improved session statistics calculation with better timestamp handling
   const calculateSessionStats = () => {
-    if (!tradeHistory || tradeHistory.length === 0) return { wins: 0, losses: 0, total: 0, netPnl: 0 };
+    if (!tradeHistory || tradeHistory.length === 0) {
+      return { wins: 0, losses: 0, total: 0, netPnl: '0.00', winRate: 0 };
+    }
     
     const sessionTrades = tradeHistory.filter(trade => {
       if (!sessionStartTimeRef.current) return false;
-      const tradeTime = new Date(trade.timestamp || trade.time).getTime();
-      return tradeTime >= sessionStartTimeRef.current;
+      
+      // Handle multiple timestamp field names
+      const tradeTimestamp = trade.timestamp || trade.time || trade.created_at || Date.now();
+      const tradeTime = typeof tradeTimestamp === 'string' 
+        ? new Date(tradeTimestamp).getTime() 
+        : tradeTimestamp;
+      
+      return !isNaN(tradeTime) && tradeTime >= sessionStartTimeRef.current;
     });
     
-    const wins = sessionTrades.filter(trade => trade.result === 'WON' || trade.profit > 0).length;
-    const losses = sessionTrades.filter(trade => trade.result === 'LOST' || trade.profit < 0).length;
-    const netPnl = sessionTrades.reduce((sum, trade) => sum + (trade.profit || 0), 0);
+    // Update session trades ref for comparison
+    sessionTradesRef.current = sessionTrades;
+    
+    // Count wins and losses with multiple field name support
+    const wins = sessionTrades.filter(trade => {
+      const result = trade.result || trade.status;
+      const profit = trade.profit || trade.pnl || 0;
+      return result === 'WON' || profit > 0;
+    }).length;
+    
+    const losses = sessionTrades.filter(trade => {
+      const result = trade.result || trade.status;
+      const profit = trade.profit || trade.pnl || 0;
+      return result === 'LOST' || profit < 0;
+    }).length;
+    
+    const netPnl = sessionTrades.reduce((sum, trade) => {
+      return sum + (trade.profit || trade.pnl || 0);
+    }, 0);
+    
+    const sessionWinRate = sessionTrades.length > 0 
+      ? ((wins / sessionTrades.length) * 100).toFixed(1)
+      : 0;
     
     return {
       wins,
       losses,
       total: sessionTrades.length,
-      netPnl: netPnl.toFixed(2)
+      netPnl: netPnl.toFixed(2),
+      winRate: parseFloat(sessionWinRate)
     };
   };
 
@@ -54,9 +84,11 @@ const BotControls = () => {
       await startBot();
       setIsCounting(true);
       sessionStartTimeRef.current = Date.now();
-      addToast('Trading bot started', 'success');
+      sessionTradesRef.current = [];
+      addToast('🚀 Trading bot started', 'success');
     } catch (error) {
-      addToast('Failed to start bot', 'error');
+      console.error('Start bot error:', error);
+      addToast('❌ Failed to start bot', 'error');
     }
   };
 
@@ -67,12 +99,13 @@ const BotControls = () => {
       setIsCounting(false);
       const stats = calculateSessionStats();
       addToast(
-        `Session ended - ${stats.total} trades | Net P&L: $${stats.netPnl}`,
-        'info',
-        4000
+        `✅ Session ended - ${stats.total} trades | Win Rate: ${stats.winRate}% | Net P&L: $${stats.netPnl}`,
+        'success',
+        5000
       );
     } catch (error) {
-      addToast('Failed to stop bot', 'error');
+      console.error('Stop bot error:', error);
+      addToast('❌ Failed to stop bot', 'error');
     }
   };
 
@@ -81,7 +114,8 @@ const BotControls = () => {
     setSessionTime(0);
     setIsCounting(false);
     sessionStartTimeRef.current = null;
-    addToast('Session timer reset', 'info');
+    sessionTradesRef.current = [];
+    addToast('🔄 Session timer reset', 'info');
   };
 
   // Timer effect
@@ -115,7 +149,14 @@ const BotControls = () => {
     }
   }, [botStatus, isCounting]);
 
+  // Get session stats
   const sessionStats = calculateSessionStats();
+  
+  // Get overall performance metrics with fallbacks
+  const overallWinRate = performance?.win_rate ?? performance?.win_percent ?? 0;
+  const totalProfit = performance?.total_profit ?? performance?.pnl ?? 0;
+  const sharpeRatio = performance?.sharpe_ratio ?? 0;
+  const totalTrades = performance?.total_trades ?? performance?.completed_trades ?? 0;
 
   return (
     <div className="bot-controls">
@@ -141,7 +182,7 @@ const BotControls = () => {
             <Trophy size={14} />
           </div>
           <div className="stat-content">
-            <div className="stat-label">Wins</div>
+            <div className="stat-label">Session Wins</div>
             <div className="stat-value">{sessionStats.wins}</div>
           </div>
         </div>
@@ -151,7 +192,7 @@ const BotControls = () => {
             <AlertTriangle size={14} />
           </div>
           <div className="stat-content">
-            <div className="stat-label">Losses</div>
+            <div className="stat-label">Session Losses</div>
             <div className="stat-value">{sessionStats.losses}</div>
           </div>
         </div>
@@ -161,7 +202,7 @@ const BotControls = () => {
             <Activity size={14} />
           </div>
           <div className="stat-content">
-            <div className="stat-label">Total</div>
+            <div className="stat-label">Session Total</div>
             <div className="stat-value">{sessionStats.total}</div>
           </div>
         </div>
@@ -171,10 +212,20 @@ const BotControls = () => {
             <span>$</span>
           </div>
           <div className="stat-content">
-            <div className="stat-label">Net P&L</div>
-            <div className={`stat-value ${sessionStats.netPnl >= 0 ? 'positive' : 'negative'}`}>
-              ${sessionStats.netPnl}
+            <div className="stat-label">Session P&L</div>
+            <div className={`stat-value ${parseFloat(sessionStats.netPnl) >= 0 ? 'positive' : 'negative'}`}>
+              {parseFloat(sessionStats.netPnl) >= 0 ? '+' : ''}{sessionStats.netPnl}
             </div>
+          </div>
+        </div>
+
+        <div className="stat-item">
+          <div className="stat-icon rate">
+            <TrendingUp size={14} />
+          </div>
+          <div className="stat-content">
+            <div className="stat-label">Session Win%</div>
+            <div className="stat-value">{sessionStats.winRate.toFixed(1)}%</div>
           </div>
         </div>
       </div>
@@ -210,23 +261,44 @@ const BotControls = () => {
         </button>
       </div>
 
+      {/* Overall Performance Summary */}
+      <div className="performance-summary">
+        <h4>Overall Performance</h4>
+        <div className="summary-grid">
+          <div className="summary-item">
+            <span className="summary-label">All-Time Trades:</span>
+            <span className="summary-value">{totalTrades}</span>
+          </div>
+          <div className="summary-item">
+            <span className="summary-label">Overall Win Rate:</span>
+            <span className="summary-value">
+              {(overallWinRate).toFixed(1)}%
+            </span>
+          </div>
+          <div className="summary-item">
+            <span className="summary-label">Total P&L:</span>
+            <span className={`summary-value ${totalProfit >= 0 ? 'positive' : 'negative'}`}>
+              ${(totalProfit).toFixed(2)}
+            </span>
+          </div>
+          <div className="summary-item">
+            <span className="summary-label">Sharpe Ratio:</span>
+            <span className="summary-value">{(sharpeRatio).toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Status Information */}
       <div className="bot-status-info">
         <div className="status-row">
           <span className="status-label">Bot Status:</span>
           <span className={`status-value status-${botStatus}`}>
-            {botStatus.toUpperCase()}
-          </span>
-        </div>
-        <div className="status-row">
-          <span className="status-label">Overall Win Rate:</span>
-          <span className="status-value">
-            {performance.win_rate?.toFixed(1) || '0.0'}%
+            {botStatus === 'running' ? '🟢 RUNNING' : '🔴 STOPPED'}
           </span>
         </div>
         {sessionStartTimeRef.current && (
           <div className="session-start">
-            Session started: {new Date(sessionStartTimeRef.current).toLocaleTimeString()}
+            ⏰ Session started: {new Date(sessionStartTimeRef.current).toLocaleTimeString()}
           </div>
         )}
       </div>

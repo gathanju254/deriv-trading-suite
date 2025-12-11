@@ -461,6 +461,51 @@ class TradingBot:
         logger.info(f"Recovery system reconfigured: {self.risk.get_recovery_metrics()}")
         return self.risk.get_recovery_metrics()
 
+    # ===============================================================
+    # ADDED METHOD FOR BOT METRICS
+    # ===============================================================
+    async def get_bot_metrics(self) -> Dict:
+        """Get current bot performance metrics"""
+        try:
+            from src.db.repositories.trade_history_repo import TradeHistoryRepo
+            from src.trading.performance import performance
+            
+            # Get trading stats from database
+            stats = TradeHistoryRepo.get_trading_stats()
+            
+            # Get performance tracker data
+            perf_data = performance.get_performance_summary()
+            
+            return {
+                "running": self.running,
+                "symbol": settings.SYMBOL,
+                "total_trades": stats.get("total_trades", 0),
+                "won_trades": stats.get("won_trades", 0),
+                "lost_trades": stats.get("lost_trades", 0),
+                "win_rate": stats.get("win_rate", 0),
+                "total_profit": stats.get("total_profit", 0),
+                "pnl": stats.get("total_profit", 0),  # Alias for frontend
+                "sharpe_ratio": perf_data.get("sharpe_ratio", 0),
+                "max_drawdown": perf_data.get("max_drawdown", 0),
+                "volatility": perf_data.get("volatility", 0),
+                "active_trades": position_manager.get_open_count(),
+                "daily_pnl": perf_data.get("daily_pnl", 0),
+                "monthly_pnl": perf_data.get("monthly_pnl", 0),
+                "avg_profit": perf_data.get("avg_profit", 0),
+                "completed_trades": stats.get("total_trades", 0),
+                "winning_trades": stats.get("won_trades", 0),
+                "avg_trade_duration": perf_data.get("avg_trade_duration", 0)
+            }
+        except Exception as e:
+            logger.error(f"Error getting bot metrics: {e}")
+            return {
+                "running": self.running,
+                "total_trades": 0,
+                "win_rate": 0,
+                "pnl": 0,
+                "sharpe_ratio": 0
+            }
+
 
 # Singleton bot instance
 trading_bot = TradingBot()

@@ -1,5 +1,8 @@
 # backend/requirements.txt
 
+
+fastapi>=0.100.0
+uvicorn>=0.23.0
 Django>=4.2,<5.0
 websocket-client>=1.8.0
 pandas==2.2.3

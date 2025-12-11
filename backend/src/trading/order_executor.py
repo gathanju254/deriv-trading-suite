@@ -132,9 +132,21 @@ class OrderExecutor:
     async def _handle_contract_update(self, data):
         logger.debug(f"Received contract update: {data}")
 
+        # Extract contract ID from multiple possible fields
         contract_id = str(data.get("id") or data.get("contract_id"))
         if not contract_id:
+            logger.warning(f"No contract ID in update: {data}")
             return
+
+        # If position_manager provides an 'is_cleaned' helper, skip duplicates
+        is_cleaned_fn = getattr(position_manager, "is_cleaned", None)
+        if callable(is_cleaned_fn):
+            try:
+                if position_manager.is_cleaned(contract_id):
+                    logger.debug(f"Contract {contract_id} already cleaned, skipping")
+                    return
+            except Exception:
+                logger.exception("position_manager.is_cleaned check failed")
 
         # Try to find position by UUID or integer contract_id
         pos = position_manager.active_positions.get(contract_id)
@@ -166,39 +178,47 @@ class OrderExecutor:
             is_sold = True
         elif data.get("status") == "sold":
             is_sold = True
+        # IMPORTANT: Check for expired contracts (not just sold)
+        elif data.get("is_expired") == 1 or data.get("is_expired") is True:
+            is_sold = True
+            logger.info(f"🎯 CONTRACT EXPIRED: {contract_id}")
         elif data.get("status") == "won" or data.get("status") == "lost":
             is_sold = True
-        elif data.get("current_spot") and data.get("entry_tick"):
+        elif data.get("current_spot") and data.get("entry_tick") and data.get("date_expiry"):
             # Contract expired, check expiry time
-            if data.get("date_expiry"):
+            try:
                 expiry_time = datetime.fromtimestamp(int(data.get("date_expiry")))
-                if datetime.utcnow() > expiry_time:
+                if datetime.utcnow() >= expiry_time:
                     is_sold = True
-                    current = float(data.get("current_spot", 0))
-                    entry = float(data.get("entry_tick", 0))
-                    payout = 1.95 if (current > entry and data.get("contract_type") == "CALL") or (current < entry and data.get("contract_type") == "PUT") else 0
+                    logger.info(f"🎯 CONTRACT EXPIRED (time check): {contract_id}")
+            except Exception:
+                pass
 
         if is_sold:
             # Get payout from various possible fields
-            payout_fields = ["sell_price", "payout", "buy_price", "bid_price", "profit"]
+            payout_fields = ["payout", "profit", "sell_price", "buy_price", "bid_price"]
             for field in payout_fields:
                 if field in data and data[field] is not None:
                     try:
-                        payout = float(data[field])
+                        val = float(data[field])
+                        # For profit field, it's already net (buy_price - payout)
+                        if field == "profit":
+                            payout = data.get("buy_price", 0) + val  # Reconstruct payout
+                        else:
+                            payout = val
                         break
                     except (ValueError, TypeError):
                         continue
             
-            # If no payout found but we know it's sold, use default
-            if payout == 0 and "profit" in data and data["profit"] is not None:
-                try:
-                    payout = max(0, float(data["profit"]))
-                except (ValueError, TypeError):
-                    pass
-
-            result = "WON" if payout > 0 else "LOST"
+            # Determine result based on profit
+            profit = data.get("profit", 0)
+            try:
+                profit = float(profit)
+            except (ValueError, TypeError):
+                profit = 0
             
-            logger.info(f"🎯 Contract {contract_id} SETTLED: result={result}, payout={payout}")
+            result = "WON" if profit > 0 else "LOST"
+            logger.info(f"🎯 Contract {contract_id} SETTLED: result={result}, payout={payout}, profit={profit}")
 
             # Update contract DB record
             contract = ContractRepo.find(contract_id)

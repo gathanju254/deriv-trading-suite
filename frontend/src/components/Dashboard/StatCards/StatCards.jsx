@@ -1,5 +1,5 @@
 // frontend/src/components/Dashboard/StatCards/StatCards.jsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTrading } from '../../../context/TradingContext';
 import { 
   TrendingUp, 
@@ -7,56 +7,75 @@ import {
   DollarSign, 
   Percent,
   BarChart3,
-  Target,
-  Shield,
-  Clock
+  Target
 } from 'lucide-react';
 import './StatCards.css';
 
 const StatCards = () => {
   const { performance } = useTrading();
+  const [normalizedData, setNormalizedData] = useState({});
 
-  // Debug: inspect incoming performance object
-  console.debug('StatCards performance', performance);
+  useEffect(() => {
+    console.debug('📊 StatCards received performance:', performance);
 
-  // Normalize / fallback field names returned by backend / services
-  const totalProfit = performance?.total_profit ?? performance?.total_pnl ?? performance?.pnl ?? performance?.profit ?? 0;
-  const winRate = performance?.win_rate ?? performance?.winrate ?? performance?.winRatio ?? performance?.win_percent ?? 0;
-  const totalTrades = performance?.total_trades ?? performance?.totalTrades ?? performance?.trades ?? 0;
-  const sharpe = performance?.sharpe_ratio ?? performance?.sharpe ?? performance?.sharpeRatio ?? 0;
+    // Normalize data from backend response
+    // Try multiple field name variations
+    const normalized = {
+      totalProfit: 
+        performance?.total_profit ?? 
+        performance?.pnl ?? 
+        performance?.profit ?? 
+        0,
+      
+      winRate: 
+        performance?.win_rate ?? 
+        performance?.win_percent ?? 
+        0,
+      
+      totalTrades: 
+        performance?.total_trades ?? 
+        performance?.completed_trades ?? 
+        0,
+      
+      sharpeRatio: 
+        performance?.sharpe_ratio ?? 
+        performance?.sharpe ?? 
+        0
+    };
+
+    setNormalizedData(normalized);
+    
+    console.debug('📊 Normalized data:', normalized);
+  }, [performance]);
 
   const cards = [
     {
       id: 'total_profit',
       title: 'Total P&L',
-      value: `$${parseFloat(totalProfit).toFixed(2)}`,
+      value: `$${parseFloat(normalizedData.totalProfit || 0).toFixed(2)}`,
       icon: DollarSign,
-      color: totalProfit >= 0 ? 'green' : 'red',
-      change: null
+      color: (normalizedData.totalProfit || 0) >= 0 ? 'green' : 'red'
     },
     {
       id: 'win_rate',
       title: 'Win Rate',
-      value: `${parseFloat(winRate || 0).toFixed(1)}%`,
+      value: `${parseFloat(normalizedData.winRate || 0).toFixed(1)}%`,
       icon: Percent,
-      color: 'blue',
-      change: null
+      color: 'blue'
     },
     {
       id: 'total_trades',
       title: 'Total Trades',
-      value: totalTrades || '0',
+      value: normalizedData.totalTrades?.toString() || '0',
       icon: BarChart3,
-      color: 'purple',
-      change: null
+      color: 'purple'
     },
     {
       id: 'sharpe_ratio',
       title: 'Sharpe Ratio',
-      value: parseFloat(sharpe || 0).toFixed(2),
+      value: parseFloat(normalizedData.sharpeRatio || 0).toFixed(2),
       icon: Target,
-      color: 'orange',
-      change: null
+      color: 'orange'
     }
   ];
 
@@ -72,11 +91,6 @@ const StatCards = () => {
             <div className="stat-content">
               <h3>{card.title}</h3>
               <div className="stat-value">{card.value}</div>
-              {card.change !== null && (
-                <div className={`stat-change ${card.change >= 0 ? 'positive' : 'negative'}`}>
-                  {card.change >= 0 ? '+' : ''}{card.change}%
-                </div>
-              )}
             </div>
           </div>
         );
