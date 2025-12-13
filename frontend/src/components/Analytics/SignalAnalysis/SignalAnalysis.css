@@ -1,0 +1,184 @@
+/* SignalAnalysis.css - Styles for signal analysis component */
+/* Grid layout for analysis cards, consistent with design */
+
+:root {
+  --bg: rgba(15, 23, 42, 0.96);
+  --panel: rgba(30, 41, 59, 0.88);
+  --muted: #a5b4c8;
+  --text: #f8fafc;
+  --success: #10b981;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --glass: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(148, 163, 184, 0.08);
+  --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* Main container */
+.signal-analysis {
+  background: linear-gradient(135deg, var(--panel), rgba(8, 12, 20, 0.9));
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow-light);
+  transition: box-shadow 0.2s ease;
+  color: var(--text);
+  width: 100%;
+  max-width: 100%;
+}
+
+.signal-analysis:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+/* Header */
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.analysis-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+/* Analysis grid */
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.analysis-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), var(--glass));
+  border: 1px solid rgba(148, 163, 184, 0.04);
+  border-radius: 8px;
+  padding: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.analysis-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.analysis-card.bullish {
+  border-left: 4px solid var(--success);
+}
+
+.analysis-card.bearish {
+  border-left: 4px solid var(--danger);
+}
+
+.analysis-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--info);
+  margin-bottom: 8px;
+}
+
+.analysis-card.bullish .analysis-icon {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
+.analysis-card.bearish .analysis-icon {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.analysis-card.accuracy .analysis-icon {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.analysis-content {
+  flex: 1;
+}
+
+.analysis-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.analysis-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .signal-analysis {
+    padding: 16px;
+  }
+  
+  .analysis-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .analysis-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  
+  .analysis-card {
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .analysis-header h3 {
+    font-size: 1rem;
+  }
+  
+  .analysis-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .analysis-value {
+    font-size: 0.9rem;
+  }
+}
+
+/* Accessibility: High contrast mode */
+@media (prefers-contrast: high) {
+  .signal-analysis,
+  .analysis-card {
+    border-width: 2px;
+  }
+  
+  .analysis-card.bullish,
+  .analysis-card.bearish {
+    border-left-width: 6px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .signal-analysis,
+  .analysis-card {
+    transition: none;
+    transform: none !important;
+  }
+}

@@ -25,6 +25,7 @@ async def status():
 @router.get("/balance")
 async def balance():
     current_balance = await deriv.get_balance()
+    logger.info(f"Balance requested: {current_balance}")  # New: Log balance
     return {"balance": current_balance}
 
 @router.post("/manual/{side}")

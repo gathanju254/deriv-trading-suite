@@ -1,0 +1,320 @@
+/* TradingHistory.css - Styles for trading history table */
+/* Similar to RecentTrades.css but adapted for Analytics page */
+
+:root {
+  --bg: rgba(15, 23, 42, 0.96);
+  --panel: rgba(30, 41, 59, 0.88);
+  --muted: #a5b4c8;
+  --text: #f8fafc;
+  --success: #10b981;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --glass: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(148, 163, 184, 0.08);
+  --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* Main container */
+.trading-history {
+  background: linear-gradient(135deg, var(--panel), rgba(8, 12, 20, 0.9));
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow-light);
+  transition: box-shadow 0.2s ease;
+  color: var(--text);
+  width: 100%;
+  max-width: 100%;
+}
+
+.trading-history:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+/* Header */
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.history-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.history-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.history-summary span {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(71, 85, 105, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: var(--muted);
+}
+
+/* Stats section */
+.history-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.015), var(--glass));
+  border: 1px solid rgba(148, 163, 184, 0.04);
+  border-radius: 8px;
+  padding: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--info);
+  margin-bottom: 8px;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-value.positive {
+  color: var(--success);
+}
+
+.stat-value.negative {
+  color: var(--danger);
+}
+
+/* Table container */
+.history-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.history-table thead {
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.history-table th {
+  padding: 12px 16px;
+  text-align: left;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.history-table tbody tr {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  transition: background 0.15s ease;
+}
+
+.history-table tbody tr:hover {
+  background: rgba(51, 65, 85, 0.35);
+}
+
+.history-table td {
+  padding: 12px 16px;
+  color: var(--text);
+}
+
+/* Specific column widths */
+.history-table th:nth-child(1),
+.history-table td:nth-child(1) { min-width: 100px; } /* Date */
+
+.history-table th:nth-child(2),
+.history-table td:nth-child(2) { min-width: 80px; } /* Symbol */
+
+.history-table th:nth-child(3),
+.history-table td:nth-child(3) { min-width: 70px; } /* Side */
+
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) { min-width: 80px; } /* Amount */
+
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) { min-width: 80px; } /* Profit */
+
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) { min-width: 70px; } /* Status */
+
+/* Status styling */
+.status.won {
+  background: rgba(16, 185, 129, 0.18);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.status.lost {
+  background: rgba(239, 68, 68, 0.18);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Profit styling */
+.profit.positive {
+  color: var(--success);
+}
+
+.profit.negative {
+  color: var(--danger);
+}
+
+/* Side styling */
+.side.call {
+  color: var(--success);
+}
+
+.side.put {
+  color: var(--danger);
+}
+
+/* No history state */
+.no-history {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.no-history p {
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+/* Scrollbar */
+.history-table-container::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.history-table-container::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+.history-table-container::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .trading-history {
+    padding: 16px;
+  }
+  
+  .history-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .history-stats {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .history-table {
+    font-size: 0.8rem;
+  }
+  
+  .history-table th,
+  .history-table td {
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .history-header h3 {
+    font-size: 1rem;
+  }
+  
+  .history-summary {
+    gap: 8px;
+  }
+  
+  .history-summary span {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+  }
+  
+  .stat-value {
+    font-size: 0.9rem;
+  }
+}
+
+/* Accessibility: High contrast mode */
+@media (prefers-contrast: high) {
+  .trading-history,
+  .stat-card {
+    border-width: 2px;
+  }
+  
+  .status {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .trading-history,
+  .stat-card {
+    transition: none;
+    transform: none !important;
+  }
+}

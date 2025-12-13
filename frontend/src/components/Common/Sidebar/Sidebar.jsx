@@ -10,10 +10,12 @@ import {
   Wallet
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
+import { useTrading } from '../../../context/TradingContext'; // New: Import TradingContext
 import './Sidebar.css';
 
 const Sidebar = () => {
   const { sidebarCollapsed, mobileMenuOpen, toggleMobileMenu } = useApp();
+  const { balance } = useTrading();  // New: Access balance from context
 
   const menuItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
@@ -76,7 +78,7 @@ const Sidebar = () => {
           <div className="balance-widget">
             <Wallet size={16} />
             {!sidebarCollapsed && (
-              <span className="balance-text">Loading...</span>
+              <span className="balance-text">{`$${balance.toFixed(2)}`}</span>
             )}
           </div>
         </div>

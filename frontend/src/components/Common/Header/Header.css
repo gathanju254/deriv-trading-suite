@@ -10,6 +10,7 @@
   position: sticky;
   top: 0;
   z-index: 100;
+  transition: padding 0.3s ease; /* Smooth transition for responsive padding */
 }
 
 .header-left {
@@ -18,8 +19,24 @@
   gap: 12px;
 }
 
+/* Mobile: Show menu button, hide sidebar toggle */
 .menu-button {
   display: none;
+  background: none;
+  border: none;
+  color: #f8fafc;
+  cursor: pointer;
+  padding: 12px; /* Larger touch target */
+  border-radius: 8px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.menu-button:hover {
+  background-color: #374151;
+}
+
+.menu-button:active {
+  transform: scale(0.95); /* Subtle feedback on tap */
 }
 
 .sidebar-toggle {
@@ -30,94 +47,26 @@
   border: none;
   color: #f8fafc;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 6px;
-  transition: background-color 0.2s;
+  padding: 12px; /* Larger touch target */
+  border-radius: 8px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
 }
 
 .sidebar-toggle:hover {
   background-color: #374151;
 }
 
-.header-center {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.sidebar-toggle:active {
+  transform: scale(0.95); /* Subtle feedback on tap */
 }
 
-.status-indicators {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.status-indicator {
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.status-indicator::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.status-connected {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.status-connected::before {
-  background-color: #10b981;
-}
-
-.status-connecting {
-  background-color: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-.status-connecting::before {
-  background-color: #3b82f6;
-}
-
-.status-disconnected {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.status-disconnected::before {
-  background-color: #ef4444;
-}
-
-.reconnect-button {
-  background-color: #3b82f6;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.reconnect-button:hover {
-  background-color: #2563eb;
-}
+/* Removed: header-center styles since the section is gone */
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0; /* Prevent shrinking on small screens */
 }
 
 .icon-button {
@@ -128,31 +77,95 @@
   border: none;
   color: #f8fafc;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 6px;
-  transition: background-color 0.2s;
+  padding: 12px; /* Larger touch target for mobile */
+  border-radius: 8px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  min-width: 44px; /* Minimum touch target size for accessibility */
+  min-height: 44px;
 }
 
 .icon-button:hover {
   background-color: #374151;
 }
 
+.icon-button:active {
+  transform: scale(0.95); /* Subtle feedback on tap */
+}
+
+.icon-button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Mobile-specific enhancements */
 @media (max-width: 768px) {
+  .header {
+    padding: 12px 16px; /* Reduced padding for more space */
+    height: auto; /* Allow flexible height */
+    min-height: 60px; /* Minimum height to prevent cramping */
+  }
+
   .menu-button {
-    display: flex;
+    display: flex; /* Show on mobile */
   }
-  
+
   .sidebar-toggle {
-    display: none;
+    display: none; /* Hide on mobile */
   }
-  
-  .header-center {
-    flex: 1;
-    justify-content: center;
+
+  .header-left {
+    gap: 8px; /* Tighter gap */
   }
-  
-  .status-indicators {
-    flex-wrap: wrap;
-    justify-content: center;
+
+  .header-right {
+    gap: 4px; /* Tighter gap to fit more buttons */
+    flex-wrap: wrap; /* Allow wrapping if needed */
+    justify-content: flex-end;
+  }
+
+  .icon-button {
+    padding: 10px; /* Slightly smaller but still touch-friendly */
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .header {
+    padding: 8px 12px;
+  }
+
+  .header-right {
+    gap: 2px; /* Minimal gap */
+  }
+
+  .icon-button {
+    padding: 8px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .header {
+    border-bottom-width: 2px;
+  }
+
+  .menu-button,
+  .sidebar-toggle,
+  .icon-button {
+    border: 1px solid #f8fafc;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .menu-button,
+  .sidebar-toggle,
+  .icon-button {
+    transition: none;
+    transform: none !important;
   }
 }

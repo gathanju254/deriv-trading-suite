@@ -138,6 +138,17 @@ export const derivService = {
       console.error('Error getting market data:', error);
       return {};
     }
+  },
+
+  async getBalance() {
+    try {
+      const response = await api.get('/balance');
+      console.log('🔍 Raw balance response:', response.data);  // New: Debug log
+      return response.data;
+    } catch (error) {
+      console.error('Error getting balance:', error);
+      throw error;
+    }
   }
 };
 

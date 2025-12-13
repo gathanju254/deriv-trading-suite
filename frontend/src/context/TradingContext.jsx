@@ -22,6 +22,7 @@ export const TradingProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [marketData, setMarketData] = useState({});
   const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
+  const [balance, setBalance] = useState(0);  // New: Balance state
   
   // Refs to prevent unnecessary state updates
   const tradeHistoryRef = useRef([]);
@@ -158,6 +159,18 @@ export const TradingProvider = ({ children }) => {
     }
   };
 
+  // New: Function to refresh balance
+  const refreshBalance = async () => {
+    try {
+      const balanceData = await derivService.getBalance();
+      setBalance(balanceData.balance || 0);
+    } catch (error) {
+      console.error('Failed to refresh balance:', error);
+      setBalance(0);  // Fallback to 0 on error
+    }
+  };
+
+  // Update refreshAllData to include balance
   const refreshAllData = async () => {
     setLoading(true);
     try {
@@ -166,7 +179,8 @@ export const TradingProvider = ({ children }) => {
         derivService.getPerformance(),
         derivService.getTradeHistory(),
         derivService.getSignals(),
-        derivService.getBotMetrics()
+        derivService.getBotMetrics(),
+        refreshBalance()  // New: Fetch balance in parallel
       ]);
       
       // Only update if data has changed
@@ -215,11 +229,13 @@ export const TradingProvider = ({ children }) => {
     // Initialize WebSocket
     const cleanup = initWebSocket();
     
-    // Set up less frequent periodic refresh (5 minutes instead of 30 seconds)
-    const interval = setInterval(refreshAllData, 5 * 60 * 1000);
+    // Set up more frequent balance refresh (30 seconds instead of 5 minutes)
+    const balanceInterval = setInterval(refreshBalance, 30 * 1000);  // New: Refresh balance every 30 seconds
+    const fullRefreshInterval = setInterval(refreshAllData, 5 * 60 * 1000);  // Keep full refresh less frequent
     
     return () => {
-      clearInterval(interval);
+      clearInterval(balanceInterval);  // New: Clear balance interval
+      clearInterval(fullRefreshInterval);
       websocketService.disconnect();
       if (cleanup && typeof cleanup.then === 'function') {
         cleanup.then(fn => fn && fn());
@@ -247,6 +263,7 @@ export const TradingProvider = ({ children }) => {
     loading,
     marketData,
     lastUpdateTime,
+    balance,  // New: Expose balance
     startBot,
     stopBot,
     refreshAllData,

@@ -105,6 +105,10 @@
 
 .balance-text {
   transition: opacity 0.3s ease;
+  font-weight: 600;  /* New: Make balance text bolder for emphasis */
+  font-size: 0.9rem;  /* New: Slightly larger for readability */
+  color: #10b981;  /* New: Success green to indicate positive balance (matches app's green theme) */
+  font-family: 'SF Mono', monospace;  /* New: Monospace for currency alignment */
 }
 
 .sidebar.collapsed .balance-text {
@@ -134,6 +138,10 @@
     opacity: 1;
     width: auto;
     overflow: visible;
+  }
+
+  .balance-text {
+    font-size: 0.8rem;  /* New: Slightly smaller on mobile for fit */
   }
 }
 
