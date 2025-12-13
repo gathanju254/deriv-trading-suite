@@ -1,6 +1,8 @@
 import asyncio
 import time
 from typing import Dict
+from collections import deque
+from datetime import datetime
 
 from src.core.deriv_api import deriv
 from src.utils.logger import logger
@@ -67,154 +69,224 @@ class TradingBot:
             for strat in self.strategies
         }
 
+        # Signal storage (last 50 signals)
+        self.signal_history = []  # Already exists, but we'll populate it now
+        self.signal_counter = 0
+
     # ===============================================================
     # 📡 TICK HANDLER
     # ===============================================================
     async def _tick_handler(self, msg: Dict):
-        if "tick" not in msg:
-            return
-
-        # ---- Tick Throttle ----
-        now = asyncio.get_event_loop().time()
-        if now - self._last_tick_time < self.min_tick_interval:
-            return
-        self._last_tick_time = now
-
-        tick = msg["tick"]
-        price = float(tick["quote"])
-
-        # ===========================================================
-        # 1. ENHANCED MARKET ANALYZER (avoid bad conditions)
-        # ===========================================================
-        market_status = self.market_analyzer.analyze_market(price)
-        if not market_status["tradable"]:
-            logger.info(f"⛔ Market not tradable → {market_status['reason']} | Regime: {market_status.get('regime', 'UNKNOWN')}")
-            return
-
-        # ===========================================================
-        # 2. TIME FILTER — avoid back-to-back trades
-        # ===========================================================
-        if time.time() - self.last_trade_time < self.min_trade_interval:
-            return
-
-        # ===========================================================
-        # 3. STRATEGY SIGNAL EXTRACTION
-        # ===========================================================
-        signals = []
-        for strat in self.strategies:
-            try:
-                sig = strat.on_tick(tick)
-                if sig:
-                    sig["meta"]["strategy"] = strat.name
-                    signals.append(sig)
-
-                    if sig["side"] == "CALL":
-                        self.strategy_performance[strat.name]["calls"] += 1
-                    else:
-                        self.strategy_performance[strat.name]["puts"] += 1
-
-            except Exception:
-                logger.exception(f"Strategy error in {strat.name}")
-
-        # ===========================================================
-        # DEBUG: Log extracted signals
-        # ===========================================================
-        if signals:
-            logger.info(f"📡 {len(signals)} SIGNALS DETECTED:")
-            for i, sig in enumerate(signals):
-                logger.info(f"   {i+1}. {sig['side']} @ {sig['score']:.3f} from {sig['meta']['strategy']}")
-        else:
-            logger.info("📡 No signals from strategies")
-
-        # ===========================================================
-        # 4. CONSENSUS (ML + Traditional)
-        # ===========================================================
-        consensus = self.consensus.aggregate(signals, price)
-
-        # ===========================================================
-        # DEBUG: Log consensus results
-        # ===========================================================
-        if consensus:
-            logger.info(f"✅ CONSENSUS PASSED → {consensus}")
-        else:
-            logger.info(f"❌ CONSENSUS FAILED - No consensus from {len(signals)} signals")
-            if signals:
-                logger.info("Signal details:")
-                for sig in signals:
-                    logger.info(f"   - {sig['side']} @ {sig['score']} from {sig['meta']['strategy']}")
-            return
-
-        # Require strong consensus
-        if consensus.get("sources", 0) < 1:
-            return
-        if consensus["score"] < 0.65:  # HIGHER THRESHOLD = fewer, safer trades
-            return
-
-        logger.info(f"✅ CONSENSUS OK → {consensus} | Market Regime: {market_status.get('regime')}")
-
-        # ===========================================================
-        # 5. RISK MANAGER CHECKS
-        # ===========================================================
+        """Enhanced tick handler with signal generation and storage"""
         try:
-            balance = await deriv.get_balance()
-        except Exception:
-            logger.exception("Failed to get balance")
-            return
+            if "tick" not in msg:
+                return
 
-        trade_amount = self.risk.get_next_trade_amount()
+            symbol = msg["tick"].get("symbol")
+            price = msg["tick"].get("quote")
 
-        # Get recovery status for logging
-        recovery_metrics = self.risk.get_recovery_metrics()
-        
-        # Log recovery status if active
-        if settings.RECOVERY_ENABLED and recovery_metrics["recovery_streak"] > 0:
-            logger.info(f"🟡 Recovery active: using recovery amount ${trade_amount:.2f}")
-        else:
-            logger.info(f"🟢 Normal mode: using base trade amount ${trade_amount:.2f}")
+            if not symbol or price is None:
+                return
 
-        if not self.risk.allow_trade(position_manager.get_open_count(), balance):
-            logger.info("⛔ RiskManager blocked trade")
-            return
-
-        # ===========================================================
-        # 6. EXECUTE TRADE
-        # ===========================================================
-        side = consensus["side"]
-        logger.info(
-            f"🚀 EXECUTING TRADE: side={side}, amount={trade_amount}, "
-            f"method={consensus.get('method')}, regime={market_status.get('regime')}"
-        )
-
-        try:
-            trade_id = await order_executor.place_trade(
-                side=side,
-                amount=trade_amount,
-                symbol=settings.SYMBOL
+            # Get consensus signal
+            signal = self.consensus.generate_consensus_signal(
+                self.strategies, symbol, price
             )
 
-            # Save consensus snapshot with market context
-            order_executor.trades[trade_id]["consensus_data"] = {
-                "method": consensus.get("method"),
-                "signals_count": len(signals),
-                "traditional_score": consensus.get("traditional_score", 0),
-                "ml_score": consensus.get("ml_score", 0),
-                "strategy_breakdown": {s.name: 0 for s in self.strategies},
-                "signals": signals,
-                "market_regime": market_status.get("regime"),
-                "volatility": market_status.get("volatility"),
-                "trend_strength": market_status.get("trend_strength"),
-                "recovery_data": recovery_metrics if settings.RECOVERY_ENABLED else None
-            }
+            if signal and signal.get("direction"):
+                # Store the signal with metadata
+                signal_record = {
+                    "id": f"sig_{self.signal_counter}_{int(datetime.utcnow().timestamp())}",
+                    "direction": signal["direction"],  # "BUY", "SELL", or "HOLD"
+                    "symbol": symbol,
+                    "price": price,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "message": signal.get("reason", "No reason provided"),
+                    "confidence": signal.get("confidence", 0.5),
+                    "strength": signal.get("strength", 50)
+                }
+                
+                self.signal_history.append(signal_record)
+                self.signal_counter += 1
+                
+                logger.info(f"Signal generated: {signal_record['direction']} @ {price}")
+                
+                # Broadcast signal via WebSocket
+                from src.api.websocket import ws_manager
+                await ws_manager.broadcast({
+                    "type": "signal",
+                    "data": signal_record
+                })
 
+        except Exception as e:
+            logger.error(f"Error in tick handler: {e}")
+
+    async def _tick_handler(self, msg: Dict):
+        """Handle incoming tick data and execute trades"""
+        try:
+            price = float(msg.get("quote", 0))
+            symbol = msg.get("symbol", settings.SYMBOL)
+            
+            # ===========================================================
+            # 1. ENHANCED MARKET ANALYZER (avoid bad conditions)
+            # ===========================================================
+            market_status = self.market_analyzer.analyze_market(price)
+            if not market_status["tradable"]:
+                logger.info(f"⛔ Market not tradable → {market_status['reason']} | Regime: {market_status.get('regime', 'UNKNOWN')}")
+                return
+
+            # ===========================================================
+            # 2. TIME FILTER — avoid back-to-back trades
+            # ===========================================================
+            if time.time() - self.last_trade_time < self.min_trade_interval:
+                return
+
+            # ===========================================================
+            # 3. STRATEGY SIGNAL EXTRACTION
+            # ===========================================================
+            signals = []
+            for strat in self.strategies:
+                try:
+                    sig = strat.on_tick({"quote": price, "symbol": settings.SYMBOL, "epoch": msg["tick"]["epoch"]})
+                    if sig:
+                        signals.append(sig)
+                except Exception as e:
+                    logger.debug(f"[{strat.name}] Signal error: {e}")
+        
+            # NEW: Store signals in history (extend the list, limit to 1000)
+            if signals:
+                self.signal_history.extend(signals)
+                if len(self.signal_history) > 1000:
+                    self.signal_history = self.signal_history[-1000:]  # Keep only recent 1000
+
+            if signals:
+                logger.info(f"📊 Got {len(signals)} signals from strategies")
+
+                # STORE SIGNALS IN HISTORY + BROADCAST VIA WEBSOCKET
+                for sig in signals:
+                    signal_data = {
+                        "id": f"sig_{self.signal_counter}_{int(time.time())}",
+                        "direction": sig.get("side") or "UNKNOWN",
+                        "confidence": float(sig.get("score", 0)) if sig.get("score") is not None else 0,
+                        "price": price,
+                        "symbol": symbol,
+                        "timestamp": msg.get("epoch", int(time.time())),
+                        "strategy": sig.get("meta", {}).get("strategy", "unknown"),
+                        "message": f"{sig.get('side', 'UNKNOWN')} signal from {sig.get('meta', {}).get('strategy', 'unknown')}",
+                        "score": sig.get("score", 0)
+                    }
+
+                    # Append to history
+                    try:
+                        self.signal_history.append(signal_data)
+                        self.signal_counter += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to append to signal history: {e}")
+
+                    # BROADCAST VIA WEBSOCKET (robust to disconnected clients)
+                    try:
+                        from src.api.websocket import ws_manager
+                        await ws_manager.broadcast_signal(signal_data)
+                    except Exception as e:
+                        logger.exception(f"Failed to broadcast signal: {e}")
+            else:
+                logger.info("📡 No signals from strategies")
+
+            # ===========================================================
+            # 4. CONSENSUS (ML + Traditional)
+            # ===========================================================
+            # Convert signals to consensus format
+            consensus_signals = []
             for sig in signals:
-                order_executor.trades[trade_id]["consensus_data"]["strategy_breakdown"][sig["meta"]["strategy"]] += 1
+                consensus_signals.append({
+                    "side": sig.get("side"),
+                    "score": sig.get("score"),
+                    "meta": sig.get("meta", {})
+                })
+            
+            consensus = self.consensus.aggregate(consensus_signals, price)
 
-            self.last_trade_time = time.time()
+            if consensus:
+                logger.info(f"✅ CONSENSUS PASSED → {consensus}")
+            else:
+                logger.info(f"❌ CONSENSUS FAILED - No consensus from {len(signals)} signals")
+                return
 
-            logger.info(f"✅ Trade placed: {trade_id}")
+            # Require strong consensus
+            if consensus.get("sources", 0) < 1:
+                return
+            if consensus["score"] < 0.65:  # HIGHER THRESHOLD = fewer, safer trades
+                return
 
-        except Exception:
-            logger.exception("❌ Trade execution failed")
+            logger.info(f"✅ CONSENSUS OK → {consensus} | Market Regime: {market_status.get('regime')}")
+
+            # ===========================================================
+            # 5. RISK MANAGER CHECKS
+            # ===========================================================
+            try:
+                balance = await deriv.get_balance()
+            except Exception:
+                logger.exception("Failed to get balance")
+                return
+
+            trade_amount = self.risk.get_next_trade_amount()
+
+            # Get recovery status for logging
+            recovery_metrics = self.risk.get_recovery_metrics()
+            
+            # Log recovery status if active
+            if settings.RECOVERY_ENABLED and recovery_metrics["recovery_streak"] > 0:
+                logger.info(f"🟡 Recovery active: using recovery amount ${trade_amount:.2f}")
+            else:
+                logger.info(f"🟢 Normal mode: using base trade amount ${trade_amount:.2f}")
+
+            if not self.risk.allow_trade(position_manager.get_open_count(), balance):
+                logger.info("⛔ RiskManager blocked trade")
+                return
+
+            # ===========================================================
+            # 6. EXECUTE TRADE
+            # ===========================================================
+            side = consensus["side"]
+            logger.info(
+                f"🚀 EXECUTING TRADE: side={side}, amount={trade_amount}, "
+                f"method={consensus.get('method')}, regime={market_status.get('regime')}"
+            )
+
+            try:
+                trade_id = await order_executor.place_trade(
+                    side=side,
+                    amount=trade_amount,
+                    symbol=settings.SYMBOL
+                )
+
+                # Save consensus snapshot with market context
+                order_executor.trades[trade_id]["consensus_data"] = {
+                    "method": consensus.get("method"),
+                    "signals_count": len(signals),
+                    "traditional_score": consensus.get("traditional_score", 0),
+                    "ml_score": consensus.get("ml_score", 0),
+                    "strategy_breakdown": {s.name: 0 for s in self.strategies},
+                    "signals": signals,
+                    "market_regime": market_status.get("regime"),
+                    "volatility": market_status.get("volatility"),
+                    "trend_strength": market_status.get("trend_strength"),
+                    "recovery_data": recovery_metrics if settings.RECOVERY_ENABLED else None
+                }
+
+                for sig in signals:
+                    order_executor.trades[trade_id]["consensus_data"]["strategy_breakdown"][sig["meta"]["strategy"]] += 1
+
+                self.last_trade_time = time.time()
+
+                logger.info(f"✅ Trade placed: {trade_id}")
+
+            except Exception:
+                logger.exception("❌ Trade execution failed")
+        
+        # ✅ ADD PROPER EXCEPTION HANDLING (FIX)
+        except Exception as e:
+            logger.error(f"Error in _tick_handler: {e}")
 
     # ===============================================================
     # MAIN BOT LOOP
@@ -473,7 +545,7 @@ class TradingBot:
             # Get trading stats from database
             stats = TradeHistoryRepo.get_trading_stats()
             
-            # Get performance tracker data
+            # Get performance tracker data (includes best_day, worst_day, profit_factor)
             perf_data = performance.get_performance_summary()
             
             return {
@@ -494,7 +566,10 @@ class TradingBot:
                 "avg_profit": perf_data.get("avg_profit", 0),
                 "completed_trades": stats.get("total_trades", 0),
                 "winning_trades": stats.get("won_trades", 0),
-                "avg_trade_duration": perf_data.get("avg_trade_duration", 0)
+                "avg_trade_duration": perf_data.get("avg_trade_duration", 0),
+                "profit_factor": perf_data.get("profit_factor"),  # ← NEW
+                "best_day": perf_data.get("best_day"),             # ← NEW
+                "worst_day": perf_data.get("worst_day")            # ← NEW
             }
         except Exception as e:
             logger.error(f"Error getting bot metrics: {e}")
@@ -503,9 +578,19 @@ class TradingBot:
                 "total_trades": 0,
                 "win_rate": 0,
                 "pnl": 0,
-                "sharpe_ratio": 0
+                "sharpe_ratio": 0,
+                "profit_factor": None,  # ← NEW
+                "best_day": None,       # ← NEW
+                "worst_day": None       # ← NEW
             }
 
+    # ===============================================================  
+    # NEW METHOD: Get Recent Signals
+    # ===============================================================  
+    def get_recent_signals(self, limit: int = 10):
+        """Return the most recent signals from history"""
+        return self.signal_history[-limit:] if self.signal_history else []
+    
 
 # Singleton bot instance
 trading_bot = TradingBot()

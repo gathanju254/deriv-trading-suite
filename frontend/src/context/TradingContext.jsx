@@ -1,5 +1,4 @@
 // frontend/src/context/TradingContext.jsx
-// frontend/src/context/TradingContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { derivService } from '../services/derivService';
 import { websocketService } from '../services/websocket';
@@ -32,24 +31,18 @@ export const TradingProvider = ({ children }) => {
   // Initialize WebSocket connection
   const initWebSocket = useCallback(async () => {
     try {
-      setWsConnectionStatus('connecting');
       await websocketService.connect('ws://localhost:8000/ws');
       setWsConnectionStatus('connected');
       
-      // Subscribe to real-time updates
-      const unsubscribeTick = websocketService.subscribe('tick', handleTick);
-      const unsubscribeTrade = websocketService.subscribe('trade', handleTrade);
-      const unsubscribeSignal = websocketService.subscribe('signal', handleSignal);
-      const unsubscribeConnection = websocketService.subscribe('connection', handleConnection);
+      // Subscribe to all events
+      websocketService.subscribe('signal', handleSignal);     // Real-time signals
+      websocketService.subscribe('tick', handleTick);         // Market data
+      websocketService.subscribe('trade', handleTrade);       // Trade updates
+      websocketService.subscribe('connection', handleConnection);
       
-      return () => {
-        unsubscribeTick();
-        unsubscribeTrade();
-        unsubscribeSignal();
-        unsubscribeConnection();
-      };
+      console.log('✅ WebSocket initialized');
     } catch (error) {
-      console.error('WebSocket connection failed:', error);
+      console.error('WebSocket initialization failed:', error);
       setWsConnectionStatus('disconnected');
     }
   }, []);
@@ -89,11 +82,13 @@ export const TradingProvider = ({ children }) => {
   };
 
   const handleSignal = (data) => {
-    // Handle signal updates - only update signals
+    // Handle real-time signal updates from WebSocket
+    console.log('📡 New signal from WebSocket:', data);
+    
     setSignals(prev => {
-      const newSignals = [data.data, ...prev.slice(0, 9)];
-      signalsRef.current = newSignals;
-      return newSignals;
+      const updated = [data.data, ...prev].slice(0, 50);
+      signalsRef.current = updated;
+      return updated;
     });
   };
 
@@ -156,13 +151,10 @@ export const TradingProvider = ({ children }) => {
 
   const refreshSignals = async () => {
     try {
-      const signalsData = await derivService.getSignals();
-      if (JSON.stringify(signalsData.signals) !== JSON.stringify(signalsRef.current)) {
-        signalsRef.current = signalsData.signals || [];
-        setSignals(signalsData.signals || []);
-      }
+      const response = await derivService.getSignals();
+      setSignals(response.signals || []);
     } catch (error) {
-      console.error('Failed to refresh signals:', error);
+      console.error('Error refreshing signals:', error);
     }
   };
 

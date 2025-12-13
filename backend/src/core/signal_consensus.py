@@ -273,3 +273,36 @@ class SignalConsensus:
             self.ml_consensus.training_data.clear()
             self.ml_consensus.labels.clear()
             logger.info("ML consensus retrained with latest samples.")
+
+    def generate_consensus_signal(self, strategies, symbol: str, price: float) -> Dict:
+        """Generate consensus signal from multiple strategies"""
+        try:
+            signals = []
+            confidences = []
+            
+            for strategy in strategies:
+                sig = strategy.analyze(symbol)
+                if sig and sig.get("direction"):
+                    signals.append(sig["direction"])
+                    confidences.append(sig.get("confidence", 0.5))
+            
+            if not signals:
+                return None
+            
+            # Majority vote
+            bullish = signals.count("BUY")
+            bearish = signals.count("SELL")
+            
+            direction = "BUY" if bullish > bearish else "SELL" if bearish > bullish else "HOLD"
+            confidence = sum(confidences) / len(confidences) if confidences else 0.5
+            strength = (max(bullish, bearish) / len(signals)) * 100 if signals else 50
+            
+            return {
+                "direction": direction,
+                "confidence": confidence,
+                "strength": strength,
+                "reason": f"{bullish} bullish, {bearish} bearish signals"
+            }
+        except Exception as e:
+            logger.error(f"Error generating consensus signal: {e}")
+            return None

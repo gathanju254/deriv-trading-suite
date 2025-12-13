@@ -15,9 +15,11 @@ from src.db.session import SessionLocal
 class PerformanceTracker:
     def __init__(self):
         self.trades: List[Dict] = []
-        self.daily_pnl = {}
-        self.weekly_pnl = {}
-        self.monthly_pnl = {}
+        
+        # Time-bucketed PnL
+        self.daily_pnl: Dict[str, float] = {}
+        self.weekly_pnl: Dict[str, float] = {}
+        self.monthly_pnl: Dict[str, float] = {}
         
         # Load existing trades from database on startup
         self._load_existing_trades()
@@ -149,6 +151,10 @@ class PerformanceTracker:
                     "daily_pnl": self.daily_pnl,
                     "weekly_pnl": self.weekly_pnl,
                     "monthly_pnl": self.monthly_pnl,
+                    "best_day": 0.0,  # NEW
+                    "worst_day": 0.0,  # NEW
+                    "avg_trade_duration": 0.0,  # NEW
+                    "volatility": 0.0  # NEW
                 }
 
             profits = [t["profit"] for t in completed]
@@ -178,6 +184,17 @@ class PerformanceTracker:
                 peak = max(peak, running)
                 max_drawdown = max(max_drawdown, peak - running)
 
+            # NEW: Calculate best and worst day
+            best_day = max(self.daily_pnl.values()) if self.daily_pnl else 0.0
+            worst_day = min(self.daily_pnl.values()) if self.daily_pnl else 0.0
+            
+            # NEW: Calculate average trade duration (simplified - use 5 ticks as default)
+            avg_trade_duration = 5.0  # Default for binary options contracts
+            
+            # NEW: Calculate volatility (std of daily returns)
+            daily_returns = list(self.daily_pnl.values())
+            volatility = statistics.stdev(daily_returns) if len(daily_returns) > 1 else 0.0
+
             return {
                 "total_trades": total_trades,
                 "winning_trades": len(wins),
@@ -186,12 +203,16 @@ class PerformanceTracker:
                 "total_profit": round(total_profit, 2),
                 "average_profit": round(avg_win, 2),
                 "average_loss": round(avg_loss, 2),
-                "profit_factor": round(profit_factor, 2),
+                "profit_factor": round(profit_factor, 2) if profit_factor != float("inf") else 0.0,
                 "sharpe_ratio": round(sharpe_ratio, 2),
                 "max_drawdown": round(max_drawdown, 2),
                 "daily_pnl": self.daily_pnl,
                 "weekly_pnl": self.weekly_pnl,
                 "monthly_pnl": self.monthly_pnl,
+                "best_day": round(best_day, 2),  # NEW
+                "worst_day": round(worst_day, 2),  # NEW
+                "avg_trade_duration": round(avg_trade_duration, 2),  # NEW
+                "volatility": round(volatility, 4)  # NEW
             }
 
         except Exception:
@@ -210,6 +231,56 @@ class PerformanceTracker:
                 "daily_pnl": self.daily_pnl,
                 "weekly_pnl": self.weekly_pnl,
                 "monthly_pnl": self.monthly_pnl,
+                "best_day": 0.0,  # NEW
+                "worst_day": 0.0,  # NEW
+                "avg_trade_duration": 0.0,  # NEW
+                "volatility": 0.0  # NEW
+            }
+
+    def get_performance_summary(self) -> Dict:
+        """Get a summary of performance metrics for the bot metrics endpoint"""
+        try:
+            metrics = self.get_performance_metrics()
+            
+            # Calculate daily P&L (most recent day)
+            daily_pnl = 0.0
+            if self.daily_pnl:
+                # Get today's key
+                today_key = datetime.utcnow().strftime("%Y-%m-%d")
+                daily_pnl = self.daily_pnl.get(today_key, 0.0)
+            
+            # Calculate monthly P&L (current month)
+            monthly_pnl = 0.0
+            if self.monthly_pnl:
+                current_month_key = datetime.utcnow().strftime("%Y-%m")
+                monthly_pnl = self.monthly_pnl.get(current_month_key, 0.0)
+            
+            return {
+                "sharpe_ratio": metrics.get("sharpe_ratio", 0.0),
+                "max_drawdown": metrics.get("max_drawdown", 0.0),
+                "volatility": metrics.get("volatility", 0.0),
+                "daily_pnl": round(daily_pnl, 2),
+                "monthly_pnl": round(monthly_pnl, 2),
+                "avg_profit": metrics.get("average_profit", 0.0),
+                "avg_trade_duration": metrics.get("avg_trade_duration", 0.0),
+                "profit_factor": metrics.get("profit_factor", None),  # Can be None if no losses
+                "best_day": metrics.get("best_day", None),  # Can be None if no trades
+                "worst_day": metrics.get("worst_day", None)  # Can be None if no trades
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting performance summary: {e}")
+            return {
+                "sharpe_ratio": 0.0,
+                "max_drawdown": 0.0,
+                "volatility": 0.0,
+                "daily_pnl": 0.0,
+                "monthly_pnl": 0.0,
+                "avg_profit": 0.0,
+                "avg_trade_duration": 0.0,
+                "profit_factor": None,
+                "best_day": None,
+                "worst_day": None
             }
 
     def get_recent_performance(self, days: int = 7) -> Dict:
@@ -237,89 +308,6 @@ class PerformanceTracker:
                 "trades_count": 0,
                 "total_profit": 0.0,
                 "average_profit": 0.0,
-            }
-
-    def get_performance_summary(self) -> Dict:
-        """Get summary performance metrics"""
-        if not self.trades:
-            return {
-                "sharpe_ratio": 0,
-                "max_drawdown": 0,
-                "volatility": 0,
-                "daily_pnl": 0,
-                "monthly_pnl": 0,
-                "avg_profit": 0,
-                "avg_trade_duration": 0
-            }
-        
-        try:
-            profits = [t.get("profit", 0) for t in self.trades if t.get("profit") is not None]
-            
-            if not profits:
-                return {
-                    "sharpe_ratio": 0,
-                    "max_drawdown": 0,
-                    "volatility": 0,
-                    "daily_pnl": 0,
-                    "monthly_pnl": 0,
-                    "avg_profit": 0,
-                    "avg_trade_duration": 0
-                }
-            
-            total_profit = sum(profits)
-            avg_profit = total_profit / len(profits) if profits else 0
-            
-            # Calculate Sharpe Ratio (simplified)
-            import statistics
-            if len(profits) > 1:
-                std_dev = statistics.stdev(profits)
-                sharpe = (avg_profit / std_dev * 252 ** 0.5) if std_dev > 0 else 0
-            else:
-                sharpe = 0
-                std_dev = 0
-            
-            # Calculate max drawdown
-            cumulative = 0
-            peak = 0
-            max_dd = 0
-            for profit in profits:
-                cumulative += profit
-                if cumulative > peak:
-                    peak = cumulative
-                drawdown = peak - cumulative
-                if drawdown > max_dd:
-                    max_dd = drawdown
-            
-            max_dd_percent = (max_dd / peak * 100) if peak > 0 else 0
-            
-            # Calculate daily/monthly PnL - SIMPLIFIED (no date parsing)
-            # Just use most recent trades for daily/monthly
-            recent_trades = self.trades[-20:] if len(self.trades) > 20 else self.trades
-            daily_pnl = sum(t.get("profit", 0) for t in recent_trades)
-            monthly_pnl = sum(t.get("profit", 0) for t in self.trades[-100:])
-            
-            # Average trade duration - skip if no closed_at available
-            avg_duration = 0  # Default to 0 since we don't track timing in simple mode
-            
-            return {
-                "sharpe_ratio": round(sharpe, 2),
-                "max_drawdown": round(max_dd_percent, 2),
-                "volatility": round(std_dev * 100 if 'std_dev' in locals() else 0, 2),
-                "daily_pnl": round(daily_pnl, 2),
-                "monthly_pnl": round(monthly_pnl, 2),
-                "avg_profit": round(avg_profit, 2),
-                "avg_trade_duration": round(avg_duration, 1)
-            }
-        except Exception as e:
-            logger.error(f"Error calculating performance summary: {e}")
-            return {
-                "sharpe_ratio": 0,
-                "max_drawdown": 0,
-                "volatility": 0,
-                "daily_pnl": 0,
-                "monthly_pnl": 0,
-                "avg_profit": 0,
-                "avg_trade_duration": 0
             }
 
 

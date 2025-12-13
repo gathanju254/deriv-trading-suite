@@ -6,6 +6,7 @@ from src.utils.logger import logger
 import asyncio
 import json
 import time
+from typing import Dict
 
 ws_router = APIRouter()
 
@@ -44,6 +45,22 @@ class WSManager:
 
         for ws in disconnected:
             self.disconnect(ws)
+
+    async def broadcast_signal(self, signal: Dict):
+        """Broadcast new signal to all connected clients"""
+        try:
+            message = {
+                "type": "signal",
+                "data": signal
+            }
+
+            for connection in self.active_connections:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    logger.warning(f"Failed to send signal to client: {e}")
+        except Exception as e:
+            logger.error(f"Error broadcasting signal: {e}")
 
 
 ws_manager = WSManager()

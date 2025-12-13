@@ -5,56 +5,99 @@ import { useTrading } from '../../../context/TradingContext';
 import { TrendingUp, TrendingDown, Target, Activity, PieChart, Shield, Zap } from 'lucide-react';
 import './StrategyPerformance.css';
 
-const StrategyPerformance = () => {
-  const { performance } = useTrading();
+const safeNum = (v, fallback = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const toPercent = (v) => {
+  // Backend may already return percent (e.g. 50.46) or ratio (0.5).
+  if (v === null || v === undefined) return 0;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return n <= 1 && n >= 0 ? n * 100 : n;
+};
+
+const normalizePerformance = (p = {}) => {
+  const totalProfit = safeNum(p.pnl ?? p.total_profit ?? p.totalProfit ?? p.profit ?? 0);
+  const avgProfit = safeNum(p.avg_profit ?? p.avgProfit ?? 0);
   
+  // These now come directly from backend!
+  const profitFactorRaw = p.profit_factor ?? p.profitFactor ?? null;
+  const bestDayRaw = p.best_day ?? p.bestDay ?? null;
+  const worstDayRaw = p.worst_day ?? p.worstDay ?? null;
+
+  return {
+    totalProfit,
+    winRate: toPercent(p.win_rate ?? p.winRate ?? p.win_percent ?? 0),
+    totalTrades: safeNum(p.total_trades ?? p.completed_trades ?? p.totalTrades ?? 0),
+    winningTrades: safeNum(p.winning_trades ?? p.won_trades ?? p.wins ?? 0),
+    activeTrades: safeNum(p.active_trades ?? p.activeTrades ?? 0),
+    avgTradesPerDay: safeNum(p.avg_trades_per_day ?? p.avgTradesPerDay ?? 0),
+    sharpe: safeNum(p.sharpe_ratio ?? p.sharpe ?? p.sharpeRatio ?? 0),
+    maxDrawdown: safeNum(p.max_drawdown ?? p.maxDrawdown ?? p.max_drawdown_percent ?? 0),
+    volatility: safeNum(p.volatility ?? p.volatiltiy ?? 0),
+    dailyPnl: safeNum(p.daily_pnl ?? p.dailyPnl ?? p.daily_profit ?? 0),
+    monthlyPnl: safeNum(p.monthly_pnl ?? p.monthlyPnl ?? 0),
+    avgProfit,
+    // These are now numbers or null - much cleaner!
+    profitFactor: profitFactorRaw !== null && profitFactorRaw !== undefined ? safeNum(profitFactorRaw, 1) : null,
+    bestDay: bestDayRaw !== null && bestDayRaw !== undefined ? safeNum(bestDayRaw, 0) : null,
+    worstDay: worstDayRaw !== null && worstDayRaw !== undefined ? safeNum(worstDayRaw, 0) : null
+  };
+};
+
+const StrategyPerformance = () => {
+  const { performance: raw } = useTrading();
+  const performance = normalizePerformance(raw);
+
   const strategyMetrics = [
     {
       id: 'overall_performance',
       title: 'Total P&L',
-      value: `$${performance.pnl?.toFixed(2) || '0.00'}`,
-      trend: performance.pnl >= 0 ? 'up' : 'down',
+      value: `$${performance.totalProfit.toFixed(2)}`,
+      trend: performance.totalProfit >= 0 ? 'up' : 'down',
       icon: TrendingUp,
-      color: performance.pnl >= 0 ? 'success' : 'error',
+      color: performance.totalProfit >= 0 ? 'success' : 'error',
       details: [
-        { label: 'Daily', value: `$${performance.daily_pnl?.toFixed(2) || '0.00'}` },
-        { label: 'Monthly', value: `$${performance.monthly_pnl?.toFixed(2) || '0.00'}` }
+        { label: 'Daily', value: `$${performance.dailyPnl.toFixed(2)}` },
+        { label: 'Monthly', value: `$${performance.monthlyPnl.toFixed(2)}` }
       ]
     },
     {
       id: 'accuracy',
       title: 'Win Rate',
-      value: `${performance.win_rate?.toFixed(1) || '0.0'}%`,
-      trend: performance.win_rate >= 50 ? 'up' : 'down',
+      value: `${performance.winRate.toFixed(1)}%`,
+      trend: performance.winRate >= 50 ? 'up' : 'down',
       icon: Target,
-      color: performance.win_rate >= 50 ? 'success' : performance.win_rate >= 40 ? 'warning' : 'error',
+      color: performance.winRate >= 50 ? 'success' : performance.winRate >= 40 ? 'warning' : 'error',
       details: [
-        { label: 'Wins', value: performance.winning_trades || 0 },
-        { label: 'Total', value: performance.completed_trades || 0 }
+        { label: 'Wins', value: performance.winningTrades },
+        { label: 'Total', value: performance.totalTrades }
       ]
     },
     {
       id: 'trades',
       title: 'Total Trades',
-      value: performance.total_trades || '0',
+      value: `${performance.totalTrades || 0}`,
       trend: 'neutral',
       icon: Activity,
       color: 'info',
       details: [
-        { label: 'Active', value: performance.active_trades || '0' },
-        { label: 'Daily Avg', value: performance.avg_trades_per_day?.toFixed(1) || '0.0' }
+        { label: 'Active', value: performance.activeTrades },
+        { label: 'Daily Avg', value: performance.avgTradesPerDay.toFixed(1) }
       ]
     },
     {
       id: 'risk_metrics',
       title: 'Sharpe Ratio',
-      value: performance.sharpe_ratio?.toFixed(2) || '0.00',
-      trend: performance.sharpe_ratio >= 1 ? 'up' : 'down',
+      value: performance.sharpe.toFixed(2),
+      trend: performance.sharpe >= 1 ? 'up' : 'down',
       icon: Shield,
-      color: performance.sharpe_ratio >= 1 ? 'success' : performance.sharpe_ratio >= 0.5 ? 'warning' : 'error',
+      color: performance.sharpe >= 1 ? 'success' : performance.sharpe >= 0.5 ? 'warning' : 'error',
       details: [
-        { label: 'Max Drawdown', value: `${performance.max_drawdown?.toFixed(1) || '0.0'}%` },
-        { label: 'Volatility', value: `${performance.volatility?.toFixed(1) || '0.0'}%` }
+        { label: 'Max Drawdown', value: `${performance.maxDrawdown.toFixed(1)}%` },
+        { label: 'Volatility', value: `${performance.volatility.toFixed(1)}%` }
       ]
     }
   ];
@@ -107,7 +150,7 @@ const StrategyPerformance = () => {
         })}
       </div>
 
-      {/* Additional Performance Stats */}
+      {/* Additional Performance Stats - FIXED */}
       <div className="performance-stats">
         <div className="stat-item">
           <div className="stat-icon">
@@ -116,7 +159,7 @@ const StrategyPerformance = () => {
           <div className="stat-content">
             <span className="stat-label">Best Day</span>
             <span className="stat-value positive">
-              +${performance.best_day?.toFixed(2) || '0.00'}
+              {performance.bestDay !== null ? `+$${performance.bestDay.toFixed(2)}` : '—'}
             </span>
           </div>
         </div>
@@ -128,7 +171,7 @@ const StrategyPerformance = () => {
           <div className="stat-content">
             <span className="stat-label">Worst Day</span>
             <span className="stat-value negative">
-              -${Math.abs(performance.worst_day || 0).toFixed(2)}
+              {performance.worstDay !== null ? `-$${Math.abs(performance.worstDay).toFixed(2)}` : '—'}
             </span>
           </div>
         </div>
@@ -140,7 +183,7 @@ const StrategyPerformance = () => {
           <div className="stat-content">
             <span className="stat-label">Profit Factor</span>
             <span className="stat-value">
-              {performance.profit_factor?.toFixed(2) || '1.00'}
+              {performance.profitFactor !== null ? performance.profitFactor.toFixed(2) : 'N/A'}
             </span>
           </div>
         </div>
@@ -152,7 +195,7 @@ const StrategyPerformance = () => {
           <div className="stat-content">
             <span className="stat-label">Avg Profit</span>
             <span className="stat-value">
-              ${performance.avg_profit?.toFixed(2) || '0.00'}
+              ${performance.avgProfit.toFixed(2)}
             </span>
           </div>
         </div>
