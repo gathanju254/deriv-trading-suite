@@ -1,94 +1,160 @@
 // frontend/src/components/Dashboard/RecentTrades/RecentTrades.jsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTrading } from '../../../context/TradingContext';
 import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Clock,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  DollarSign,
+  BarChart3
 } from 'lucide-react';
 import './RecentTrades.css';
 
 const RecentTrades = () => {
   const { tradeHistory, loading } = useTrading();
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return '--:--';
-    return new Date(timestamp).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  // -------------------
+  // Date helpers
+  // -------------------
+  const formatDateParts = (timestamp) => {
+    if (!timestamp) {
+      return { date: '—', time: '--:--:--' };
+    }
+
+    try {
+      const d = new Date(timestamp);
+
+      return {
+        date: d.toLocaleDateString([], {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }),
+        time: d.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        })
+      };
+    } catch {
+      return { date: '—', time: '--:--:--' };
+    }
   };
 
-  const formatProfit = (amount) => {
-    const num = parseFloat(amount) || 0;
-    return num.toFixed(2);
+  // -------------------
+  // Profit helpers
+  // -------------------
+  const formatProfit = (trade) => {
+    const profit = trade.contract?.profit ?? 0;
+    return Number(profit).toFixed(2);
   };
 
-  const getProfitColor = (profit) => {
+  const getProfitColor = (trade) => {
+    const profit = trade.contract?.profit ?? 0;
     if (profit > 0) return 'profit-positive';
     if (profit < 0) return 'profit-negative';
     return 'profit-neutral';
   };
 
-  const getProfitIcon = (profit) => {
+  const getProfitIcon = (trade) => {
+    const profit = trade.contract?.profit ?? 0;
     if (profit > 0) return <ArrowUpRight size={14} />;
     if (profit < 0) return <ArrowDownRight size={14} />;
     return null;
   };
 
   // -------------------
-  //  LOADING UI
+  // Status helpers
   // -------------------
-  if (loading && (!tradeHistory || tradeHistory.length === 0)) {
+  const getStatusDisplay = (status) => {
+    const map = {
+      PENDING: { text: 'PENDING', class: 'status-pending' },
+      ACTIVE: { text: 'ACTIVE', class: 'status-pending' },
+      WON: { text: 'WON', class: 'status-won' },
+      LOST: { text: 'LOST', class: 'status-lost' },
+      ERROR: { text: 'ERROR', class: 'status-lost' }
+    };
+
+    return map[status?.toUpperCase()] || {
+      text: 'UNKNOWN',
+      class: 'status-pending'
+    };
+  };
+
+  // -------------------
+  // Direction helpers
+  // -------------------
+  const getDirectionDisplay = (side) => {
+    const s = side?.toUpperCase();
+    return s === 'CALL' ? 'BUY' : s === 'PUT' ? 'SELL' : 'UNKNOWN';
+  };
+
+  const getDirectionClass = (side) => {
+    const s = side?.toUpperCase();
+    return s === 'CALL' ? 'direction-buy' : 'direction-sell';
+  };
+
+  // -------------------
+  // Summary (memoized)
+  // -------------------
+  const summary = useMemo(() => {
+    if (!tradeHistory?.length) {
+      return { total: 0, won: 0, lost: 0, winRate: 0, totalProfit: '0.00' };
+    }
+
+    const total = tradeHistory.length;
+    const won = tradeHistory.filter(t => t.status?.toUpperCase() === 'WON').length;
+    const lost = tradeHistory.filter(t => t.status?.toUpperCase() === 'LOST').length;
+    const winRate = ((won / total) * 100).toFixed(1);
+    const totalProfit = tradeHistory
+      .reduce((sum, t) => sum + (t.contract?.profit ?? 0), 0)
+      .toFixed(2);
+
+    return { total, won, lost, winRate, totalProfit };
+  }, [tradeHistory]);
+
+  // -------------------
+  // LOADING
+  // -------------------
+  if (loading && !tradeHistory?.length) {
     return (
       <div className="recent-trades">
         <div className="section-header">
-          <h2>Recent Trades</h2>
+          <h2><BarChart3 size={20} /> Recent Trades</h2>
         </div>
         <div className="trades-loading">
           <div className="loading-spinner" />
-          <p>Fetching the latest trades...</p>
+          <p>Loading trade history...</p>
         </div>
       </div>
     );
   }
 
   // -------------------
-  //  EMPTY UI
+  // EMPTY
   // -------------------
-  if (!tradeHistory || tradeHistory.length === 0) {
+  if (!tradeHistory?.length) {
     return (
       <div className="recent-trades">
         <div className="section-header">
-          <h2>Recent Trades</h2>
+          <h2><BarChart3 size={20} /> Recent Trades</h2>
         </div>
-
         <div className="no-trades">
           <DollarSign size={32} />
-          <p>No trade activity yet</p>
-          <small>Your journal is waiting for its first story.</small>
+          <p>No trades found</p>
+          <small>Trades will appear once the bot starts executing.</small>
         </div>
       </div>
     );
   }
 
   // -------------------
-  //  MAIN TABLE UI
+  // MAIN TABLE
   // -------------------
   return (
     <div className="recent-trades">
       <div className="section-header">
-        <h2>
-          <Clock size={20} />
-          Recent Trades
-        </h2>
-
-        <div className="trade-count">
-          Showing {tradeHistory.length} trades
-        </div>
+        <h2><BarChart3 size={20} /> Recent Trades</h2>
+        <div className="trade-count">{summary.total} trades loaded</div>
       </div>
 
       <div className="trades-table-container">
@@ -99,46 +165,57 @@ const RecentTrades = () => {
               <th>Symbol</th>
               <th>Direction</th>
               <th>Stake</th>
-              <th>Profit / Loss</th>
+              <th>Duration</th>
+              <th>Entry / Exit</th>
+              <th>P/L</th>
               <th>Status</th>
             </tr>
           </thead>
-
           <tbody>
             {tradeHistory.map((trade, index) => {
-              const profit = trade.profit ?? trade.pnl ?? 0;
-              const status = trade.result?.toLowerCase() || 'pending';
+              const { date, time } = formatDateParts(trade.created_at);
+              const statusInfo = getStatusDisplay(trade.status);
 
               return (
                 <tr key={trade.id || index} className="trade-row">
-                  <td className="trade-time">
-                    <Clock size={12} />
-                    {formatDate(trade.timestamp || trade.time)}
+                  {/* ✅ DATETIME CELL */}
+                  <td>
+                    <div className="trade-datetime">
+                      <span className="trade-date">{date}</span>
+                      <span className="trade-time">{time}</span>
+                    </div>
                   </td>
 
-                  <td className="trade-symbol">
-                    {trade.symbol || 'R_100'}
-                  </td>
+                  <td className="trade-symbol">{trade.symbol || 'N/A'}</td>
 
                   <td className="trade-direction">
-                    <span className={`direction-${trade.side?.toLowerCase() || 'buy'}`}>
-                      {trade.side?.toUpperCase() || 'BUY'}
+                    <span className={getDirectionClass(trade.side)}>
+                      {getDirectionDisplay(trade.side)}
                     </span>
                   </td>
 
-                  <td className="trade-stake">
-                    ${parseFloat(trade.stake || 1).toFixed(2)}
+                  <td>${Number(trade.amount || 0).toFixed(2)}</td>
+
+                  <td>{trade.duration ? `${trade.duration}t` : 'N/A'}</td>
+
+                  <td className="trade-entry-exit">
+                    {trade.contract ? (
+                      <>
+                        <div>Entry: {trade.contract.entry_tick ?? '—'}</div>
+                        <div>Exit: {trade.contract.exit_tick ?? '—'}</div>
+                      </>
+                    ) : (
+                      'Pending'
+                    )}
                   </td>
 
-                  <td className={`trade-profit ${getProfitColor(profit)}`}>
-                    {getProfitIcon(profit)}
-                    ${formatProfit(profit)}
+                  <td className={`trade-profit ${getProfitColor(trade)}`}>
+                    {getProfitIcon(trade)}
+                    ${formatProfit(trade)}
                   </td>
 
                   <td className="trade-status">
-                    <span className={`status-${status}`}>
-                      {status.toUpperCase()}
-                    </span>
+                    <span className={statusInfo.class}>{statusInfo.text}</span>
                   </td>
                 </tr>
               );
@@ -147,19 +224,22 @@ const RecentTrades = () => {
         </table>
       </div>
 
-      {/* Summary */}
+      {/* SUMMARY */}
       <div className="trades-summary">
         <div className="summary-item">
           <span className="summary-label">Total Trades</span>
-          <span className="summary-value">{tradeHistory.length}</span>
+          <span className="summary-value">{summary.total}</span>
         </div>
-
         <div className="summary-item">
           <span className="summary-label">Win Rate</span>
           <span className="summary-value">
-            {
-              `${tradeHistory.filter(t => t.result === 'WON').length} / ${tradeHistory.length}`
-            }
+            {summary.winRate}% ({summary.won}/{summary.total})
+          </span>
+        </div>
+        <div className="summary-item">
+          <span className="summary-label">Total Profit</span>
+          <span className={`summary-value ${parseFloat(summary.totalProfit) >= 0 ? 'profit-positive' : 'profit-negative'}`}>
+            ${summary.totalProfit}
           </span>
         </div>
       </div>
