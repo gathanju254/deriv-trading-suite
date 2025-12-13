@@ -1,1 +1,392 @@
-/* frontend/src/components/TradingView/MarketOverview/MarketOverview.css */
+/* frontend/src/components/Trading/MarketOverview/MarketOverview.css */
+.market-overview-trading {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.overview-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.market-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.market-status.bullish {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.market-status.bearish {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.market-status.neutral {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.overview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Current Market Data */
+.current-market {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.price-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.price-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.price-label {
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+.price-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1;
+}
+
+.price-symbol {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  display: inline-block;
+  margin-top: 0.25rem;
+}
+
+.price-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* Market Metrics Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.metric-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.metric-icon.volatility {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.metric-icon.momentum {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.metric-icon.rsi {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+}
+
+.metric-icon.signals {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.metric-content {
+  flex: 1;
+}
+
+.metric-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-bottom: 0.25rem;
+}
+
+.metric-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.metric-bar {
+  height: 6px;
+  background: rgba(71, 85, 105, 0.18);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.metric-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Support & Resistance */
+.support-resistance {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.support-resistance h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0 0 1rem 0;
+}
+
+.levels-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.level-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(30, 41, 59, 0.3);
+  border-radius: 6px;
+}
+
+.level-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.level-label.support {
+  color: #10b981;
+}
+
+.level-label.current {
+  color: #3b82f6;
+}
+
+.level-label.resistance {
+  color: #ef4444;
+}
+
+.level-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+/* Market Sentiment */
+.market-sentiment {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.market-sentiment h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0 0 1rem 0;
+}
+
+.sentiment-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sentiment-meter {
+  height: 12px;
+  background: rgba(71, 85, 105, 0.18);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sentiment-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+.sentiment-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.sentiment-value {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+/* Trading Recommendations */
+.trading-recommendations {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  padding: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.trading-recommendations h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0 0 1rem 0;
+}
+
+.recommendation-content {
+  padding: 1rem;
+  background: rgba(30, 41, 59, 0.3);
+  border-radius: 6px;
+}
+
+.recommendation {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.recommendation p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #f8fafc;
+}
+
+.recommendation.bullish {
+  color: #10b981;
+}
+
+.recommendation.bearish {
+  color: #ef4444;
+}
+
+.recommendation.neutral {
+  color: #94a3b8;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .market-overview-trading {
+    padding: 1rem;
+    gap: 1rem;
+  }
+  
+  .price-display {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .price-meta {
+    align-items: flex-start;
+  }
+  
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .levels-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .level-item {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .sentiment-labels {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}

@@ -1,4 +1,5 @@
 // frontend/src/pages/Trading.jsx
+// frontend/src/pages/Trading/Trading.jsx
 import React from 'react';
 import TradingChart from '../../components/Trading/TradingChart/TradingChart';
 import TradeControls from '../../components/Trading/TradeControls/TradeControls';

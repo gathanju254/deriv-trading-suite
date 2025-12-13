@@ -1,4 +1,5 @@
 /* frontend/src/paages/Trading.css */
+/* frontend/src/pages/Trading/Trading.css */
 .trading-page {
   max-width: 1400px;
   margin: 0 auto;
@@ -42,6 +43,22 @@
   grid-area: market;
 }
 
+/* Ensure components fit properly */
+.chart-section > div,
+.controls-section > div,
+.market-section > div {
+  height: 100%;
+}
+
+@media (max-width: 1200px) {
+  .trading-layout {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "chart chart"
+      "controls market";
+  }
+}
+
 @media (max-width: 1024px) {
   .trading-layout {
     grid-template-columns: 1fr;
@@ -59,5 +76,9 @@
   
   .trading-layout {
     gap: 1rem;
+  }
+  
+  .trading-page {
+    padding: 0 1rem;
   }
 }
