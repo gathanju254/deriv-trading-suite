@@ -62,15 +62,12 @@ class MomentumStrategy(BaseStrategy):
         if len(prices) < self.macd_slow + 10:
             return 0
             
-        # Simple MACD calculation
-        ema_fast = ema(prices, self.macd_fast)
-        ema_slow = ema(prices, self.macd_slow)
-        
-        if not ema_fast or not ema_slow:
+        macd_result = macd(prices, self.macd_fast, self.macd_slow, self.macd_signal)
+        if not macd_result:
             return 0
             
-        macd_line = ema_fast[-1] - ema_slow[-1]
-        return macd_line
+        # Return MACD line value (difference between fast and slow EMA)
+        return macd_result[-1][0]  # macd_line value
 
     def on_tick(self, tick: Dict):
         price = float(tick["quote"])
@@ -83,12 +80,16 @@ class MomentumStrategy(BaseStrategy):
         if len(self.prices) < self.rsi_period + 1:
             return None
         
-        # Calculate RSI
+        # Calculate RSI with debug logging
         rsivals = rsi(self.prices, self.rsi_period)
         if not rsivals:
+            logger.debug(f"Momentum: Not enough data for RSI calculation")
             return None
             
         latest_rsi = rsivals[-1]
+        
+        # ADD DEBUG LOGGING:
+        logger.debug(f"Momentum RSI: {latest_rsi:.2f}, Prices: {self.prices[-5:]}")
         
         # Calculate MACD for confirmation
         macd_signal = self._calculate_macd_signal(self.prices)
@@ -101,20 +102,24 @@ class MomentumStrategy(BaseStrategy):
         if latest_rsi > self.dynamic_overbought and macd_signal < 0:
             signal_strength = 0.85  # Reduced from 0.9
             side = "PUT"
+            logger.debug(f"Momentum: Strong PUT signal - RSI:{latest_rsi:.2f} > {self.dynamic_overbought}, MACD:{macd_signal:.4f} < 0")
             
         # RSI oversold + MACD positive = Strong CALL signal  
         elif latest_rsi < self.dynamic_oversold and macd_signal > 0:
             signal_strength = 0.85  # Reduced from 0.9
             side = "CALL"
+            logger.debug(f"Momentum: Strong CALL signal - RSI:{latest_rsi:.2f} < {self.dynamic_oversold}, MACD:{macd_signal:.4f} > 0")
             
         # Standard RSI signals
         elif latest_rsi > self.dynamic_overbought:
             signal_strength = 0.7
             side = "PUT"
+            logger.debug(f"Momentum: Standard PUT signal - RSI:{latest_rsi:.2f} > {self.dynamic_overbought}")
             
         elif latest_rsi < self.dynamic_oversold:
             signal_strength = 0.7
             side = "CALL"
+            logger.debug(f"Momentum: Standard CALL signal - RSI:{latest_rsi:.2f} < {self.dynamic_oversold}")
             
         # RSI divergence detection with reasonable thresholds
         elif len(rsivals) >= 5:
@@ -123,12 +128,14 @@ class MomentumStrategy(BaseStrategy):
                 latest_rsi > 62 and price > np.mean(self.prices[-5:])):
                 signal_strength = 0.65  # Increased from 0.6
                 side = "PUT"
+                logger.debug(f"Momentum: Bearish divergence - Price up, RSI down")
                 
             # Check for bullish divergence (price lower, RSI higher)
             elif (price < self.prices[-2] and latest_rsi > rsivals[-2] and 
                   latest_rsi < 38 and price < np.mean(self.prices[-5:])):
                 signal_strength = 0.65  # Increased from 0.6
                 side = "CALL"
+                logger.debug(f"Momentum: Bullish divergence - Price down, RSI up")
         
         if side:
             # Store signal for performance tracking
@@ -140,6 +147,8 @@ class MomentumStrategy(BaseStrategy):
                 "macd": macd_signal,
                 "price": price
             })
+            
+            logger.info(f"Momentum signal generated: {side} @ {signal_strength:.2f}, RSI:{latest_rsi:.2f}")
             
             return {
                 "side": side, 
@@ -171,11 +180,23 @@ class MomentumStrategy(BaseStrategy):
         total_trades = len(self.performance_history)
         win_rate = wins / total_trades if total_trades > 0 else 0
         
+        # Calculate MACD success rate
+        macd_correct = 0
+        macd_total = 0
+        for signal in self.signal_history[-50:]:
+            rsi_val = signal.get("rsi", 0)
+            macd_val = signal.get("macd", 0)
+            if rsi_val > self.dynamic_overbought and macd_val < 0:
+                macd_total += 1
+            elif rsi_val < self.dynamic_oversold and macd_val > 0:
+                macd_total += 1
+        
         return {
             "total_signals": len(self.signal_history),
             "total_trades": total_trades,
             "win_rate": round(win_rate, 3),
             "current_thresholds": f"{self.dynamic_overbought}/{self.dynamic_oversold}",
             "avg_profit": round(np.mean(self.performance_history) if self.performance_history else 0, 4),
-            "recent_performance": self.performance_history[-10:] if len(self.performance_history) >= 10 else self.performance_history
+            "recent_performance": self.performance_history[-10:] if len(self.performance_history) >= 10 else self.performance_history,
+            "macd_confirmation_rate": f"{macd_correct}/{macd_total}" if macd_total > 0 else "N/A"
         }

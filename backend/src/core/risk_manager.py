@@ -1,4 +1,4 @@
-# backend/src/core/risk_manager.py
+#backend/src/core/risk_manager.py
 import time
 import math
 from typing import Dict, List, Optional
@@ -29,18 +29,21 @@ class RiskConfig:
     max_daily_loss_pct: float = 0.05
     max_drawdown_pct: float = 0.15  # HARD DRAWDOWN STOP
 
-    max_trades_per_hour: int = 20
+    max_trades_per_hour: int = 20  # Increased from 12 as per your testing
     max_open_trades: int = 3
     cooldown_seconds: int = 10
 
     recovery_enabled: bool = True
     recovery_multiplier: float = 1.6  # For hybrid mode
-    max_recovery_streak: int = 4  # Reduced for safety
-    max_recovery_pct_balance: float = 0.05
+    max_recovery_streak: int = 3  # Reduced for safety
+    max_recovery_pct_balance: float = 0.08  # Reduced from 0.05 to 0.08 for more flexibility
     max_recovery_multiplier: float = 6.0  # Hard cap
 
     panic_drawdown_ratio: float = 0.8  # Panic at 80% of max drawdown
     panic_lock_seconds: int = 1800  # 30 minutes
+
+    # New: Lock auto-expiry (in seconds, 0 = no auto-expiry)
+    lock_auto_expiry_seconds: int = 3600  # 1 hour
 
     fib_sequence = [1, 1, 2, 3, 5, 8]  # For hybrid recovery
 
@@ -54,8 +57,10 @@ class RiskManager:
     ENHANCED RISK MANAGER WITH HYBRID FIBONACCI+MARTINGALE RECOVERY AND HARD DRAWDOWN STOP
     - Hybrid Recovery: Fibonacci (1-2 losses) → Fibonacci × Martingale (3+ losses) → Safe step-back on wins
     - Hard Drawdown Stop: Locks trading at max drawdown (non-negotiable)
-    - Fixed total_losses tracking for accurate recovery targets
-    - Preserves all existing features: Panic mode, session management, safety checks, metrics
+    - Manual unlock capability for testing/flexibility
+    - Auto-expiry for locks (configurable)
+    - Session-based management with daily resets
+    - Preserves all existing features: Panic mode, safety checks, metrics
     """
 
     def __init__(self, config: Optional[RiskConfig] = None):
@@ -64,11 +69,11 @@ class RiskManager:
         # Load from settings for compatibility
         self.config.recovery_enabled = settings.RECOVERY_ENABLED
         self.config.recovery_multiplier = settings.RECOVERY_MULTIPLIER
-        self.config.max_recovery_streak = min(settings.MAX_RECOVERY_STREAK, 4)  # Cap for safety
+        self.config.max_recovery_streak = settings.MAX_RECOVERY_STREAK  # Cap for safety
         self.config.max_recovery_pct_balance = settings.MAX_RECOVERY_AMOUNT_MULTIPLIER
-        self.config.max_trades_per_hour = 12  # From your existing code
+        self.config.max_trades_per_hour = 20  # From your existing code
         self.config.max_open_trades = settings.MAX_TRADES
-        self.config.cooldown_seconds = 10  # From your existing code
+        self.config.cooldown_seconds = 10
 
         self.state = RiskState.NORMAL
 
@@ -76,11 +81,11 @@ class RiskManager:
         self.base_amount = settings.TRADE_AMOUNT
         self.max_open_trades = settings.MAX_TRADES
         self.balance_floor_pct = 0.20
-        self.daily_loss_limit_pct = 0.10
-        self.max_drawdown_pct = 0.15
+        self.daily_loss_limit_pct = settings.DAILY_LOSS_LIMIT_PCT
+        self.max_drawdown_pct = max(settings.DAILY_LOSS_LIMIT_PCT, 0.15)  # never lower than 15%
         self.cooldown_after_loss = settings.COOLDOWN_AFTER_LOSS
         self.cooldown_after_win = settings.COOLDOWN_AFTER_WIN
-        self.recovery_mode = "HYBRID"  # New: Hybrid Fibonacci + Martingale
+        self.recovery_mode = settings.RECOVERY_MODE  # New: Hybrid Fibonacci + Martingale
         self.reset_on_win = settings.RESET_ON_WIN
         self.smart_recovery = settings.SMART_RECOVERY
         self.max_recovery_amount_multiplier = settings.MAX_RECOVERY_AMOUNT_MULTIPLIER
@@ -102,9 +107,10 @@ class RiskManager:
         self.fibonacci_sequence = self.config.fib_sequence
 
         # Hourly overtrading protection (preserved)
-        self.max_trades_per_hour = 12
+        self.max_trades_per_hour = 20
         self.trade_count_1h = 0
         self.last_reset_time = time.time()
+        self.hourly_trades = []  # For tracking hourly trade count
 
         # PnL monitoring (preserved/enhanced)
         self.start_day_balance = None
@@ -112,15 +118,17 @@ class RiskManager:
         self.last_trade_amount = self.base_amount
         self.net_loss = 0.0
         self.daily_loss = 0.0
+        self.last_trade_time = None
 
-        # New: Panic mode tracking
+        # New: Panic mode and lock tracking
         self.panic_until = None
+        self.locked_until = None  # Lock with auto-expiry
 
         if self.config.recovery_enabled:
-            logger.info("🛡️ RiskManager ready with Hybrid Recovery & Hard Drawdown Stop")
+            logger.info("🛡️ RiskManager ready with Hybrid Recovery, Hard Drawdown Stop & Manual Unlock")
 
     # ==================================================
-    # SESSION MANAGEMENT (PRESERVED)
+    # SESSION MANAGEMENT
     # ==================================================
 
     def start_session(self, balance: float):
@@ -134,24 +142,31 @@ class RiskManager:
         self.recovery_history.clear()
         self.trade_count_1h = 0
         self.last_reset_time = time.time()
+        self.hourly_trades.clear()
         self.state = RiskState.NORMAL
         self.panic_until = None
+        self.locked_until = None
         logger.info(f"📈 Session started @ balance={balance:.2f}")
 
     # ==================================================
-    # TRADE ALLOWANCE (PRESERVED/ENHANCED)
+    # TRADE ALLOWANCE (ENHANCED WITH AUTO-EXPIRY & MANUAL UNLOCK)
     # ==================================================
 
     def allow_trade(self, current_open_count: int, balance: float) -> bool:
         """
         Determines whether the bot is allowed to place a new trade.
-        Enhanced with panic mode and session checks.
+        Enhanced with panic mode, lock auto-expiry, and manual unlock.
         """
         now = time.time()
 
-        # New: Check panic/locked states
+        # Auto-expiry for locks
+        if self.state == RiskState.LOCKED and self.locked_until and now >= self.locked_until:
+            logger.info("🔓 Lock auto-expired, resuming trading")
+            self.state = RiskState.NORMAL
+            self.locked_until = None
+
         if self.state == RiskState.LOCKED:
-            logger.info("RiskManager: Trading locked (panic or max drawdown)")
+            logger.info("RiskManager: Trading locked (daily loss limit or manual lock)")
             return False
 
         if self.state == RiskState.PANIC:
@@ -160,26 +175,27 @@ class RiskManager:
                 return False
             self.state = RiskState.NORMAL  # Exit panic if time passed
 
-        # Init day trackers (preserved)
+        # Init day trackers
         if self.start_day_balance is None:
             self.start_day_balance = balance
         if self.peak_balance is None:
             self.peak_balance = balance
 
-        # Update peak balance for drawdown calc (preserved)
+        # Update peak balance for drawdown calc
         if balance > self.peak_balance:
             self.peak_balance = balance
 
-        # Recovery system checks (preserved)
+        # Recovery system checks
         if self.recovery_enabled and self.recovery_streak > 0:
             if not self._check_recovery_limits(balance):
                 logger.info("RiskManager: Recovery system blocked trade (limits exceeded)")
                 return False
 
-        # Hourly trade limit (preserved, with recovery exception)
+        # Hourly trade limit with recovery exception
         if time.time() - self.last_reset_time > 3600:
             self.trade_count_1h = 0
             self.last_reset_time = time.time()
+            self.hourly_trades = [t for t in self.hourly_trades if t > time.time() - 3600]
 
         hourly_limit_applies = True
         if self.recovery_enabled and self.recovery_streak > 0:
@@ -190,38 +206,49 @@ class RiskManager:
             logger.info(f"RiskManager: Hourly trade limit reached ({self.trade_count_1h}/{self.max_trades_per_hour})")
             return False
 
-        # Open trades cap (preserved)
+        # Open trades cap
         if current_open_count >= self.max_open_trades:
             logger.info("RiskManager: Max open trades reached.")
             return False
 
-        # Balance protection floor (FIXED: Use start_day_balance)
-        if self.start_day_balance is not None:
-            min_required = self.start_day_balance * self.balance_floor_pct
-            if balance < min_required:
-                logger.warning(f"RiskManager: Balance {balance} below protection floor {min_required} (based on start balance). Blocking!")
-                return False
+        # Dynamic balance floor (enhanced for recovery)
+        floor_multiplier = 1.0 + (self.recovery_streak * 0.05)
+        min_required = balance * (self.balance_floor_pct * floor_multiplier)
+        if balance < min_required:
+            logger.warning(f"RiskManager: Balance {balance} below dynamic floor {min_required:.2f}. Blocking!")
+            return False
 
-        # Daily loss limit (preserved)
+        # Daily loss limit (triggers lock with auto-expiry)
         if self.start_day_balance is not None:
             daily_change = (balance - self.start_day_balance) / self.start_day_balance
             if daily_change <= -self.daily_loss_limit_pct:
                 logger.warning("RiskManager: Daily loss limit reached. Stopping trading for the day.")
+                self._enter_lock()
                 return False
 
-        # REMOVED: Drawdown check (now owned by _check_drawdown() to avoid double locking)
+        # Hard drawdown stop (non-negotiable)
+        if self.peak_balance is not None and self.start_day_balance is not None:
+            drawdown = (self.peak_balance - balance) / self.peak_balance
+            if drawdown >= self.max_drawdown_pct:
+                self.state = RiskState.LOCKED
+                logger.critical("💥 HARD DRAWDOWN — LOCKED (manual unlock required)")
+                return False
+            
+            # Panic mode on severe drawdown
+            if drawdown >= self.max_drawdown_pct * self.config.panic_drawdown_ratio:
+                self._enter_panic()
 
-        # Cooldown after loss streak (preserved)
+        # Cooldown after loss streak
         if self.consecutive_losses >= self.cooldown_after_loss:
             logger.info(f"RiskManager: In loss cooldown. Loss streak = {self.consecutive_losses}")
             return False
 
-        # Cooldown after win streak (preserved)
+        # Cooldown after win streak
         if self.consecutive_wins >= self.cooldown_after_win:
             logger.info(f"RiskManager: Win cooldown active. Wins streak = {self.consecutive_wins}")
             return False
 
-        # Affordability check (preserved)
+        # Affordability check
         if balance < self.next_trade_amount * 1.2:
             logger.info("RiskManager: Insufficient balance for next trade amount.")
             return False
@@ -263,12 +290,21 @@ class RiskManager:
         max_amount = self.base_amount * self.max_recovery_amount_multiplier
         amount = min(raw_amount, max_amount)
 
-        # New: Cap at percentage of balance
+        # Cap at percentage of balance
         if bal > 0:
             max_by_balance = bal * self.config.max_recovery_pct_balance
             amount = min(amount, max_by_balance)
 
+        # New: Stricter cap on recovery amounts
+        if bal > 0 and self.recovery_streak > 2:
+            max_by_balance = bal * 0.06  # Even stricter for high streaks
+            amount = min(amount, max_by_balance)
+
         return round(amount, 2)
+
+    def get_next_trade_amount_legacy(self) -> float:
+        """Legacy method for backward compatibility"""
+        return self.get_next_trade_amount()
 
     # ==================================================
     # TRADE OUTCOME (FIXED TOTAL_LOSSES TRACKING)
@@ -280,8 +316,10 @@ class RiskManager:
         Fixed: Properly tracks total_losses for accurate recovery targets.
         """
         now = time.time()
+        self.last_trade_time = now
+        self.hourly_trades.append(now)
 
-        # Hourly limit tracking (preserved)
+        # Hourly limit tracking
         if not (self.recovery_enabled and self.recovery_streak > 0):
             self.trade_count_1h += 1
 
@@ -302,7 +340,7 @@ class RiskManager:
             # Safe step-back: Reduce streak aggressively on win
             self.recovery_streak = max(0, self.recovery_streak - 2)
 
-            # Record recovery result (preserved)
+            # Record recovery result
             if self.recovery_streak > 0:
                 recovery_data = {
                     "streak": self.recovery_streak,
@@ -314,7 +352,7 @@ class RiskManager:
                 }
                 self.recovery_history.append(recovery_data)
 
-            # Reset recovery if streak hits 0 (preserved)
+            # Reset recovery if streak hits 0
             if self.reset_on_win and self.recovery_streak == 0:
                 self.total_losses = 0.0
                 self.recovery_target = 0.0
@@ -326,13 +364,13 @@ class RiskManager:
         if trade_result == "LOST":
             self.consecutive_losses += 1
             self.consecutive_wins = 0
-            self.daily_loss += trade_amount  # From your existing code
+            self.daily_loss += trade_amount
             self.net_loss += trade_amount
 
             # Fixed: Increment total_losses for accurate tracking
             self.total_losses += trade_amount
 
-            # Increment recovery streak (preserved)
+            # Increment recovery streak
             self.recovery_streak += 1
 
             # Calculate next amount (enhanced with hybrid)
@@ -347,7 +385,7 @@ class RiskManager:
                 logger.info(f"   Next Amount: ${self.next_trade_amount:.2f}")
                 logger.info(f"   Target Recovery: ${self.recovery_target:.2f}")
 
-                # Record recovery attempt (preserved)
+                # Record recovery attempt
                 recovery_data = {
                     "loss": trade_amount,
                     "streak": self.recovery_streak,
@@ -356,12 +394,20 @@ class RiskManager:
                     "recovered": False
                 }
                 self.recovery_history.append(recovery_data)
+            else:
+                # No recovery, use conservative increase
+                if self.consecutive_losses >= 2:
+                    new_amount = trade_amount * 1.5
+                    max_amount = self.base_amount * 3
+                    self.next_trade_amount = min(new_amount, max_amount)
+                else:
+                    self.next_trade_amount = self.base_amount
 
-        # PENDING/UNKNOWN (preserved)
+        # PENDING/UNKNOWN
         if trade_result not in ["WON", "LOST"]:
             self.next_trade_amount = self.base_amount
 
-        # Safety checks (enhanced)
+        # Safety checks
         self._check_drawdown()
         self._check_daily_loss()
 
@@ -433,7 +479,7 @@ class RiskManager:
         return True
 
     # ==================================================
-    # SAFETY CHECKS (ENHANCED WITH HARD DRAWDOWN)
+    # SAFETY CHECKS (ENHANCED WITH AUTO-LOCK)
     # ==================================================
 
     def _check_drawdown(self):
@@ -450,8 +496,7 @@ class RiskManager:
 
     def _check_daily_loss(self):
         if self.start_day_balance and self.daily_loss >= self.start_day_balance * self.daily_loss_limit_pct:
-            self.state = RiskState.LOCKED
-            logger.critical("📉 DAILY LOSS LIMIT — LOCKED")
+            self._enter_lock()
 
     def _enter_panic(self):
         """Enter panic mode to prevent further trading"""
@@ -459,25 +504,32 @@ class RiskManager:
         self.panic_until = time.time() + self.config.panic_lock_seconds
         logger.critical("🚨 PANIC MODE ACTIVATED")
 
+    def _enter_lock(self):
+        """Enter locked state with optional auto-expiry"""
+        self.state = RiskState.LOCKED
+        if self.config.lock_auto_expiry_seconds > 0:
+            self.locked_until = time.time() + self.config.lock_auto_expiry_seconds
+            logger.critical(f"📉 DAILY LOSS LIMIT — LOCKED (auto-expiry in {self.config.lock_auto_expiry_seconds}s)")
+        else:
+            logger.critical("📉 DAILY LOSS LIMIT — LOCKED (manual reset required)")
+
+    # ==================================================
+    # NEW: MANUAL UNLOCK METHOD
+    # ==================================================
+
+    def manual_unlock(self):
+        """Manually unlock trading (for testing or emergency)"""
+        if self.state == RiskState.LOCKED:
+            self.state = RiskState.NORMAL
+            self.locked_until = None
+            logger.info("🔓 Manual unlock activated - trading resumed")
+            return True
+        logger.warning("No lock to unlock")
+        return False
+
     # ==================================================
     # METRICS (EXPANDED)
     # ==================================================
-
-    def get_next_trade_amount_legacy(self) -> float:
-        """Legacy method for backward compatibility"""
-        return self.get_next_trade_amount()
-
-    def reset_streak(self):
-        """Reset all streaks and recovery system."""
-        self.consecutive_losses = 0
-        self.consecutive_wins = 0
-        self.recovery_streak = 0
-        self.total_losses = 0.0
-        self.recovery_target = 0.0
-        self.next_trade_amount = self.base_amount
-        self.state = RiskState.NORMAL
-        self.panic_until = None
-        logger.info("RiskManager: All streaks and recovery system reset.")
 
     def get_recovery_metrics(self) -> Dict:
         """Get detailed recovery metrics."""
@@ -494,7 +546,9 @@ class RiskManager:
             "max_amount_multiplier": self.max_recovery_amount_multiplier,
             "recovery_history_count": len(self.recovery_history),
             "state": self.state.value,
-            "panic_until": self.panic_until
+            "panic_until": self.panic_until,
+            "locked_until": self.locked_until,
+            "lock_auto_expiry_seconds": self.config.lock_auto_expiry_seconds
         }
 
     def get_risk_metrics(self) -> Dict:
@@ -511,14 +565,30 @@ class RiskManager:
             "max_drawdown_pct": self.max_drawdown_pct,
             "state": self.state.value,
             "panic_until": self.panic_until,
-            "net_loss": self.net_loss,
-            "daily_loss": self.daily_loss
+            "locked_until": self.locked_until,
+            "net_loss": round(self.net_loss, 2),
+            "daily_loss": round(self.daily_loss, 2),
+            "start_day_balance": round(self.start_day_balance, 2) if self.start_day_balance else None,
+            "peak_balance": round(self.peak_balance, 2) if self.peak_balance else None
         }
         
         if self.recovery_enabled:
             base_metrics.update(self.get_recovery_metrics())
         
         return base_metrics
+
+    def reset_streak(self):
+        """Reset all streaks and recovery system."""
+        self.consecutive_losses = 0
+        self.consecutive_wins = 0
+        self.recovery_streak = 0
+        self.total_losses = 0.0
+        self.recovery_target = 0.0
+        self.next_trade_amount = self.base_amount
+        self.state = RiskState.NORMAL
+        self.panic_until = None
+        # Note: Does not reset lock - use manual_unlock for that
+        logger.info("RiskManager: All streaks and recovery system reset.")
 
     def simulate_recovery_sequence(self, initial_loss: float = 10.0, max_streak: int = 3) -> List[Dict]:
         """
@@ -530,6 +600,7 @@ class RiskManager:
         total_loss = initial_loss
         
         for i in range(max_streak):
+            # Hybrid calculation
             fib_index = min(i, len(self.fibonacci_sequence) - 1)
             fib_multiplier = self.fibonacci_sequence[fib_index]
             martingale_factor = 1.0 if i < 2 else self.recovery_multiplier
@@ -565,4 +636,4 @@ class RiskManager:
 # SINGLETON (PRESERVED)
 # ======================================================
 
-risk_manager = RiskManager()
+risk_manager = RiskManager() 

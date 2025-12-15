@@ -1,3 +1,4 @@
+# backend/src/trading/bot.py
 import asyncio
 import time
 from typing import Dict
@@ -73,6 +74,8 @@ class TradingBot:
         self.signal_history = []  # Already exists, but we'll populate it now
         self.signal_counter = 0
 
+        self.session_open = None  # New: Track session opening price
+
     # ===============================================================
     # 📡 TICK HANDLER
     # ===============================================================
@@ -126,6 +129,11 @@ class TradingBot:
         try:
             price = float(msg.get("quote", 0))
             symbol = msg.get("symbol", settings.SYMBOL)
+            
+            # New: Set session open on first tick
+            if self.session_open is None:
+                self.session_open = price
+                logger.info(f"Session open set to: {self.session_open}")
             
             # ===========================================================
             # 1. ENHANCED MARKET ANALYZER (avoid bad conditions)
@@ -218,6 +226,12 @@ class TradingBot:
             if consensus["score"] < 0.65:  # HIGHER THRESHOLD = fewer, safer trades
                 return
 
+            # Require higher consensus in ranging markets
+            market_regime = market_status.get('regime')
+            threshold = 0.75 if market_regime == "RANGING" else 0.65
+            if consensus["score"] < threshold:
+                return
+
             logger.info(f"✅ CONSENSUS OK → {consensus} | Market Regime: {market_status.get('regime')}")
 
             # ===========================================================
@@ -260,7 +274,7 @@ class TradingBot:
                     symbol=settings.SYMBOL
                 )
 
-                # Save consensus snapshot with market context
+                # Save consensus snapshot with market context (enhanced)
                 order_executor.trades[trade_id]["consensus_data"] = {
                     "method": consensus.get("method"),
                     "signals_count": len(signals),
@@ -271,7 +285,9 @@ class TradingBot:
                     "market_regime": market_status.get("regime"),
                     "volatility": market_status.get("volatility"),
                     "trend_strength": market_status.get("trend_strength"),
-                    "recovery_data": recovery_metrics if settings.RECOVERY_ENABLED else None
+                    "recovery_data": recovery_metrics if settings.RECOVERY_ENABLED else None,
+                    "side": consensus["side"],  # New: Add traded side
+                    "session_open": self.session_open  # New: Add session open
                 }
 
                 for sig in signals:
@@ -319,6 +335,17 @@ class TradingBot:
         except Exception:
             logger.exception("Connection/authorization failed")
             return
+
+        # New: Initialize risk manager session after successful authorization
+        try:
+            balance = await deriv.get_balance()
+            self.risk.start_session(balance)
+            # Optional: Reset recovery to start clean
+            self.risk.reset_streak()
+            logger.info(f"✅ Risk manager session started with balance: {balance:.2f}")
+        except Exception as e:
+            logger.error(f"Failed to start risk session: {e}")
+            # Continue without session start to avoid blocking bot startup
 
         await deriv.add_listener(self._tick_handler)
         await deriv.subscribe_ticks(settings.SYMBOL)
@@ -410,8 +437,13 @@ class TradingBot:
             if settings.RECOVERY_ENABLED:
                 recovery_metrics = self.risk.get_recovery_metrics()
                 logger.info(f"Recovery Streak  : {recovery_metrics['recovery_streak']}/{settings.MAX_RECOVERY_STREAK}")
-                logger.info(f"Total Losses     : ${recovery_metrics['total_losses']:.2f}")
-                logger.info(f"Recovery Target  : ${recovery_metrics['recovery_target']:.2f}")
+                
+                # FIXED: Use actual risk manager values
+                actual_total_losses = abs(self.risk.total_losses)
+                recovery_target = actual_total_losses / 0.82 if actual_total_losses > 0 else 0
+                
+                logger.info(f"Total Losses     : ${actual_total_losses:.2f}")
+                logger.info(f"Recovery Target  : ${recovery_target:.2f}")
                 logger.info(f"Recovery Mode    : {recovery_metrics['recovery_mode']}")
                 if recovery_metrics['recovery_streak'] > 0:
                     logger.info(f"🔁 IN RECOVERY MODE | Attempt {recovery_metrics['recovery_streak']}")

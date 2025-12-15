@@ -28,6 +28,7 @@ class Settings:
     # -----------------------
     # Advanced risk & money management
     # -----------------------
+    DAILY_LOSS_LIMIT_PCT: float = float(os.getenv("DAILY_LOSS_LIMIT_PCT", 0.10))
     MARTINGALE_MULTIPLIER: float = float(os.getenv("MARTINGALE_MULTIPLIER", 2.0))
     ANTI_MARTINGALE_MULTIPLIER: float = float(os.getenv("ANTI_MARTINGALE_MULTIPLIER", 1.5))
     COOLDOWN_AFTER_LOSS: int = int(os.getenv("COOLDOWN_AFTER_LOSS", 3))  # trades
@@ -38,7 +39,7 @@ class Settings:
     # -----------------------
     RECOVERY_ENABLED: bool = os.getenv("RECOVERY_ENABLED", "True").lower() == "true"
     RECOVERY_MULTIPLIER: float = float(os.getenv("RECOVERY_MULTIPLIER", 2.0))
-    MAX_RECOVERY_STREAK: int = int(os.getenv("MAX_RECOVERY_STREAK", 3))
+    MAX_RECOVERY_STREAK: int = int(os.getenv("MAX_RECOVERY_STREAK", 4))
     MAX_RECOVERY_AMOUNT_MULTIPLIER: float = float(os.getenv("MAX_RECOVERY_AMOUNT_MULTIPLIER", 5.0))
     RESET_ON_WIN: bool = os.getenv("RESET_ON_WIN", "True").lower() == "true"
     SMART_RECOVERY: bool = os.getenv("SMART_RECOVERY", "True").lower() == "true"

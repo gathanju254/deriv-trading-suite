@@ -253,6 +253,9 @@ class OrderExecutor:
                     consensus_data = self.trades.get(trade_id, {}).get("consensus_data", {})
                     logger.info(f"Trade closure: trade_id={trade_id}, result={result}, profit={profit}, consensus_data={consensus_data}")
 
+                    # Update risk manager and performance (KEEP ONLY THIS CALL)
+                    order_executor.risk.update_trade_outcome(result, trade.amount)
+                    profit = payout - trade.amount if payout is not None else -trade.amount
                     performance.add_trade({
                         "id": trade_id,
                         "symbol": trade.symbol,
@@ -264,17 +267,18 @@ class OrderExecutor:
                         "consensus_data": consensus_data
                     })
 
-                    self.risk.update_trade_outcome(result, trade.amount)
-
                     if trade_id in self.trades:
                         consensus_data = self.trades[trade_id].get("consensus_data", {})
                         signals = consensus_data.get("signals", [])
                         logger.info(f"ML training: trade_id={trade_id}, signals={signals}, result={result}, entry_tick={data.get('entry_tick')}")
                         try:
+                            # Updated: Pass traded_side and session_open to match new signature
                             self.consensus.add_training_sample(
                                 signals,
                                 result,
-                                data.get("entry_tick") or 0
+                                data.get("entry_tick") or 0,
+                                consensus_data.get("side", "UNKNOWN"),  # traded_side from consensus
+                                consensus_data.get("session_open")      # session_open from bot
                             )
                         except Exception:
                             logger.exception("ML training sample failed")

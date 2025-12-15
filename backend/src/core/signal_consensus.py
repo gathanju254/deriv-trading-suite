@@ -1,27 +1,28 @@
 # backend/src/core/signal_consensus.py
 from typing import List, Dict
-import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
-import joblib
-import os
 from src.config.settings import settings
 from src.utils.logger import logger
+import numpy as np
+import os
+import joblib
 
 
 class MLConsensus:
-    """Machine learning-based consensus handler"""
+    """Machine learning-based consensus handler - FIXED for side prediction"""
 
     def __init__(self):
         self.model = None
         self.scaler = StandardScaler()
         self.is_trained = False
         self.training_data: List[List[float]] = []
-        self.labels: List[str] = []
+        self.labels: List[str] = []  # Now: "PUT" or "CALL" (fixed vocabulary)
 
-    def extract_features(self, signals: List[Dict], current_price: float) -> List[float]:
+    def extract_features(self, signals: List[Dict], current_price: float, session_open: float = None) -> List[float]:
         """
         Convert signals into numerical features for ML model.
+        FIXED: Removed raw price, added normalized features.
         """
         features = []
 
@@ -46,16 +47,28 @@ class MLConsensus:
                 sum(s["score"] for s in strat_signals) if strat_signals else 0.0,
             ])
 
-        # Optional: Add normalized price for context
-        features.append(float(current_price))
+        # FIXED: Normalized price features (not raw price)
+        if session_open and session_open > 0:
+            pct_change_from_open = (current_price - session_open) / session_open
+            features.append(pct_change_from_open)
+        else:
+            features.append(0.0)  # Fallback
+
+        # Add signal strength variance (for stability)
+        scores = [s["score"] for s in signals]
+        if len(scores) > 1:
+            features.append(np.var(scores))
+        else:
+            features.append(0.0)
 
         return features
 
     def train(self, features: List[List[float]], labels: List[str]):
         """
         Train or retrain the RandomForest model.
+        FIXED: Labels are now "PUT"/"CALL".
         """
-        if len(features) < 10:
+        if len(features) < 20:  # Increased threshold
             logger.warning("Not enough samples to train ML consensus model.")
             return
 
@@ -73,11 +86,12 @@ class MLConsensus:
         os.makedirs("models", exist_ok=True)
         joblib.dump(self.model, "models/consensus_model.pkl")
         joblib.dump(self.scaler, "models/scaler.pkl")
-        logger.info("ML consensus model trained and saved.")
+        logger.info("ML consensus model trained and saved (predicting sides).")
 
     def predict(self, features: List[float]) -> Dict:
         """
         Predict side and probability using ML model.
+        FIXED: Now predicts "PUT" or "CALL".
         """
         if not self.is_trained or self.model is None:
             return None
@@ -85,7 +99,7 @@ class MLConsensus:
         try:
             X = np.array([features])
             X_scaled = self.scaler.transform(X)
-            prediction = self.model.predict(X_scaled)[0]
+            prediction = self.model.predict(X_scaled)[0]  # "PUT" or "CALL"
             probability = float(np.max(self.model.predict_proba(X_scaled)))
             return {"side": prediction, "score": probability, "method": "ml"}
         except Exception as e:
@@ -94,7 +108,7 @@ class MLConsensus:
 
 
 class SignalConsensus:
-    """Aggregates multiple strategy signals with optional ML consensus"""
+    """Aggregates multiple strategy signals with optional ML consensus - ENHANCED"""
 
     def __init__(self, min_score: float = None):
         self.min_score = min_score or settings.MIN_CONSENSUS_SCORE
@@ -108,22 +122,23 @@ class SignalConsensus:
                 self.ml_consensus.model = joblib.load("models/consensus_model.pkl")
                 self.ml_consensus.scaler = joblib.load("models/scaler.pkl")
                 self.ml_consensus.is_trained = True
-                logger.info("ML consensus model loaded successfully.")
+                logger.info("ML consensus model loaded (side prediction).")
         except Exception as e:
             logger.warning(f"Failed to load ML model: {e}")
 
-    def aggregate(self, signals: List[Dict], current_price: float = None) -> Dict:
+    def aggregate(
+        self,
+        signals: List[Dict],
+        current_price: float = None,
+        session_open: float = None
+    ) -> Dict:
         """
-        Loss-optimized signal aggregation:
-        - Removes weak/noisy signals
-        - Requires multi-strategy agreement
-        - Requires minimum confidence
-        - Filters conflicting signals
-        - Applies trend + volatility checks
-        - Integrates ML model safely
+        Loss-optimized signal aggregation.
+        ML-safe, feature-validated, fallback-protected.
         """
+
         # ---------------------------------------------------------
-        # 0. Sanity check
+        # 0. SANITY CHECK
         # ---------------------------------------------------------
         if not signals:
             return None
@@ -131,169 +146,173 @@ class SignalConsensus:
         # ---------------------------------------------------------
         # 1. FILTER OUT WEAK SIGNALS
         # ---------------------------------------------------------
-        strong = [s for s in signals if s.get("score", 0) >= 0.6]  # Lowered from 0.7
-        if len(strong) < 1:  # Changed from 2 to 1 to allow single strong signal
+        strong = [s for s in signals if s.get("score", 0) >= 0.6]
+        if len(strong) < 2:
             return None
 
         # ---------------------------------------------------------
-        # 2. STRATEGY DIVERSITY (preferred but not required)
+        # 2. STRATEGY DIVERSITY CHECK
         # ---------------------------------------------------------
         strategies = {s.get("meta", {}).get("strategy") for s in strong}
-        if len(strategies) < 1:  # Changed from 2 to 1
+        if len(strategies) < 2:
             return None
 
         # ---------------------------------------------------------
-        # 3. IMPROVED CONFLICT DETECTION
-        # Only reject if conflicting signals are close in strength
+        # 3. CONFLICT DETECTION (BIAS SEEKING)
+        # Reject only if signals are TOO CLOSE (murky market)
         # ---------------------------------------------------------
         call_signals = [s for s in strong if s["side"].upper() == "CALL"]
         put_signals = [s for s in strong if s["side"].upper() == "PUT"]
-        
-        call_strength = sum(s["score"] for s in call_signals) if call_signals else 0.0
-        put_strength = sum(s["score"] for s in put_signals) if put_signals else 0.0
-        
-        has_call = len(call_signals) > 0
-        has_put = len(put_signals) > 0
-        
-        # Only reject trade if we have both sides AND they're close in strength
-        if has_call and has_put:
-            strength_diff = abs(call_strength - put_strength)
+
+        call_strength = sum(s["score"] for s in call_signals)
+        put_strength = sum(s["score"] for s in put_signals)
+
+        if call_signals and put_signals:
             total_strength = call_strength + put_strength
-            
             if total_strength > 0:
-                relative_diff = strength_diff / total_strength
-                # If signals are too close in strength (difference < 40%), skip
-                if relative_diff < 0.4:
-                    logger.info(f"Conflict detection: signals too close (diff={relative_diff:.2f})")
+                conflict_ratio = abs(call_strength - put_strength) / total_strength
+                # Reject if market bias is unclear
+                if conflict_ratio < 0.30:
+                    logger.debug(f"Conflict too close: ratio={conflict_ratio:.2f}")
                     return None
 
         # ---------------------------------------------------------
-        # 4. VOLATILITY FILTER (avoid choppy markets) - More permissive
+        # 4. VOLATILITY FILTER (ANTI-CHOP)
         # ---------------------------------------------------------
         try:
-            scores = [s.get("score", 0.5) for s in strong]
+            scores = [s["score"] for s in strong]
             volatility = max(scores) - min(scores)
-            if volatility > 0.45:  # Increased from 0.35 to 0.45
-                logger.info(f"High strategy volatility: {volatility:.2f}")
+            if volatility > 0.45:
+                logger.debug(f"High signal volatility: {volatility:.2f}")
                 return None
         except Exception:
             pass
 
         # ---------------------------------------------------------
-        # 5. TRADITIONAL CONSENSUS (weighted)
+        # 5. TRADITIONAL CONSENSUS (WEIGHTED)
         # ---------------------------------------------------------
         agg = {"CALL": 0.0, "PUT": 0.0}
         for s in strong:
-            side = s["side"].upper()
-            agg[side] += float(s.get("score", 0.5))
+            agg[s["side"].upper()] += float(s.get("score", 0.5))
 
-        # Decide direction
         if agg["CALL"] == agg["PUT"]:
-            return None  # no clear bias
+            return None
 
         traditional_side = "CALL" if agg["CALL"] > agg["PUT"] else "PUT"
-        total = agg["CALL"] + agg["PUT"] or 1.0
+        total = agg["CALL"] + agg["PUT"]
         traditional_score = agg[traditional_side] / total
 
-        # Minimum score filter - lowered threshold
-        if traditional_score < max(self.min_score, 0.55):  # Minimum 0.55
-            logger.info(f"Traditional score too low: {traditional_score:.2f}")
+        if traditional_score < max(self.min_score, 0.55):
             return None
 
         # ---------------------------------------------------------
-        # 6. ML CONSENSUS (used only if stable + trained)
+        # 6. ML CONSENSUS (VALIDATED + SAFE)
         # ---------------------------------------------------------
         ml_result = None
+
         if (
             settings.ML_CONSENSUS_ENABLED
             and self.ml_consensus.is_trained
             and current_price is not None
         ):
-            features = self.ml_consensus.extract_features(strong, current_price)
-            ml_result = self.ml_consensus.predict(features)
+            try:
+                features = self.ml_consensus.extract_features(
+                    strong, current_price, session_open
+                )
+
+                # DEBUG: Feature validation
+                logger.debug(f"ML Features ({len(features)}): {features}")
+
+                EXPECTED_FEATURES = 13
+                if len(features) != EXPECTED_FEATURES:
+                    logger.warning(
+                        f"ML feature mismatch: expected {EXPECTED_FEATURES}, got {len(features)}. "
+                        "Falling back to traditional."
+                    )
+                else:
+                    ml_result = self.ml_consensus.predict(features)
+
+            except Exception as e:
+                logger.error(f"ML prediction failed: {e}. Falling back to traditional.")
 
         # ---------------------------------------------------------
         # 7. SMART COMBINATION LOGIC
-        # ML only overrides if:
-        #   • ML score significantly higher
-        #   • ML side does NOT conflict traditional
         # ---------------------------------------------------------
         if ml_result:
             ml_side = ml_result["side"]
             ml_score = ml_result["score"]
 
             if (
-                ml_score >= 0.70  # Lowered from 0.75 to 0.70
-                and ml_side == traditional_side  # no conflict
-                and ml_score > traditional_score + 0.05  # Lowered from 0.1 to 0.05
+                ml_score >= 0.70
+                and ml_side == traditional_side
+                and ml_score > traditional_score + 0.05
             ):
-                logger.info(f"ML consensus overriding traditional: {ml_score:.2f} > {traditional_score:.2f}")
-                return {
-                    "side": ml_side,
-                    "score": ml_score,
-                    "sources": len(strong),
-                    "strategies": list(strategies),
-                    "method": "ml",
-                    "traditional_score": traditional_score,
-                    "ml_score": ml_score,
-                }
+                final_side = ml_side
+                final_score = ml_score
+                method = "ml_override"
+            else:
+                final_side = traditional_side
+                final_score = traditional_score
+                method = "traditional"
+        else:
+            final_side = traditional_side
+            final_score = traditional_score
+            method = "traditional"
 
         # ---------------------------------------------------------
-        # 8. DEFAULT → TRADITIONAL CONSENSUS
+        # 8. FINAL OUTPUT
         # ---------------------------------------------------------
         return {
-            "side": traditional_side,
-            "score": traditional_score,
+            "side": final_side,
+            "score": final_score,
             "sources": len(strong),
             "strategies": list(strategies),
-            "method": "traditional",
+            "method": method,
             "traditional_score": traditional_score,
             "ml_score": ml_result["score"] if ml_result else 0.0,
         }
 
-    def add_training_sample(self, signals: List[Dict], outcome: str, current_price: float):
+    def add_training_sample(self, signals: List[Dict], outcome: str, current_price: float, traded_side: str, session_open: float = None):
         """
-        Add a labeled sample to ML dataset and retrain periodically.
+        Add a labeled sample to ML dataset.
+        FIXED: Label is traded_side ("PUT"/"CALL"), not outcome.
         """
         if not settings.ML_CONSENSUS_ENABLED:
             return
 
         if not signals:
-            logger.warning("ML training sample skipped: signals list is empty.")
             return
 
-        logger.info(f"ML training sample added. Outcome: {outcome}, Current sample count: {len(self.ml_consensus.training_data) + 1}")
-        features = self.ml_consensus.extract_features(signals, current_price)
+        features = self.ml_consensus.extract_features(signals, current_price, session_open)
         self.ml_consensus.training_data.append(features)
-        self.ml_consensus.labels.append(outcome)
+        self.ml_consensus.labels.append(traded_side.upper())  # "PUT" or "CALL"
 
         # Retrain periodically
         if len(self.ml_consensus.training_data) >= 50:
             self.ml_consensus.train(self.ml_consensus.training_data, self.ml_consensus.labels)
             self.ml_consensus.training_data.clear()
             self.ml_consensus.labels.clear()
-            logger.info("ML consensus retrained with latest samples.")
+            logger.info("ML consensus retrained (side prediction).")
 
     def generate_consensus_signal(self, strategies, symbol: str, price: float) -> Dict:
-        """Generate consensus signal from multiple strategies"""
+        """Generate consensus signal from multiple strategies (unchanged)"""
         try:
             signals = []
             confidences = []
             
             for strategy in strategies:
-                sig = strategy.analyze(symbol)
-                if sig and sig.get("direction"):
-                    signals.append(sig["direction"])
-                    confidences.append(sig.get("confidence", 0.5))
+                signal = strategy.on_tick({"quote": price, "symbol": symbol})
+                if signal:
+                    signals.append(signal["side"])
+                    confidences.append(signal["score"])
             
             if not signals:
-                return None
+                return {"direction": "HOLD", "confidence": 0.0, "strength": 0}
             
-            # Majority vote
-            bullish = signals.count("BUY")
-            bearish = signals.count("SELL")
+            bullish = signals.count("CALL")
+            bearish = signals.count("PUT")
             
-            direction = "BUY" if bullish > bearish else "SELL" if bearish > bullish else "HOLD"
+            direction = "CALL" if bullish > bearish else "PUT" if bearish > bullish else "HOLD"
             confidence = sum(confidences) / len(confidences) if confidences else 0.5
             strength = (max(bullish, bearish) / len(signals)) * 100 if signals else 50
             
@@ -301,8 +320,8 @@ class SignalConsensus:
                 "direction": direction,
                 "confidence": confidence,
                 "strength": strength,
-                "reason": f"{bullish} bullish, {bearish} bearish signals"
+                "reason": f"{bullish} call, {bearish} put signals"
             }
         except Exception as e:
-            logger.error(f"Error generating consensus signal: {e}")
-            return None
+            logger.error(f"Consensus signal error: {e}")
+            return {"direction": "HOLD", "confidence": 0.0, "strength": 0}
