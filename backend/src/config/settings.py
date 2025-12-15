@@ -17,13 +17,15 @@ class Settings:
     # -----------------------
     SYMBOL: str = os.getenv("SYMBOL", "R_100")
     TRADE_AMOUNT: float = float(os.getenv("TRADE_AMOUNT", 1.0))
-    MAX_TRADES: int = int(os.getenv("MAX_TRADES", 3))
+    MAX_TRADES_PER_HOUR: int = int(os.getenv("MAX_TRADES_PER_HOUR", 20))
+    MAX_TRADES: int = int(os.getenv("MAX_TRADES", 100))
     STOP_LOSS_PERCENT: float = float(os.getenv("STOP_LOSS_PERCENT", 5))
     TAKE_PROFIT_PERCENT: float = float(os.getenv("TAKE_PROFIT_PERCENT", 10))
     MIN_CONSENSUS_SCORE: float = float(os.getenv("MIN_CONSENSUS_SCORE", 0.6))
     BASE_CURRENCY: str = os.getenv("BASE_CURRENCY", "USD")
     CONTRACT_DURATION: int = int(os.getenv("CONTRACT_DURATION", 5))
     TIMEFRAME: str = os.getenv("TIMEFRAME", "1m")
+
 
     # -----------------------
     # Advanced risk & money management

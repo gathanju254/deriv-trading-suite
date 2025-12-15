@@ -71,7 +71,7 @@ class RiskManager:
         self.config.recovery_multiplier = settings.RECOVERY_MULTIPLIER
         self.config.max_recovery_streak = settings.MAX_RECOVERY_STREAK  # Cap for safety
         self.config.max_recovery_pct_balance = settings.MAX_RECOVERY_AMOUNT_MULTIPLIER
-        self.config.max_trades_per_hour = 20  # From your existing code
+        self.config.max_trades_per_hour = settings.MAX_TRADES_PER_HOUR  # Load from settings (single source of truth)
         self.config.max_open_trades = settings.MAX_TRADES
         self.config.cooldown_seconds = 10
 
@@ -107,7 +107,7 @@ class RiskManager:
         self.fibonacci_sequence = self.config.fib_sequence
 
         # Hourly overtrading protection (preserved)
-        self.max_trades_per_hour = 20
+        self.max_trades_per_hour = settings.MAX_TRADES_PER_HOUR  # Load from settings (single source of truth)
         self.trade_count_1h = 0
         self.last_reset_time = time.time()
         self.hourly_trades = []  # For tracking hourly trade count
@@ -636,4 +636,4 @@ class RiskManager:
 # SINGLETON (PRESERVED)
 # ======================================================
 
-risk_manager = RiskManager() 
+risk_manager = RiskManager()
