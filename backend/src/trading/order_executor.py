@@ -195,29 +195,33 @@ class OrderExecutor:
                 pass
 
         if is_sold:
-            # Get payout from various possible fields
-            payout_fields = ["payout", "profit", "sell_price", "buy_price", "bid_price"]
+            # Get payout from various possible fields - PRIORITIZE ACTUAL RECEIVED PAYOUT
+            payout_fields = ["sell_price", "bid_price", "payout", "buy_price"]  # Moved sell_price/bid_price first
+            payout = 0.0
             for field in payout_fields:
                 if field in data and data[field] is not None:
                     try:
                         val = float(data[field])
-                        # For profit field, it's already net (buy_price - payout)
-                        if field == "profit":
-                            payout = data.get("buy_price", 0) + val  # Reconstruct payout
-                        else:
-                            payout = val
+                        payout = val
                         break
                     except (ValueError, TypeError):
                         continue
-            
-            # Determine result based on profit
+        
+            # Determine result based on profit - USE DIRECTLY WHEN AVAILABLE
             profit = data.get("profit", 0)
             try:
                 profit = float(profit)
             except (ValueError, TypeError):
                 profit = 0
             
-            result = "WON" if profit > 0 else "LOST"
+            # For expired contracts without profit field, assume LOSS
+            if "profit" not in data and data.get("is_expired"):
+                profit = -trade.amount if trade else 0
+                payout = 0.0
+                result = "LOST"
+            else:
+                result = "WON" if profit > 0 else "LOST"
+            
             logger.info(f"🎯 Contract {contract_id} SETTLED: result={result}, payout={payout}, profit={profit}")
 
             # Update contract DB record

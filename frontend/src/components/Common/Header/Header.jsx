@@ -30,13 +30,13 @@ const Header = () => {
 
       <div className="header-right">
         <button className="icon-button" aria-label="Notifications">
-          <Bell size={24} /> {/* Increased size for mobile touch */}
+          <Bell size={24} />
         </button>
         <button className="icon-button" aria-label="Settings">
-          <Settings size={24} /> {/* Increased size for mobile touch */}
+          <Settings size={24} />
         </button>
         <button className="icon-button" aria-label="User profile">
-          <User size={24} /> {/* Increased size for mobile touch */}
+          <User size={24} />
         </button>
       </div>
     </header>

@@ -1,171 +1,166 @@
 /* frontend/src/components/Common/Header/Header.css */
+/* ============================= */
+/* ========= HEADER ============ */
+/* ============================= */
+
 .header {
+  position: fixed;               /* 🔒 truly fixed */
+  top: 0;
+  left: 0;
+  right: 0;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
-  background-color: #1e293b;
-  border-bottom: 1px solid #374151;
+
   height: 70px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  transition: padding 0.3s ease; /* Smooth transition for responsive padding */
+  padding: 0 24px;
+
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border-bottom: 1px solid #374151;
+
+  z-index: 1000;
+  overflow-x: hidden;
 }
+
+/* ============================= */
+/* ======== LEFT SIDE ========== */
+/* ============================= */
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
-/* Mobile: Show menu button, hide sidebar toggle */
+/* Mobile menu button (hamburger) */
 .menu-button {
   display: none;
+  align-items: center;
+  justify-content: center;
+
   background: none;
   border: none;
   color: #f8fafc;
+
   cursor: pointer;
-  padding: 12px; /* Larger touch target */
-  border-radius: 8px;
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  padding: 10px;
+  border-radius: 10px;
+
+  transition: background-color 0.2s ease;
 }
 
 .menu-button:hover {
   background-color: #374151;
 }
 
-.menu-button:active {
-  transform: scale(0.95); /* Subtle feedback on tap */
-}
-
+/* Desktop sidebar toggle */
 .sidebar-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
+
   background: none;
   border: none;
   color: #f8fafc;
+
   cursor: pointer;
-  padding: 12px; /* Larger touch target */
-  border-radius: 8px;
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  padding: 10px;
+  border-radius: 10px;
+
+  transition: background-color 0.2s ease;
 }
 
 .sidebar-toggle:hover {
   background-color: #374151;
 }
 
-.sidebar-toggle:active {
-  transform: scale(0.95); /* Subtle feedback on tap */
-}
-
-/* Removed: header-center styles since the section is gone */
+/* ============================= */
+/* ======== RIGHT SIDE ========= */
+/* ============================= */
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0; /* Prevent shrinking on small screens */
+  flex-shrink: 0;
 }
 
+/* Icon buttons (Bell, Settings, User) */
 .icon-button {
   display: flex;
   align-items: center;
   justify-content: center;
+
   background: none;
   border: none;
   color: #f8fafc;
+
   cursor: pointer;
-  padding: 12px; /* Larger touch target for mobile */
-  border-radius: 8px;
-  transition: background-color 0.2s ease, transform 0.1s ease;
-  min-width: 44px; /* Minimum touch target size for accessibility */
-  min-height: 44px;
+  padding: 10px;
+  border-radius: 10px;
+
+  transition:
+    background-color 0.2s ease,
+    transform 0.15s ease;
 }
 
 .icon-button:hover {
   background-color: #374151;
+  transform: translateY(-1px);
 }
 
 .icon-button:active {
-  transform: scale(0.95); /* Subtle feedback on tap */
+  transform: translateY(0);
 }
 
-.icon-button:focus-visible {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
+/* ============================= */
+/* ===== MOBILE BEHAVIOR ======= */
+/* ============================= */
 
-/* Mobile-specific enhancements */
 @media (max-width: 768px) {
   .header {
-    padding: 12px 16px; /* Reduced padding for more space */
-    height: auto; /* Allow flexible height */
-    min-height: 60px; /* Minimum height to prevent cramping */
+    padding: 0 16px;
+    height: 64px;
   }
 
+  /* Show hamburger */
   .menu-button {
-    display: flex; /* Show on mobile */
+    display: flex;
   }
 
+  /* Hide desktop sidebar toggle */
   .sidebar-toggle {
-    display: none; /* Hide on mobile */
+    display: none;
   }
 
-  .header-left {
-    gap: 8px; /* Tighter gap */
-  }
-
+  /* Compress right side icons */
   .header-right {
-    gap: 4px; /* Tighter gap to fit more buttons */
-    flex-wrap: wrap; /* Allow wrapping if needed */
-    justify-content: flex-end;
+    gap: 4px;
   }
 
   .icon-button {
-    padding: 10px; /* Slightly smaller but still touch-friendly */
-    min-width: 40px;
-    min-height: 40px;
+    padding: 12px; /* Bigger tap targets for mobile */
+  }
+
+  /* Hide less-critical icons on smaller screens */
+  .icon-button[aria-label="Settings"] {
+    display: none;
   }
 }
 
-/* Extra small screens */
+/* ============================= */
+/* ===== EXTRA SMALL ========= */
+/* ============================= */
+
 @media (max-width: 480px) {
   .header {
-    padding: 8px 12px;
+    padding: 0 12px;
   }
 
-  .header-right {
-    gap: 2px; /* Minimal gap */
-  }
-
-  .icon-button {
-    padding: 8px;
-    min-width: 36px;
-    min-height: 36px;
-  }
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .header {
-    border-bottom-width: 2px;
-  }
-
-  .menu-button,
-  .sidebar-toggle,
-  .icon-button {
-    border: 1px solid #f8fafc;
-  }
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .menu-button,
-  .sidebar-toggle,
-  .icon-button {
-    transition: none;
-    transform: none !important;
+  /* Only show notifications + profile */
+  .icon-button[aria-label="Notifications"] {
+    display: none;
   }
 }

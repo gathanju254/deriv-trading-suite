@@ -18,8 +18,8 @@ class MarketAnalyzer:
         self.recent_prices: List[float] = []
         self.max_history = 100
         self.volatility_threshold = 0.004  # Keep high to avoid extreme volatility
-        self.min_volatility_threshold = 0.00001 # Lower from 0.00001 to allow very flat markets
-        self.trend_strength_threshold = 0.000005   # Lower from 0.00005 to allow weaker trends
+        self.min_volatility_threshold = 0.00000 # Lower from 0.00001 to allow very flat markets
+        self.trend_strength_threshold = 0.000000   # Lower from 0.00005 to allow weaker trends
         
         # Market state tracking
         self.consecutive_rejects = 0

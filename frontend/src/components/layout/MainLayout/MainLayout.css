@@ -1,29 +1,99 @@
 /* frontend/src/components/layout/MainLayout/MainLayout.css */
+/* Enhanced MainLayout.css - Improved responsiveness, animations, and polish, and accessibility */
+
 .main-layout {
   display: flex;
   min-height: 100vh;
-  background-color: #0f172a;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%); /* Enhanced gradient for depth */
   color: #f8fafc;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  overflow-x: hidden; /* Prevent horizontal bleed */
 }
 
+/* Main content area with enhanced glassmorphism and smooth transitions */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  margin-left: 250px;
-  transition: margin-left 0.3s ease;
+  margin-left: 250px; /* Default expanded sidebar */
+  transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease; /* Smoother easing */
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px); /* Stronger blur for glass effect */
+  border-left: 1px solid rgba(148, 163, 184, 0.1);
+  opacity: 0;
+  transform: translateY(20px) scale(0.98); /* Subtle lift and scale for animation */
+  transition: opacity 0.6s ease, transform 0.6s ease, margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.1); /* Inner shadow for depth */
 }
 
+/* Collapsed sidebar state */
 .main-layout.sidebar-collapsed .main-content {
   margin-left: 80px;
 }
 
+/* Loaded state for initial animation */
+.main-layout.loaded .main-content {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  animation: bounceIn 0.8s ease-out; /* New: Bounce effect on load */
+}
+
+/* Staggered content load */
+.main-content.content-loaded {
+  animation: fadeInStagger 0.5s ease-out 0.3s both; /* Staggered fade for children */
+}
+
+/* Content area with better padding and overflow */
 .content-area {
   flex: 1;
   padding: 24px;
+  padding-top: 94px; /* 70px header + 24px padding */
   overflow-y: auto;
+  min-height: calc(100vh - 140px);
+  scroll-behavior: smooth; /* Smooth scrolling */
 }
 
+/* Skip link for accessibility - more visible on focus */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #3b82f6;
+  color: white;
+  padding: 8px 16px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 1000;
+  transition: top 0.3s ease, box-shadow 0.3s ease;
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 6px;
+  outline: 2px solid #f8fafc;
+  outline-offset: 2px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Mobile overlay with improved interaction */
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6); /* Darker for better focus */
+  z-index: 49;
+  display: none;
+  backdrop-filter: blur(4px); /* Subtle blur */
+  transition: opacity 0.3s ease;
+}
+
+.mobile-overlay:focus {
+  outline: none; /* Prevent focus outline on overlay */
+}
+
+/* Mobile-specific styles */
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
@@ -31,5 +101,92 @@
   
   .main-layout.sidebar-collapsed .main-content {
     margin-left: 0;
+  }
+  
+  .content-area {
+    padding: 16px;
+    padding-top: 80px; /* 64px header + 16px padding */
+    min-height: calc(100vh - 120px);
+  }
+  
+  .mobile-overlay {
+    display: block;
+  }
+  
+  .main-layout.mobile-menu-open .mobile-overlay {
+    opacity: 1;
+  }
+}
+
+/* Tablet adjustments */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .content-area {
+    padding: 20px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .main-content {
+    border-left-width: 2px;
+    background: rgba(15, 23, 42, 1); /* Solid background for contrast */
+  }
+  
+  .skip-link {
+    border: 2px solid #f8fafc;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .main-content,
+  .skip-link,
+  .mobile-overlay {
+    transition: none;
+    animation: none;
+  }
+  
+  .main-layout.loaded .main-content {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Custom animations */
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-5px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeInStagger {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Print styles (hide layout elements) */
+@media print {
+  .main-layout {
+    display: block;
+  }
+  
+  .mobile-overlay,
+  .skip-link {
+    display: none;
   }
 }

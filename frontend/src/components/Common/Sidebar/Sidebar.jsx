@@ -10,12 +10,12 @@ import {
   Wallet
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
-import { useTrading } from '../../../context/TradingContext'; // New: Import TradingContext
+import { useTrading } from '../../../context/TradingContext';
 import './Sidebar.css';
 
 const Sidebar = () => {
   const { sidebarCollapsed, mobileMenuOpen, toggleMobileMenu } = useApp();
-  const { balance } = useTrading();  // New: Access balance from context
+  const { balance } = useTrading();
 
   const menuItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
@@ -30,17 +30,33 @@ const Sidebar = () => {
     }
   };
 
+  // New: Handle keyboard events for accessibility (close on Escape)
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape' && mobileMenuOpen) {
+      toggleMobileMenu();
+    }
+  };
+
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile overlay - enhanced for better interaction */}
       {mobileMenuOpen && (
         <div 
           className="sidebar-overlay"
           onClick={toggleMobileMenu}
+          onKeyDown={handleKeyDown} // New: Keyboard support
+          tabIndex={-1} // New: Focus management
+          aria-hidden="true"
+          role="presentation"
         />
       )}
 
-      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+      <aside 
+        className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}
+        role="navigation" // New: Semantic role for accessibility
+        aria-label="Main navigation"
+        onKeyDown={handleKeyDown} // New: Keyboard support on sidebar
+      >
         <div className="sidebar-header">
           <div className="logo">
             <Bot size={32} />
@@ -62,6 +78,7 @@ const Sidebar = () => {
                       `nav-link ${isActive ? 'active' : ''}`
                     }
                     onClick={handleNavClick}
+                    aria-label={`Navigate to ${item.label}`} // New: ARIA label for links
                   >
                     <Icon size={20} />
                     {!sidebarCollapsed && (

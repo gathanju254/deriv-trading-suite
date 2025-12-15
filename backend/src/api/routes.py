@@ -238,6 +238,14 @@ async def reset_risk():
     trading_bot.risk.reset_streak()
     return {"status": "Risk streaks reset"}
 
+@router.post("/risk/unlock")
+async def manual_unlock():
+    """Manually unlock trading if locked"""
+    success = trading_bot.risk.manual_unlock()
+    if success:
+        return {"status": "Trading unlocked"}
+    return {"status": "No lock to unlock"}
+
 
 # ============================================================
 # STRATEGY PERFORMANCE
