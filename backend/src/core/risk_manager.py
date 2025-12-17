@@ -82,6 +82,7 @@ class RiskManager:
         self.max_open_trades = settings.MAX_TRADES
         self.balance_floor_pct = 0.20
         self.daily_loss_limit_pct = settings.DAILY_LOSS_LIMIT_PCT
+        self.daily_profit_limit_pct = settings.DAILY_PROFIT_LIMIT_PCT  # NEW: Daily profit limit
         self.max_drawdown_pct = max(settings.DAILY_LOSS_LIMIT_PCT, 0.15)  # never lower than 15%
         self.cooldown_after_loss = settings.COOLDOWN_AFTER_LOSS
         self.cooldown_after_win = settings.COOLDOWN_AFTER_WIN
@@ -118,6 +119,7 @@ class RiskManager:
         self.last_trade_amount = self.base_amount
         self.net_loss = 0.0
         self.daily_loss = 0.0
+        self.daily_profit = 0.0  # NEW: Track daily profit
         self.last_trade_time = None
 
         # New: Panic mode and lock tracking
@@ -126,6 +128,8 @@ class RiskManager:
 
         if self.config.recovery_enabled:
             logger.info("🛡️ RiskManager ready with Hybrid Recovery, Hard Drawdown Stop & Manual Unlock")
+            
+        logger.info(f"⏱️ Max trades per hour set to {self.max_trades_per_hour}")
 
     # ==================================================
     # SESSION MANAGEMENT
@@ -136,6 +140,7 @@ class RiskManager:
         self.start_day_balance = balance
         self.peak_balance = balance
         self.daily_loss = 0.0
+        self.daily_profit = 0.0  # NEW: Reset daily profit per session
         self.net_loss = 0.0
         self.recovery_streak = 0
         self.total_losses = 0.0  # Reset losses per session
@@ -238,13 +243,13 @@ class RiskManager:
             if drawdown >= self.max_drawdown_pct * self.config.panic_drawdown_ratio:
                 self._enter_panic()
 
-        # Cooldown after loss streak
-        if self.consecutive_losses >= self.cooldown_after_loss:
+        # Cooldown after loss streak (only if cooldown is enabled)
+        if self.cooldown_after_loss > 0 and self.consecutive_losses >= self.cooldown_after_loss:
             logger.info(f"RiskManager: In loss cooldown. Loss streak = {self.consecutive_losses}")
             return False
 
-        # Cooldown after win streak
-        if self.consecutive_wins >= self.cooldown_after_win:
+        # Cooldown after win streak (only if cooldown is enabled)
+        if self.cooldown_after_win > 0 and self.consecutive_wins >= self.cooldown_after_win:
             logger.info(f"RiskManager: Win cooldown active. Wins streak = {self.consecutive_wins}")
             return False
 
@@ -336,6 +341,14 @@ class RiskManager:
             # Fixed: Reduce total_losses on win (caps at 0)
             self.total_losses = max(0.0, self.total_losses - trade_amount)
             self.net_loss = max(0.0, self.net_loss - trade_amount)
+
+            # NEW: Track daily profit and check limit
+            self.daily_profit += trade_amount * 0.95  # Approx payout (adjust if needed)
+            daily_profit_pct = self.daily_profit / self.start_day_balance if self.start_day_balance else 0
+            if daily_profit_pct >= self.daily_profit_limit_pct:
+                self.state = RiskState.LOCKED
+                self.locked_until = time.time() + 3600  # 1-hour auto-expiry
+                logger.info("🎯 DAILY PROFIT TARGET REACHED - Locking trades")
 
             # Safe step-back: Reduce streak aggressively on win
             self.recovery_streak = max(0, self.recovery_streak - 2)
@@ -568,6 +581,7 @@ class RiskManager:
             "locked_until": self.locked_until,
             "net_loss": round(self.net_loss, 2),
             "daily_loss": round(self.daily_loss, 2),
+            "daily_profit": round(self.daily_profit, 2),  # NEW: Include daily profit in metrics
             "start_day_balance": round(self.start_day_balance, 2) if self.start_day_balance else None,
             "peak_balance": round(self.peak_balance, 2) if self.peak_balance else None
         }

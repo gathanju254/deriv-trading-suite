@@ -31,6 +31,7 @@ class Settings:
     # Advanced risk & money management
     # -----------------------
     DAILY_LOSS_LIMIT_PCT: float = float(os.getenv("DAILY_LOSS_LIMIT_PCT", 0.10))
+    DAILY_PROFIT_LIMIT_PCT: float = float(os.getenv("DAILY_PROFIT_LIMIT_PCT", 0.10))  # NEW: 10% daily profit cap
     MARTINGALE_MULTIPLIER: float = float(os.getenv("MARTINGALE_MULTIPLIER", 2.0))
     ANTI_MARTINGALE_MULTIPLIER: float = float(os.getenv("ANTI_MARTINGALE_MULTIPLIER", 1.5))
     COOLDOWN_AFTER_LOSS: int = int(os.getenv("COOLDOWN_AFTER_LOSS", 3))  # trades
