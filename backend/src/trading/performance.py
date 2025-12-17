@@ -21,7 +21,10 @@ class PerformanceTracker:
         self.weekly_pnl: Dict[str, float] = {}
         self.monthly_pnl: Dict[str, float] = {}
         
-        # Load existing trades from database on startup
+        # Remove this line: self._load_existing_trades()
+
+    def initialize_after_db(self):
+        """Load existing trades after database is created."""
         self._load_existing_trades()
 
     def _load_existing_trades(self):

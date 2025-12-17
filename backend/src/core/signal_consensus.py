@@ -223,7 +223,7 @@ class SignalConsensus:
                 # DEBUG: Feature validation
                 logger.debug(f"ML Features ({len(features)}): {features}")
 
-                EXPECTED_FEATURES = 13
+                EXPECTED_FEATURES = 14  # Updated expected feature count
                 if len(features) != EXPECTED_FEATURES:
                     logger.warning(
                         f"ML feature mismatch: expected {EXPECTED_FEATURES}, got {len(features)}. "

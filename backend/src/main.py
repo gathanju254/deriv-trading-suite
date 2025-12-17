@@ -19,6 +19,9 @@ from src.trading.bot import trading_bot
 from src.db.session import engine
 from src.db.base import Base
 
+# --- Performance tracker import ---
+from src.trading.performance import performance  # Add this line
+
 # Import models so SQLAlchemy registers them
 import src.db.models.trade
 import src.db.models.contract
@@ -96,6 +99,9 @@ app.include_router(ws_router)
 async def startup_event():
     logger.info("Initializing database...")
     Base.metadata.create_all(bind=engine)
+    
+    # Initialize performance tracker after DB is ready
+    performance.initialize_after_db()
 
     logger.info("Launching Trading Bot background task...")
     asyncio.create_task(trading_bot.run())

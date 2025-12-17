@@ -36,7 +36,7 @@ class RiskConfig:
     recovery_enabled: bool = True
     recovery_multiplier: float = 1.6  # For hybrid mode
     max_recovery_streak: int = 3  # Reduced for safety
-    max_recovery_pct_balance: float = 0.08  # Reduced from 0.05 to 0.08 for more flexibility
+    max_recovery_pct_balance: float = 0.10  # Reduced from 0.05 to 0.08 for more flexibility
     max_recovery_multiplier: float = 6.0  # Hard cap
 
     panic_drawdown_ratio: float = 0.8  # Panic at 80% of max drawdown
@@ -70,7 +70,8 @@ class RiskManager:
         self.config.recovery_enabled = settings.RECOVERY_ENABLED
         self.config.recovery_multiplier = settings.RECOVERY_MULTIPLIER
         self.config.max_recovery_streak = settings.MAX_RECOVERY_STREAK  # Cap for safety
-        self.config.max_recovery_pct_balance = settings.MAX_RECOVERY_AMOUNT_MULTIPLIER
+        # REMOVE: Do not override max_recovery_pct_balance with the multiplier
+        # self.config.max_recovery_pct_balance = settings.MAX_RECOVERY_AMOUNT_MULTIPLIER
         self.config.max_trades_per_hour = settings.MAX_TRADES_PER_HOUR  # Load from settings (single source of truth)
         self.config.max_open_trades = settings.MAX_TRADES
         self.config.cooldown_seconds = 10
@@ -89,13 +90,13 @@ class RiskManager:
         self.recovery_mode = settings.RECOVERY_MODE  # New: Hybrid Fibonacci + Martingale
         self.reset_on_win = settings.RESET_ON_WIN
         self.smart_recovery = settings.SMART_RECOVERY
-        self.max_recovery_amount_multiplier = settings.MAX_RECOVERY_AMOUNT_MULTIPLIER
+        self.max_recovery_amount_multiplier = settings.MAX_RECOVERY_AMOUNT_MULTIPLIER  # Separate multiplier
 
         # Set recovery attributes directly on self for direct access
         self.recovery_enabled = self.config.recovery_enabled
         self.recovery_multiplier = self.config.recovery_multiplier
         self.max_recovery_streak = self.config.max_recovery_streak
-        self.max_recovery_pct_balance = self.config.max_recovery_pct_balance
+        self.max_recovery_pct_balance = self.config.max_recovery_pct_balance  # Now correctly uses 0.08
 
         # Recovery tracking (enhanced)
         self.consecutive_losses = 0
@@ -302,7 +303,7 @@ class RiskManager:
 
         # New: Stricter cap on recovery amounts
         if bal > 0 and self.recovery_streak > 2:
-            max_by_balance = bal * 0.06  # Even stricter for high streaks
+            max_by_balance = bal * 0.08  # Even stricter for high streaks
             amount = min(amount, max_by_balance)
 
         return round(amount, 2)
@@ -477,13 +478,15 @@ class RiskManager:
             logger.warning(f"RiskManager: Max recovery streak reached ({self.recovery_streak})")
             return False
         
-        max_percentage_of_balance = 0.05
+        # FIX: Use config value instead of hardcoded 5%
+        max_percentage_of_balance = self.config.max_recovery_pct_balance  # Now 0.08 (8%)
         max_amount_by_balance = balance * max_percentage_of_balance
         
         if self.next_trade_amount > max_amount_by_balance:
             logger.warning(f"RiskManager: Recovery amount too large for balance")
             return False
         
+        # Use the separate multiplier for base-amount cap
         max_allowed = self.base_amount * self.max_recovery_amount_multiplier
         if self.next_trade_amount > max_allowed:
             logger.warning(f"RiskManager: Recovery amount exceeds maximum cap")
