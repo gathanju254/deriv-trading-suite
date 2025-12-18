@@ -459,6 +459,18 @@ class TradingBot:
                 recovery_rate = (successful_recoveries / recovery_metrics['recovery_history_count']) * 100 if recovery_metrics['recovery_history_count'] > 0 else 0
                 logger.info(f"Recovery Success : {recovery_rate:.1f}% ({successful_recoveries}/{recovery_metrics['recovery_history_count']})")
             
+            # Add lock status info
+            lock_status = "UNLOCKED"
+            if risk.get('state') == 'locked':
+                lock_status = "LOCKED"
+                if risk.get('locked_until'):
+                    lock_time_left = max(0, risk['locked_until'] - time.time())
+                    lock_status += f" (auto-unlock in {lock_time_left:.0f}s)"
+            
+            logger.info(f"Lock Status      : {lock_status}")
+            logger.info(f"Daily Profit     : ${risk.get('daily_profit', 0):.2f}")
+            logger.info(f"Daily Loss       : ${risk.get('daily_loss', 0):.2f}")
+            
             logger.info("=================================================")
 
         except Exception:

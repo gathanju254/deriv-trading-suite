@@ -12,6 +12,7 @@ from src.db.models.trade import Trade
 from src.db.models.contract import Contract
 from datetime import datetime, timedelta
 import asyncio
+from src.core.risk_manager import RiskState
 
 router = APIRouter(prefix="/api", tags=["Trading API"])
 
@@ -246,6 +247,44 @@ async def manual_unlock():
         return {"status": "Trading unlocked"}
     return {"status": "No lock to unlock"}
 
+@router.post("/risk/reset-daily-profit")
+async def reset_daily_profit():
+    """Reset daily profit tracking to unlock trading"""
+    success = trading_bot.risk.manual_unlock()
+    if success:
+        return {"status": "Daily profit tracking reset and trading unlocked"}
+    return {"status": "No lock to reset"}
+
+@router.get("/risk/lock-status")
+async def get_lock_status():
+    """Get detailed lock status information"""
+    risk = trading_bot.risk
+    
+    # Calculate percentages
+    start_balance = risk.start_day_balance or 0
+    daily_loss_pct = (risk.daily_loss / start_balance) * 100 if start_balance > 0 else 0
+    daily_profit_pct = (risk.daily_profit / start_balance) * 100 if start_balance > 0 else 0
+    
+    return {
+        "state": risk.state.value,
+        "locked_until": risk.locked_until,
+        "daily_loss": {
+            "amount": risk.daily_loss,
+            "percentage": round(daily_loss_pct, 2),
+            "limit_percentage": risk.daily_loss_limit_pct * 100
+        },
+        "daily_profit": {
+            "amount": risk.daily_profit,
+            "percentage": round(daily_profit_pct, 2),
+            "limit_percentage": risk.daily_profit_limit_pct * 100
+        },
+        "start_balance": start_balance,
+        "current_balance": await deriv.get_balance(),
+        "is_locked": risk.state == RiskState.LOCKED,
+        "lock_reason": "daily_loss" if daily_loss_pct >= risk.daily_loss_limit_pct * 100 else 
+                      "daily_profit" if daily_profit_pct >= risk.daily_profit_limit_pct * 100 else 
+                      "none"
+    }
 
 # ============================================================
 # STRATEGY PERFORMANCE

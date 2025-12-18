@@ -345,11 +345,12 @@ class RiskManager:
 
             # NEW: Track daily profit and check limit
             self.daily_profit += trade_amount * 0.95  # Approx payout (adjust if needed)
-            daily_profit_pct = self.daily_profit / self.start_day_balance if self.start_day_balance else 0
-            if daily_profit_pct >= self.daily_profit_limit_pct:
-                self.state = RiskState.LOCKED
-                self.locked_until = time.time() + 3600  # 1-hour auto-expiry
-                logger.info("🎯 DAILY PROFIT TARGET REACHED - Locking trades")
+
+            if self.start_day_balance:
+                daily_profit_pct = self.daily_profit / self.start_day_balance
+                if daily_profit_pct >= self.daily_profit_limit_pct:
+                    self._enter_lock(f"Daily profit target reached ({daily_profit_pct:.1%} >= {self.daily_profit_limit_pct:.1%})")
+                    logger.info(f"📈 Daily Profit: ${self.daily_profit:.2f} ({daily_profit_pct:.1%} of ${self.start_day_balance:.2f})")
 
             # Safe step-back: Reduce streak aggressively on win
             self.recovery_streak = max(0, self.recovery_streak - 2)
@@ -520,14 +521,22 @@ class RiskManager:
         self.panic_until = time.time() + self.config.panic_lock_seconds
         logger.critical("🚨 PANIC MODE ACTIVATED")
 
-    def _enter_lock(self):
+    def _enter_lock(self, reason: str = "unknown"):
         """Enter locked state with optional auto-expiry"""
         self.state = RiskState.LOCKED
         if self.config.lock_auto_expiry_seconds > 0:
             self.locked_until = time.time() + self.config.lock_auto_expiry_seconds
-            logger.critical(f"📉 DAILY LOSS LIMIT — LOCKED (auto-expiry in {self.config.lock_auto_expiry_seconds}s)")
+            logger.critical(f"🔒 LOCKED: {reason} (auto-expiry in {self.config.lock_auto_expiry_seconds}s)")
         else:
-            logger.critical("📉 DAILY LOSS LIMIT — LOCKED (manual reset required)")
+            logger.critical(f"🔒 LOCKED: {reason} (manual reset required)")
+        
+        # Log detailed lock info
+        logger.critical(f"📊 LOCK DETAILS:")
+        logger.critical(f"   State: {self.state.value}")
+        logger.critical(f"   Daily Loss: ${self.daily_loss:.2f}")
+        logger.critical(f"   Daily Profit: ${self.daily_profit:.2f}")
+        logger.critical(f"   Start Balance: ${self.start_day_balance:.2f}")
+        logger.critical(f"   Locked Until: {self.locked_until}")
 
     # ==================================================
     # NEW: MANUAL UNLOCK METHOD
@@ -538,8 +547,20 @@ class RiskManager:
         if self.state == RiskState.LOCKED:
             self.state = RiskState.NORMAL
             self.locked_until = None
-            logger.info("🔓 Manual unlock activated - trading resumed")
+            
+            # Also reset daily profit lock if that was the reason
+            if self.daily_profit >= self.start_day_balance * self.daily_profit_limit_pct:
+                logger.info("💰 Daily profit lock detected - resetting daily profit tracking")
+                self.daily_profit = 0.0
+            
+            # Reset daily loss lock if that was the reason
+            if self.daily_loss >= self.start_day_balance * self.daily_loss_limit_pct:
+                logger.info("📉 Daily loss lock detected - resetting daily loss tracking")
+                self.daily_loss = 0.0
+            
+            logger.info("🔓 Manual unlock activated - ALL locks cleared, trading resumed")
             return True
+        
         logger.warning("No lock to unlock")
         return False
 
