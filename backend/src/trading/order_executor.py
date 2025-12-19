@@ -32,8 +32,12 @@ class OrderExecutor:
         self.risk = risk_manager
         self.consensus = SignalConsensus()
 
-        # Attach WS listener once event loop exists
-        asyncio.get_event_loop().create_task(self._attach_ws_listener())
+        # listener state
+        self._listener_registered = False
+        self._listener = self._ws_listener  # keep a reference to avoid re-wrapping
+
+        # DO NOT attach listener at import-time anymore
+        # asyncio.get_event_loop().create_task(self._attach_ws_listener())
 
     # -------------------------------------------------------
     # REGISTER AS DERIV WS LISTENER
@@ -59,6 +63,8 @@ class OrderExecutor:
                 # Process messages
                 if "buy" in msg:
                     await self._handle_buy(msg["buy"])
+                elif msg.get("msg_type") == "buy" and "error" in msg:
+                    await self._handle_buy({"error": msg.get("error"), "echo_req": msg.get("echo_req")})
 
                 if msg.get("proposal_open_contract"):
                     await self._handle_contract_update(msg["proposal_open_contract"])
@@ -79,6 +85,21 @@ class OrderExecutor:
     # -------------------------------------------------------
     async def _handle_buy(self, buy_data):
         logger.info("BUY response: %s", buy_data)
+
+        # If this payload is an error (msg_type == 'buy' error), mark the awaiting trade as REJECTED
+        if buy_data and isinstance(buy_data, dict) and buy_data.get("error"):
+            err = buy_data.get("error")
+            # find first trade awaiting contract and mark rejected
+            for trade_id, meta in list(self.trades.items()):
+                if meta.get("awaiting_contract"):
+                    trade = TradeRepo.get(trade_id)
+                    if trade:
+                        trade.status = "REJECTED"
+                        TradeRepo.update(trade)
+                    meta["awaiting_contract"] = False
+                    meta["error"] = err
+                    logger.error(f"Immediate BUY error for trade {trade_id} via WS error: {err}")
+                    return
 
         proposal_id = buy_data.get("proposal_id")
         contract_id = buy_data.get("contract_id")
@@ -327,14 +348,37 @@ class OrderExecutor:
         )
         TradeRepo.create(trade)
 
-        # Submit BUY request
-        await deriv.buy(
+        # Submit BUY request and wait for immediate buy response (best-effort)
+        buy_resp = await deriv.buy(
             symbol=symbol,
             amount=amount,
             contract_type=side.upper(),
             duration=duration,
             duration_unit=duration_unit
         )
+
+        # Log buy response for debugging (helps correlate proposal_id/contract_id)
+        if buy_resp:
+            logger.info(f"BUY response received for trade {trade_id}: {json.dumps(buy_resp)}")
+        else:
+            logger.debug(f"No immediate BUY response for trade {trade_id} (will rely on WS updates)")
+
+        # If the buy response contains an immediate error, mark trade as rejected and update DB
+        if buy_resp and isinstance(buy_resp, dict) and buy_resp.get("error"):
+            err = buy_resp.get("error")
+            logger.error(f"Immediate BUY error for trade {trade_id}: {err}")
+            # Update DB trade status to REJECTED (or FAILED)
+            trade.status = "REJECTED"
+            TradeRepo.update(trade)
+            # update internal record to avoid awaiting contract
+            self.trades[trade_id] = {
+                "side": side.upper(),
+                "amount": amount,
+                "awaiting_contract": False,
+                "consensus_data": {},
+                "error": err
+            }
+            return trade_id
 
         # internal trade record
         self.trades[trade_id] = {
@@ -347,6 +391,51 @@ class OrderExecutor:
         logger.info(f"Placed trade {trade_id}: {side.upper()} {amount}")
         return trade_id
 
+    async def _ws_listener(self, msg):
+        try:
+            # DEBUG: Log ALL messages to see what Deriv sends
+            if "tick" not in msg:  # Don't log tick messages (too noisy)
+                logger.debug(f"📨 Deriv message: {json.dumps(msg)[:500]}")
+            
+            # Check for contract settlement
+            if "proposal_open_contract" in msg:
+                contract_data = msg["proposal_open_contract"]
+                logger.info(f"📊 Contract update: ID={contract_data.get('id')}, is_sold={contract_data.get('is_sold')}, status={contract_data.get('status')}")
+                if contract_data.get("is_sold") or contract_data.get("status") == "sold":
+                    logger.info(f"🎯 CONTRACT SETTLED: {contract_data}")
+                    
+            elif "sell" in msg:
+                logger.info(f"💰 Sell response: {msg['sell']}")
+            
+            # Process messages
+            if "buy" in msg:
+                await self._handle_buy(msg["buy"])
+            elif msg.get("msg_type") == "buy" and "error" in msg:
+                await self._handle_buy({"error": msg.get("error"), "echo_req": msg.get("echo_req")})
 
-# Singleton instance
+            if msg.get("proposal_open_contract"):
+                await self._handle_contract_update(msg["proposal_open_contract"])
+
+            if msg.get("contract"):
+                await self._handle_contract_update(msg["contract"])
+
+            if msg.get("sell"):
+                await self._handle_contract_update(msg["sell"])
+        except Exception:
+            logger.exception("OrderExecutor WS listener failed")
+
+    async def start(self):
+        """Register the order executor listener with the Deriv client (idempotent)."""
+        if self._listener_registered:
+            return
+        try:
+            await deriv.add_listener(self._listener)
+            self._listener_registered = True
+            logger.info("OrderExecutor listener registered with Deriv WS.")
+        except Exception:
+            logger.exception("Failed to register OrderExecutor listener")
+
+# -------------------------------------------------------
+# SINGLETON INSTANCE (export for imports)
+# -------------------------------------------------------
 order_executor = OrderExecutor()

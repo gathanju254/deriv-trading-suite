@@ -125,16 +125,38 @@ class TradingBot:
             logger.error(f"Error in tick handler: {e}")
 
     async def _tick_handler(self, msg: Dict):
-        """Handle incoming tick data and execute trades"""
+        """Unified tick handler: accepts full Deriv messages or plain tick dicts,
+        normalizes price extraction, ignores zero/invalid prices and sets session_open only on valid price.
+        """
         try:
-            price = float(msg.get("quote", 0))
-            symbol = msg.get("symbol", settings.SYMBOL)
-            
-            # New: Set session open on first tick
+            # msg might be {"tick": {...}} or already the inner tick
+            tick = msg.get("tick") if isinstance(msg, dict) and "tick" in msg else msg
+
+            # Normalize symbol/price fields from different possible payload shapes
+            symbol = tick.get("symbol") if isinstance(tick, dict) else None
+            price_raw = None
+            for k in ("quote", "price", "ask", "bid"):
+                if isinstance(tick, dict) and tick.get(k) is not None:
+                    price_raw = tick.get(k)
+                    break
+
+            # Safe float conversion
+            try:
+                price = float(price_raw)
+            except Exception:
+                price = 0.0
+
+            # If price is missing or zero, skip processing (prevents session_open=0.0 and bad RSI inputs)
+            if price <= 0:
+                logger.debug(f"Skipping tick with non-positive price: {price_raw}")
+                return
+
+            # Set session open once on first valid price
             if self.session_open is None:
                 self.session_open = price
                 logger.info(f"Session open set to: {self.session_open}")
-            
+
+            # --- resume existing processing (market analyzer, strategies, consensus, risk checks, place trade) ---
             # ===========================================================
             # 1. ENHANCED MARKET ANALYZER (avoid bad conditions)
             # ===========================================================
@@ -335,6 +357,12 @@ class TradingBot:
         except Exception:
             logger.exception("Connection/authorization failed")
             return
+
+        # Ensure order executor listener is registered once (avoid multiple listeners during reload)
+        try:
+            await order_executor.start()
+        except Exception:
+            logger.exception("Failed to start order executor listener")
 
         # New: Initialize risk manager session after successful authorization
         try:

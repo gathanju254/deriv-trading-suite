@@ -1,4 +1,9 @@
 # backend/src/monitor_contracts.py
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # ensure root is in path for imports
+
 import asyncio
 import time
 from src.core.deriv_api import deriv

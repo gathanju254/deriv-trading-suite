@@ -33,6 +33,7 @@ class DerivAPIClient:
     async def send(self, payload: Dict[str, Any]):
         await self.connect()
         async with self._send_lock:
+            logger.debug(f"Deriv SEND → {json.dumps(payload)}")  # <-- Add debug logging for outgoing payloads
             await self.ws.send(json.dumps(payload))
 
     async def _recv(self):
@@ -156,8 +157,45 @@ class DerivAPIClient:
                 "symbol": symbol
             }
         }
-        await self.send(req)
-        return True  # request sent
+
+        # One-shot listener to capture the immediate buy response (non-blocking for other listeners)
+        ev = asyncio.Event()
+        response_container = {"msg": None}
+
+        async def _one_shot_listener(msg):
+            try:
+                # Capture multiple possible immediate responses: 'buy', 'proposal', or 'proposal_open_contract'
+                if "buy" in msg:
+                    response_container["msg"] = msg.get("buy")
+                    ev.set()
+                elif "proposal" in msg:
+                    # some brokers send proposal/proposal_open_contract before buy
+                    response_container["msg"] = msg.get("proposal")
+                    ev.set()
+                elif "proposal_open_contract" in msg:
+                    response_container["msg"] = msg.get("proposal_open_contract")
+                    ev.set()
+                # Capture explicit error payloads related to buy attempts (echo_req/msg_type==buy)
+                elif msg.get("msg_type") == "buy" and "error" in msg:
+                    # Return the whole message so caller can inspect error.code/message
+                    response_container["msg"] = {"error": msg.get("error"), "echo_req": msg.get("echo_req")}
+                    ev.set()
+            except Exception:
+                logger.exception("one-shot buy listener failed")
+
+        await self.add_listener(_one_shot_listener)
+        try:
+            await self.send(req)
+            # wait briefly for the broker response (best-effort)
+            try:
+                await asyncio.wait_for(ev.wait(), timeout=5.0)  # extended timeout
+            except asyncio.TimeoutError:
+                logger.debug("No immediate buy/proposal response received within timeout")
+        finally:
+            # ensure we remove our one-shot listener
+            await self.remove_listener(_one_shot_listener)
+
+        return response_container["msg"]  # Could be None if no immediate response arrived
 
 # single shared client
 deriv = DerivAPIClient()

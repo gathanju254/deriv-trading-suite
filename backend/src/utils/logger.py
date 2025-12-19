@@ -12,4 +12,5 @@ if not logger.handlers:
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-logger.setLevel(logging.INFO)
+# Change to DEBUG while troubleshooting; revert to INFO in production
+logger.setLevel(logging.DEBUG)
