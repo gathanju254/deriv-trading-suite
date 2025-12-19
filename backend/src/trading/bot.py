@@ -265,6 +265,10 @@ class TradingBot:
                 logger.exception("Failed to get balance")
                 return
 
+            if balance <= 0:
+                logger.info("❌ Insufficient balance ($0 or less) - skipping trade logic")
+                return
+
             trade_amount = self.risk.get_next_trade_amount()
 
             # Get recovery status for logging

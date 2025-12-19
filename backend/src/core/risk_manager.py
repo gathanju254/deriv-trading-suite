@@ -225,12 +225,24 @@ class RiskManager:
             return False
 
         # Daily loss limit (triggers lock with auto-expiry)
-        if self.start_day_balance is not None:
-            daily_change = (balance - self.start_day_balance) / self.start_day_balance
-            if daily_change <= -self.daily_loss_limit_pct:
-                logger.warning("RiskManager: Daily loss limit reached. Stopping trading for the day.")
-                self._enter_lock()
+        if self.start_day_balance is not None and self.start_day_balance > 0:
+            daily_loss_pct = (self.daily_loss / self.start_day_balance) * 100
+            if daily_loss_pct >= self.daily_loss_limit_pct:
+                self._enter_lock("daily_loss")
                 return False
+        else:
+            # Skip daily loss checks if balance is zero or invalid
+            pass
+
+        # Daily profit limit (triggers lock with auto-expiry)
+        if self.start_day_balance is not None and self.start_day_balance > 0:
+            daily_profit_pct = (self.daily_profit / self.start_day_balance) * 100
+            if daily_profit_pct >= self.daily_profit_limit_pct:
+                self._enter_lock("daily_profit")
+                return False
+        else:
+            # Skip daily profit checks if balance is zero or invalid
+            pass
 
         # Hard drawdown stop (non-negotiable)
         if self.peak_balance is not None and self.start_day_balance is not None:
