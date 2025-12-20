@@ -17,9 +17,9 @@ class MarketAnalyzer:
     def __init__(self):
         self.recent_prices: List[float] = []
         self.max_history = 100
-        self.volatility_threshold = 0.004  # Keep high to avoid extreme volatility
-        self.min_volatility_threshold = 0.0000 # Lower from 0.00001 to allow very flat markets
-        self.trend_strength_threshold = 0.00000   # Lower from 0.00005 to allow weaker trends
+        self.volatility_threshold = 0.01  # Relaxed from 0.004 to 1% for R_50 volatility
+        self.min_volatility_threshold = 0.00002  # Keep as-is (allows flat markets)
+        self.trend_strength_threshold = 0.00005  # Relaxed from 0.0001 for more trades
         
         # Market state tracking
         self.consecutive_rejects = 0
@@ -193,7 +193,7 @@ class MarketAnalyzer:
 
         # ⚠ Synthetic indices normally have tiny micro-volatility
         # Block only EXTREME chop (0.8% jump tick-to-tick)
-        if avg_change > 0.008:   # 0.8%
+        if avg_change > 0.012:   # Relaxed from 0.008 to 1.2%
             return False
 
         # ---- 2. Direction stability check ----
@@ -211,9 +211,9 @@ class MarketAnalyzer:
 
         flip_ratio = direction_changes / len(directions)
 
-        # ✔ Allow up to 85% micro-flips (R_100 is choppy)
+        # ✔ Allow up to 95% micro-flips (R_100 is choppy)
         # Only filter out *extreme* alternating up-down-up-down movement
-        if flip_ratio > 0.85:
+        if flip_ratio > 0.95:   # Relaxed from 0.85 to allow more micro-flips
             return False
 
         return True

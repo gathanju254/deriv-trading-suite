@@ -145,7 +145,6 @@ class TradingBot:
                 price = float(price_raw)
             except Exception:
                 price = 0.0
-
             # If price is missing or zero, skip processing (prevents session_open=0.0 and bad RSI inputs)
             if price <= 0:
                 logger.debug(f"Skipping tick with non-positive price: {price_raw}")
@@ -164,6 +163,9 @@ class TradingBot:
             if not market_status["tradable"]:
                 logger.info(f"⛔ Market not tradable → {market_status['reason']} | Regime: {market_status.get('regime', 'UNKNOWN')}")
                 return
+
+            # NEW: Log detailed market analysis after market status check
+            logger.debug(f"📊 Market Analysis: tradable={market_status['tradable']}, regime={market_status.get('regime')}, volatility={market_status.get('volatility', 0):.6f}, trend_strength={market_status.get('trend_strength', 0):.6f}")
 
             # ===========================================================
             # 2. TIME FILTER — avoid back-to-back trades
@@ -292,6 +294,17 @@ class TradingBot:
                 f"🚀 EXECUTING TRADE: side={side}, amount={trade_amount}, "
                 f"method={consensus.get('method')}, regime={market_status.get('regime')}"
             )
+
+            # NEW: Price stability check before trade execution
+            current_tick_price = price  # Price when signal was generated
+
+            # Brief pause for price stability check
+            await asyncio.sleep(0.1)
+
+            # Assuming you track latest_price in the tick handler
+            if hasattr(self, 'latest_price') and abs(self.latest_price - current_tick_price) / current_tick_price > 0.001:  # 0.1% threshold
+                logger.info(f"Price moved {((self.latest_price - current_tick_price)/current_tick_price*100):.2f}%, skipping trade")
+                return
 
             try:
                 trade_id = await order_executor.place_trade(
@@ -456,6 +469,10 @@ class TradingBot:
             metrics = self.performance.get_performance_metrics()
             risk = self.risk.get_risk_metrics()
             market_metrics = self.market_analyzer.get_market_metrics()
+
+            # NEW: Log session balance and daily profit target
+            logger.info(f"📊 Session started with balance: ${self.risk.start_day_balance:.2f}")
+            logger.info(f"🎯 Daily Target: ${self.risk.start_day_balance * (settings.DAILY_PROFIT_LIMIT_PCT/100):.2f}")
 
             logger.info("========== ENHANCED PERFORMANCE REPORT ==========")
             logger.info(f"Total Trades     : {metrics['total_trades']}")

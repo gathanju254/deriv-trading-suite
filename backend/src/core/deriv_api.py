@@ -2,6 +2,7 @@
 import json
 import asyncio
 import websockets
+import time
 from typing import Callable, Any, Dict
 from src.config.settings import settings
 from src.utils.logger import logger
@@ -144,6 +145,7 @@ class DerivAPIClient:
         duration: int = 1,
         duration_unit: str = "t"
     ):
+        start_time = time.time()
         req = {
             "buy": 1,
             "price": "{:.2f}".format(amount),
@@ -188,13 +190,14 @@ class DerivAPIClient:
             await self.send(req)
             # wait briefly for the broker response (best-effort)
             try:
-                await asyncio.wait_for(ev.wait(), timeout=5.0)  # extended timeout
+                await asyncio.wait_for(ev.wait(), timeout=10.0)  # Increased from 5.0, or remove timeout entirely
             except asyncio.TimeoutError:
                 logger.debug("No immediate buy/proposal response received within timeout")
         finally:
             # ensure we remove our one-shot listener
             await self.remove_listener(_one_shot_listener)
 
+        logger.debug(f"Buy request latency: {time.time() - start_time:.3f}s")
         return response_container["msg"]  # Could be None if no immediate response arrived
 
 # single shared client
