@@ -58,11 +58,14 @@ class TradingBot:
 
         # Tick throttle
         self._last_tick_time = 0
-        self.min_tick_interval = 0.10
+        self.min_tick_interval = 0.05
 
         # Prevent rapid consecutive trades
         self.last_trade_time = 0
-        self.min_trade_interval = 30  # seconds
+        self.min_trade_interval = 15  # seconds
+
+        # Track latest price for stability check
+        self.latest_price = None
 
         # Strategy performance stats
         self.strategy_performance = {
@@ -150,6 +153,9 @@ class TradingBot:
                 logger.debug(f"Skipping tick with non-positive price: {price_raw}")
                 return
 
+            # Update latest price for stability checks
+            self.latest_price = price
+
             # Set session open once on first valid price
             if self.session_open is None:
                 self.session_open = price
@@ -160,12 +166,13 @@ class TradingBot:
             # 1. ENHANCED MARKET ANALYZER (avoid bad conditions)
             # ===========================================================
             market_status = self.market_analyzer.analyze_market(price)
+            
+            # NEW: Log detailed market analysis
+            logger.debug(f"📊 Market Analysis: tradable={market_status['tradable']}, regime={market_status.get('regime')}, volatility={market_status.get('volatility', 0):.6f}, trend_strength={market_status.get('trend_strength', 0):.6f}")
+            
             if not market_status["tradable"]:
                 logger.info(f"⛔ Market not tradable → {market_status['reason']} | Regime: {market_status.get('regime', 'UNKNOWN')}")
                 return
-
-            # NEW: Log detailed market analysis after market status check
-            logger.debug(f"📊 Market Analysis: tradable={market_status['tradable']}, regime={market_status.get('regime')}, volatility={market_status.get('volatility', 0):.6f}, trend_strength={market_status.get('trend_strength', 0):.6f}")
 
             # ===========================================================
             # 2. TIME FILTER — avoid back-to-back trades
@@ -236,7 +243,11 @@ class TradingBot:
                     "meta": sig.get("meta", {})
                 })
             
-            consensus = self.consensus.aggregate(consensus_signals, price)
+            consensus = self.consensus.aggregate(consensus_signals, price, self.session_open)
+
+            # NEW: Debug logging for consensus
+            logger.debug(f"Signals count: {len(signals)}")
+            logger.debug(f"Consensus score: {consensus.get('score', 0) if consensus else 'No consensus'}")
 
             if consensus:
                 logger.info(f"✅ CONSENSUS PASSED → {consensus}")
@@ -247,13 +258,18 @@ class TradingBot:
             # Require strong consensus
             if consensus.get("sources", 0) < 1:
                 return
-            if consensus["score"] < 0.65:  # HIGHER THRESHOLD = fewer, safer trades
+            
+            # Use relaxed consensus thresholds for more trades
+            min_consensus_score = 0.60  # Reduced from 0.65 for more trades
+            if consensus["score"] < min_consensus_score:
+                logger.info(f"❌ Consensus score too low: {consensus['score']} < {min_consensus_score}")
                 return
 
             # Require higher consensus in ranging markets
             market_regime = market_status.get('regime')
-            threshold = 0.75 if market_regime == "RANGING" else 0.65
+            threshold = 0.65 if market_regime == "RANGING" else 0.60  # Reduced thresholds
             if consensus["score"] < threshold:
+                logger.info(f"❌ Consensus threshold not met for regime {market_regime}: {consensus['score']} < {threshold}")
                 return
 
             logger.info(f"✅ CONSENSUS OK → {consensus} | Market Regime: {market_status.get('regime')}")
@@ -287,24 +303,28 @@ class TradingBot:
                 return
 
             # ===========================================================
-            # 6. EXECUTE TRADE
+            # 6. PRICE STABILITY CHECK
+            # ===========================================================
+            # Store price when signal was generated
+            signal_generated_price = price
+
+            # Brief pause for price stability check
+            await asyncio.sleep(0.1)
+
+            # Check if price moved significantly since signal generation
+            if self.latest_price and abs(self.latest_price - signal_generated_price) / signal_generated_price > 0.001:  # 0.1% threshold
+                price_move_pct = ((self.latest_price - signal_generated_price) / signal_generated_price * 100)
+                logger.info(f"⚠️ Price moved {price_move_pct:.2f}%, skipping trade")
+                return
+
+            # ===========================================================
+            # 7. EXECUTE TRADE
             # ===========================================================
             side = consensus["side"]
             logger.info(
                 f"🚀 EXECUTING TRADE: side={side}, amount={trade_amount}, "
                 f"method={consensus.get('method')}, regime={market_status.get('regime')}"
             )
-
-            # NEW: Price stability check before trade execution
-            current_tick_price = price  # Price when signal was generated
-
-            # Brief pause for price stability check
-            await asyncio.sleep(0.1)
-
-            # Assuming you track latest_price in the tick handler
-            if hasattr(self, 'latest_price') and abs(self.latest_price - current_tick_price) / current_tick_price > 0.001:  # 0.1% threshold
-                logger.info(f"Price moved {((self.latest_price - current_tick_price)/current_tick_price*100):.2f}%, skipping trade")
-                return
 
             try:
                 trade_id = await order_executor.place_trade(
@@ -336,8 +356,8 @@ class TradingBot:
 
                 logger.info(f"✅ Trade placed: {trade_id}")
 
-            except Exception:
-                logger.exception("❌ Trade execution failed")
+            except Exception as e:
+                logger.exception(f"❌ Trade execution failed: {e}")
         
         # ✅ ADD PROPER EXCEPTION HANDLING (FIX)
         except Exception as e:
@@ -377,7 +397,12 @@ class TradingBot:
 
         # Ensure order executor listener is registered once (avoid multiple listeners during reload)
         try:
-            await order_executor.start()
+            # Check if order_executor has a start method
+            if hasattr(order_executor, 'start'):
+                await order_executor.start()
+            else:
+                # If no start method, the listener should already be attached via _attach_ws_listener
+                logger.debug("Order executor listener should be auto-attached")
         except Exception:
             logger.exception("Failed to start order executor listener")
 

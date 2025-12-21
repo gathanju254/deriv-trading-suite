@@ -17,9 +17,9 @@ class MarketAnalyzer:
     def __init__(self):
         self.recent_prices: List[float] = []
         self.max_history = 100
-        self.volatility_threshold = 0.01  # Relaxed from 0.004 to 1% for R_50 volatility
-        self.min_volatility_threshold = 0.00002  # Keep as-is (allows flat markets)
-        self.trend_strength_threshold = 0.00005  # Relaxed from 0.0001 for more trades
+        self.volatility_threshold = 0.015  # Increased to 1.5% for R_50
+        self.min_volatility_threshold = 0.00001  # Very low - allow flat markets
+        self.trend_strength_threshold = 0.00003  # Reduced for more trades
         
         # Market state tracking
         self.consecutive_rejects = 0
@@ -29,12 +29,14 @@ class MarketAnalyzer:
     def analyze_market(self, price: float) -> Dict:
         """
         Comprehensive market analysis to determine if conditions are favorable for trading.
-        
+
         Returns:
             Dict with 'tradable' boolean and 'reason' for rejection if applicable
         """
-        
-        # Track prices with size limit
+
+        # ---------------------------------------------------------
+        # PRICE HISTORY TRACKING
+        # ---------------------------------------------------------
         self.recent_prices.append(price)
         if len(self.recent_prices) > self.max_history:
             self.recent_prices.pop(0)
@@ -42,22 +44,7 @@ class MarketAnalyzer:
         # Need sufficient data for analysis
         if len(self.recent_prices) < 20:
             return {
-                "tradable": True,  
-                "reason": "Collecting price data",
-                "regime": "DATA_COLLECTING",
-                "volatility": 0.0,
-                "trend_strength": 0.0
-            }
-
-
-        self.recent_prices.append(price)
-        if len(self.recent_prices) > self.max_history:
-            self.recent_prices.pop(0)
-
-        # Need sufficient data for analysis
-        if len(self.recent_prices) < 20:
-            return {
-                "tradable": True,  
+                "tradable": True,
                 "reason": "Collecting price data",
                 "regime": "DATA_COLLECTING",
                 "volatility": 0.0,
@@ -68,50 +55,52 @@ class MarketAnalyzer:
         # 1. VOLATILITY ANALYSIS
         # ---------------------------------------------------------
         recent_volatility = self._calculate_volatility()
-        
-        # Too volatile - high risk
+
+        # Too volatile → high risk
         if recent_volatility > self.volatility_threshold:
             self.market_regime = "VOLATILE"
             self.consecutive_rejects += 1
             return {
-                "tradable": False, 
-                "reason": f"High volatility: {recent_volatility:.4f}",
+                "tradable": False,
+                "reason": f"High volatility: {recent_volatility:.6f}",
                 "regime": self.market_regime
             }
 
-        # Too flat - no movement
+        # Extremely flat market → no edge
         if recent_volatility < self.min_volatility_threshold:
             self.market_regime = "FLAT"
             self.consecutive_rejects += 1
             return {
-                "tradable": False, 
-                "reason": f"Market too flat: {recent_volatility:.4f}",
+                "tradable": False,
+                "reason": f"Market too flat: {recent_volatility:.6f}",
                 "regime": self.market_regime
             }
 
         # ---------------------------------------------------------
-        # 2. TREND STRENGTH ANALYSIS
+        # 2. TREND STRENGTH ANALYSIS (SOFT CHECK)
         # ---------------------------------------------------------
         trend_strength = self._calculate_trend_strength()
-        
-        if trend_strength < self.trend_strength_threshold:
+
+        # Only reject if BOTH trend is weak AND volatility is extremely low
+        if trend_strength < self.trend_strength_threshold and recent_volatility < 0.0002:
             self.market_regime = "RANGING"
             self.consecutive_rejects += 1
             return {
-                "tradable": False, 
-                "reason": f"Weak trend strength: {trend_strength:.4f}",
+                "tradable": False,
+                "reason": "Market too flat for trend-following",
                 "regime": self.market_regime
             }
 
         # ---------------------------------------------------------
-        # 3. PRICE STABILITY CHECK (avoid whipsaws)
+        # 3. PRICE STABILITY CHECK (ANTI-WHIPSAW)
         # ---------------------------------------------------------
         if not self._check_price_stability():
+            self.market_regime = "UNSTABLE"
             self.consecutive_rejects += 1
             return {
-                "tradable": False, 
+                "tradable": False,
                 "reason": "Unstable price action (whipsaw detected)",
-                "regime": "UNSTABLE"
+                "regime": self.market_regime
             }
 
         # ---------------------------------------------------------
@@ -122,10 +111,12 @@ class MarketAnalyzer:
         else:
             self.market_regime = "RANGING"
 
-        # All checks passed - market is tradable
+        # ---------------------------------------------------------
+        # MARKET IS TRADABLE
+        # ---------------------------------------------------------
         self.consecutive_rejects = 0
         self.last_tradable_time = len(self.recent_prices)
-        
+
         return {
             "tradable": True,
             "regime": self.market_regime,
@@ -133,6 +124,7 @@ class MarketAnalyzer:
             "trend_strength": trend_strength,
             "price": price
         }
+
 
     def _calculate_volatility(self) -> float:
         """Calculate normalized volatility as percentage of price"""

@@ -134,79 +134,81 @@ class SignalConsensus:
     ) -> Dict:
         """
         Loss-optimized signal aggregation.
-        ML-safe, feature-validated, fallback-protected.
+        Bias-seeking, chop-resistant, ML-safe.
         """
 
         # ---------------------------------------------------------
         # 0. SANITY CHECK
         # ---------------------------------------------------------
-        if not signals:
+        if not signals or len(signals) < 2:
             return None
 
         # ---------------------------------------------------------
-        # 1. FILTER OUT WEAK SIGNALS
+        # 1. FILTER OUT WEAK SIGNALS (CONFIDENCE FLOOR)
         # ---------------------------------------------------------
-        strong = [s for s in signals if s.get("score", 0) >= 0.6]
+        strong = [s for s in signals if float(s.get("score", 0)) >= 0.6]
         if len(strong) < 2:
             return None
 
         # ---------------------------------------------------------
-        # 2. STRATEGY DIVERSITY CHECK
+        # 2. STRATEGY DIVERSITY CHECK (ANTI-OVERFITTING)
         # ---------------------------------------------------------
         strategies = {s.get("meta", {}).get("strategy") for s in strong}
         if len(strategies) < 2:
             return None
 
         # ---------------------------------------------------------
-        # 3. CONFLICT DETECTION (BIAS SEEKING)
-        # Reject only if signals are TOO CLOSE (murky market)
+        # 3. DIRECTIONAL BIAS ANALYSIS (CONFLICT-AWARE)
         # ---------------------------------------------------------
         call_signals = [s for s in strong if s["side"].upper() == "CALL"]
         put_signals = [s for s in strong if s["side"].upper() == "PUT"]
 
-        call_strength = sum(s["score"] for s in call_signals)
-        put_strength = sum(s["score"] for s in put_signals)
+        call_strength = sum(float(s["score"]) for s in call_signals)
+        put_strength = sum(float(s["score"]) for s in put_signals)
 
         if call_signals and put_signals:
             total_strength = call_strength + put_strength
             if total_strength > 0:
                 conflict_ratio = abs(call_strength - put_strength) / total_strength
-                # Reject if market bias is unclear
+                # If bias is unclear → skip trade
                 if conflict_ratio < 0.30:
-                    logger.debug(f"Conflict too close: ratio={conflict_ratio:.2f}")
+                    logger.debug(
+                        f"Bias conflict too close | CALL={call_strength:.2f} PUT={put_strength:.2f}"
+                    )
                     return None
 
         # ---------------------------------------------------------
-        # 4. VOLATILITY FILTER (ANTI-CHOP)
+        # 4. SIGNAL DISPERSION FILTER (ANTI-CHOP)
         # ---------------------------------------------------------
         try:
-            scores = [s["score"] for s in strong]
-            volatility = max(scores) - min(scores)
-            if volatility > 0.45:
-                logger.debug(f"High signal volatility: {volatility:.2f}")
+            scores = [float(s["score"]) for s in strong]
+            dispersion = max(scores) - min(scores)
+            if dispersion > 0.45:
+                logger.debug(f"Signal dispersion too high: {dispersion:.2f}")
                 return None
         except Exception:
-            pass
+            return None
 
         # ---------------------------------------------------------
-        # 5. TRADITIONAL CONSENSUS (WEIGHTED)
+        # 5. WEIGHTED CONSENSUS (TRADITIONAL CORE)
         # ---------------------------------------------------------
         agg = {"CALL": 0.0, "PUT": 0.0}
         for s in strong:
-            agg[s["side"].upper()] += float(s.get("score", 0.5))
+            side = s["side"].upper()
+            agg[side] += float(s.get("score", 0.5))
 
         if agg["CALL"] == agg["PUT"]:
             return None
 
         traditional_side = "CALL" if agg["CALL"] > agg["PUT"] else "PUT"
-        total = agg["CALL"] + agg["PUT"]
-        traditional_score = agg[traditional_side] / total
+        total_weight = agg["CALL"] + agg["PUT"]
+        traditional_score = agg[traditional_side] / total_weight
 
         if traditional_score < max(self.min_score, 0.55):
             return None
 
         # ---------------------------------------------------------
-        # 6. ML CONSENSUS (VALIDATED + SAFE)
+        # 6. ML CONSENSUS (OPTIONAL + SAFE FALLBACK)
         # ---------------------------------------------------------
         ml_result = None
 
@@ -220,32 +222,32 @@ class SignalConsensus:
                     strong, current_price, session_open
                 )
 
-                # DEBUG: Feature validation
-                logger.debug(f"ML Features ({len(features)}): {features}")
-
-                EXPECTED_FEATURES = 14  # Updated expected feature count
-                if len(features) != EXPECTED_FEATURES:
-                    logger.warning(
-                        f"ML feature mismatch: expected {EXPECTED_FEATURES}, got {len(features)}. "
-                        "Falling back to traditional."
-                    )
-                else:
+                EXPECTED_FEATURES = 14
+                if len(features) == EXPECTED_FEATURES:
                     ml_result = self.ml_consensus.predict(features)
+                else:
+                    logger.warning(
+                        f"ML feature mismatch: expected {EXPECTED_FEATURES}, got {len(features)}"
+                    )
 
             except Exception as e:
-                logger.error(f"ML prediction failed: {e}. Falling back to traditional.")
+                logger.error(f"ML consensus error: {e}")
 
         # ---------------------------------------------------------
-        # 7. SMART COMBINATION LOGIC
+        # 7. SMART DECISION FUSION (LOSS-FIRST LOGIC)
         # ---------------------------------------------------------
         if ml_result:
-            ml_side = ml_result["side"]
-            ml_score = ml_result["score"]
+            ml_side = ml_result.get("side")
+            ml_score = float(ml_result.get("score", 0))
 
+            # ML only overrides if it is:
+            # - Strong
+            # - Same direction
+            # - Clearly better
             if (
                 ml_score >= 0.70
                 and ml_side == traditional_side
-                and ml_score > traditional_score + 0.05
+                and ml_score >= traditional_score + 0.05
             ):
                 final_side = ml_side
                 final_score = ml_score
@@ -260,16 +262,16 @@ class SignalConsensus:
             method = "traditional"
 
         # ---------------------------------------------------------
-        # 8. FINAL OUTPUT
+        # 8. FINAL OUTPUT (CLEAN + TRACEABLE)
         # ---------------------------------------------------------
         return {
             "side": final_side,
-            "score": final_score,
+            "score": round(final_score, 4),
             "sources": len(strong),
             "strategies": list(strategies),
             "method": method,
-            "traditional_score": traditional_score,
-            "ml_score": ml_result["score"] if ml_result else 0.0,
+            "traditional_score": round(traditional_score, 4),
+            "ml_score": round(ml_result["score"], 4) if ml_result else 0.0,
         }
 
     def add_training_sample(self, signals: List[Dict], outcome: str, current_price: float, traded_side: str, session_open: float = None):
