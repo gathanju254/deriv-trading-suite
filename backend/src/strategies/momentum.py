@@ -8,7 +8,7 @@ from src.utils.logger import logger
 class MomentumStrategy(BaseStrategy):
     name = "momentum"
 
-    def __init__(self, rsi_period=14, overbought=65, oversold=35, macd_fast=12, macd_slow=26, macd_signal=9, optimize=True):
+    def __init__(self, rsi_period=14, overbought=70, oversold=30, macd_fast=12, macd_slow=26, macd_signal=9, optimize=True):
         self.rsi_period = rsi_period
         self.overbought = overbought
         self.oversold = oversold
@@ -98,43 +98,43 @@ class MomentumStrategy(BaseStrategy):
         signal_strength = 0.0
         side = None
         
-        # RSI overbought + MACD negative = Strong PUT signal
+        # RSI overbought + MACD negative = Strong FALL signal
         if latest_rsi > self.dynamic_overbought and macd_signal < 0:
             signal_strength = 0.85  # Reduced from 0.9
-            side = "PUT"
-            logger.debug(f"Momentum: Strong PUT signal - RSI:{latest_rsi:.2f} > {self.dynamic_overbought}, MACD:{macd_signal:.4f} < 0")
+            side = "FALL"
+            logger.debug(f"Momentum: Strong FALL signal - RSI:{latest_rsi:.2f} > {self.dynamic_overbought}, MACD:{macd_signal:.4f} < 0")
             
-        # RSI oversold + MACD positive = Strong CALL signal  
+        # RSI oversold + MACD positive = Strong RISE signal  
         elif latest_rsi < self.dynamic_oversold and macd_signal > 0:
             signal_strength = 0.85  # Reduced from 0.9
-            side = "CALL"
-            logger.debug(f"Momentum: Strong CALL signal - RSI:{latest_rsi:.2f} < {self.dynamic_oversold}, MACD:{macd_signal:.4f} > 0")
+            side = "RISE"
+            logger.debug(f"Momentum: Strong RISE signal - RSI:{latest_rsi:.2f} < {self.dynamic_oversold}, MACD:{macd_signal:.4f} > 0")
             
         # Standard RSI signals
         elif latest_rsi > self.dynamic_overbought:
             signal_strength = 0.7
-            side = "PUT"
-            logger.debug(f"Momentum: Standard PUT signal - RSI:{latest_rsi:.2f} > {self.dynamic_overbought}")
+            side = "FALL"
+            logger.debug(f"Momentum: Standard FALL signal - RSI:{latest_rsi:.2f} > {self.dynamic_overbought}")
             
         elif latest_rsi < self.dynamic_oversold:
             signal_strength = 0.7
-            side = "CALL"
-            logger.debug(f"Momentum: Standard CALL signal - RSI:{latest_rsi:.2f} < {self.dynamic_oversold}")
+            side = "RISE"
+            logger.debug(f"Momentum: Standard RISE signal - RSI:{latest_rsi:.2f} < {self.dynamic_oversold}")
             
         # RSI divergence detection with reasonable thresholds
         elif len(rsivals) >= 5:
-            # Check for bearish divergence (price higher, RSI lower)
+            # Check for bearish divergence (price higher, RSI lower) → FALL signal
             if (price > self.prices[-2] and latest_rsi < rsivals[-2] and 
                 latest_rsi > 62 and price > np.mean(self.prices[-5:])):
                 signal_strength = 0.65  # Increased from 0.6
-                side = "PUT"
+                side = "FALL"
                 logger.debug(f"Momentum: Bearish divergence - Price up, RSI down")
                 
-            # Check for bullish divergence (price lower, RSI higher)
+            # Check for bullish divergence (price lower, RSI higher) → RISE signal
             elif (price < self.prices[-2] and latest_rsi > rsivals[-2] and 
                   latest_rsi < 38 and price < np.mean(self.prices[-5:])):
                 signal_strength = 0.65  # Increased from 0.6
-                side = "CALL"
+                side = "RISE"
                 logger.debug(f"Momentum: Bullish divergence - Price down, RSI up")
         
         if side:

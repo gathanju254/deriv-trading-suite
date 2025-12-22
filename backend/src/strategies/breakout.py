@@ -136,19 +136,19 @@ class BreakoutStrategy(BaseStrategy):
         
         signals = []
         
-        # Upward breakout with confirmation
+        # Upward breakout with confirmation → RISE signal
         if price >= current_high * (1 + self.dynamic_threshold):
             if not self._is_fake_breakout(price, "up"):
                 base_score = 0.75 * self.breakout_strength * confirmation_strength  # Increased from 0.7
                 final_score = min(0.92, base_score)  # Reduced from 0.95
-                signals.append(("CALL", final_score, "up_breakout"))
+                signals.append(("RISE", final_score, "up_breakout"))
         
-        # Downward breakout with confirmation
+        # Downward breakout with confirmation → FALL signal
         if price <= current_low * (1 - self.dynamic_threshold):
             if not self._is_fake_breakout(price, "down"):
                 base_score = 0.75 * self.breakout_strength * confirmation_strength  # Increased from 0.7
                 final_score = min(0.92, base_score)  # Reduced from 0.95
-                signals.append(("PUT", final_score, "down_breakout"))
+                signals.append(("FALL", final_score, "down_breakout"))
         
         # Multi-timeframe confirmation (if we have enough data)
         if len(self.prices) >= self.window * 1.5:  # Reduced from 2
@@ -157,13 +157,13 @@ class BreakoutStrategy(BaseStrategy):
                 larger_high = max(larger_window)
                 larger_low = min(larger_window)
                 
-                # Breakout from larger timeframe resistance
+                # Breakout from larger timeframe resistance → RISE signal
                 if price >= larger_high * (1 + self.dynamic_threshold * 0.6):  # Increased from 0.5
-                    signals.append(("CALL", 0.75, "larger_tf_breakout"))  # Reduced from 0.8
+                    signals.append(("RISE", 0.75, "larger_tf_breakout"))  # Reduced from 0.8
                     
-                # Breakout from larger timeframe support
+                # Breakout from larger timeframe support → FALL signal
                 if price <= larger_low * (1 - self.dynamic_threshold * 0.6):  # Increased from 0.5
-                    signals.append(("PUT", 0.75, "larger_tf_breakout"))  # Reduced from 0.8
+                    signals.append(("FALL", 0.75, "larger_tf_breakout"))  # Reduced from 0.8
         
         # Take the strongest signal
         if signals:

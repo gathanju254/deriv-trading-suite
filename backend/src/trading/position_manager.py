@@ -33,18 +33,27 @@ class PositionManager:
     ):
         contract_id = str(contract_id)
 
+        # Normalize side to uppercase for consistency
+        side_upper = side.upper()
+        
         self.active_positions[contract_id] = {
             "trade_id": trade_id,
             "contract_id": contract_id,
             "uuid": None,
-            "side": side,
+            "side": side_upper,
             "entry_price": entry_price,
             "opened_at": time.time(),
             "expires_at": expires_at,
             "status": "ACTIVE",
         }
 
-        logger.info(f"📌 Added position contract_id={contract_id} trade_id={trade_id}")
+        # Updated log message with RISE/FALL terminology
+        if side_upper == "RISE":
+            logger.info(f"📌 Added position for RISE trade trade_id={trade_id} contract_id={contract_id}")
+        elif side_upper == "FALL":
+            logger.info(f"📌 Added position for FALL trade trade_id={trade_id} contract_id={contract_id}")
+        else:
+            logger.info(f"📌 Added position contract_id={contract_id} trade_id={trade_id} side={side_upper}")
 
     # -------------------------
     # UUID MAPPING
@@ -105,6 +114,7 @@ class PositionManager:
 
         contract_id = pos["contract_id"]
         uuid = pos.get("uuid")
+        side = pos.get("side", "").upper()
 
         pos["status"] = result
         pos["closed_at"] = time.time()
@@ -124,10 +134,22 @@ class PositionManager:
         # remove active position
         self.active_positions.pop(contract_id, None)
 
-        logger.info(
-            f"✅ Closed position contract_id={contract_id} "
-            f"uuid={uuid} result={result} payout={payout}"
-        )
+        # Updated log message with RISE/FALL terminology
+        if side == "RISE":
+            logger.info(
+                f"✅ Closed RISE position contract_id={contract_id} "
+                f"uuid={uuid} result={result} payout={payout}"
+            )
+        elif side == "FALL":
+            logger.info(
+                f"✅ Closed FALL position contract_id={contract_id} "
+                f"uuid={uuid} result={result} payout={payout}"
+            )
+        else:
+            logger.info(
+                f"✅ Closed position contract_id={contract_id} "
+                f"uuid={uuid} side={side} result={result} payout={payout}"
+            )
 
     # -------------------------
     # STATE CHECKS

@@ -225,7 +225,7 @@ class RiskManager:
             return False
 
         # Daily loss limit (triggers lock with auto-expiry) - NOW BASED ON NET P&L
-        if self.start_day_balance is not None and self.start_day_balance > 0:
+        if self.start_day_balance is None and self.start_day_balance > 0:
             net_pnl = self.daily_profit - self.daily_loss  # Net profit/loss for the day
             net_pnl_pct = (net_pnl / self.start_day_balance) * 100
             if net_pnl_pct <= -self.daily_loss_limit_pct:  # Only lock if net P&L is below the loss limit
@@ -260,7 +260,9 @@ class RiskManager:
                 self._enter_panic()
 
         # Cooldown after loss streak (only if cooldown is enabled)
-        if self.cooldown_after_loss > 0 and self.consecutive_losses >= self.cooldown_after_loss:
+        if (self.cooldown_after_loss > 0 and 
+            self.consecutive_losses >= self.cooldown_after_loss and
+            not (self.recovery_enabled and self.recovery_streak > 0)):  # Add this condition
             logger.info(f"RiskManager: In loss cooldown. Loss streak = {self.consecutive_losses}")
             return False
 

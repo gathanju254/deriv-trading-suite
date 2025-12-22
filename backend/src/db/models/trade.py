@@ -10,7 +10,7 @@ class Trade(Base):
 
     id = Column(String, primary_key=True)  # your local trade_id (UUID)
     symbol = Column(String, index=True)
-    side = Column(String)  # CALL / PUT
+    side = Column(String)  # RISE / FALL
     amount = Column(Float)
     duration = Column(Integer)
     status = Column(String, default="PENDING")  # PENDING / ACTIVE / WON / LOST / ERROR

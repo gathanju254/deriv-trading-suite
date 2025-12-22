@@ -26,19 +26,32 @@ async def status():
 @router.get("/balance")
 async def balance():
     current_balance = await deriv.get_balance()
-    logger.info(f"Balance requested: {current_balance}")  # New: Log balance
+    logger.info(f"Balance requested: {current_balance}")
     return {"balance": current_balance}
 
-@router.post("/manual/{side}")
-async def manual(side: str):
+@router.post("/manual/{direction}")
+async def manual_trade(direction: str):
+    """Execute manual RISE or FALL trade"""
+    # Convert direction to Deriv's contract type
+    if direction.upper() == "RISE":
+        deriv_side = "CALL"
+    elif direction.upper() == "FALL":
+        deriv_side = "PUT"
+    else:
+        raise HTTPException(400, "Direction must be 'rise' or 'fall'")
+    
     trade_id = await order_executor.place_trade(
-        side.upper(), 
+        deriv_side, 
         settings.TRADE_AMOUNT, 
         settings.SYMBOL,
-        duration=5,  # Changed from 1 to 5
+        duration=5,
         duration_unit="t"
     )
-    return {"trade_id": trade_id}
+    return {
+        "trade_id": trade_id,
+        "direction": direction.upper(),
+        "amount": settings.TRADE_AMOUNT
+    }
 
 
 # ============================================================
@@ -75,33 +88,42 @@ async def get_signals(limit: int = 10):
     try:
         from src.trading.bot import trading_bot
         
-        # Get signals from bot history
         signals = trading_bot.get_recent_signals(limit=limit)
         
-        # If no signals in history, return at least structure
         if not signals:
             logger.warning("No signals in bot history - bot may not be running")
             return {
                 "signals": [],
                 "total_signals": 0,
-                "bullish_signals": 0,
-                "bearish_signals": 0,
+                "rise_signals": 0,
+                "fall_signals": 0,
                 "bot_running": trading_bot.running,
                 "signal_history_size": len(trading_bot.signal_history),
                 "last_update": datetime.utcnow().isoformat()
             }
         
-        # Calculate bullish/bearish counts with flexible direction matching
-        bullish_count = sum(1 for s in signals if str(s.get("direction", "")).upper() in ["BUY", "CALL"])
-        bearish_count = sum(1 for s in signals if str(s.get("direction", "")).upper() in ["SELL", "PUT"])
+        # Count RISE/FALL signals
+        rise_count = sum(1 for s in signals if str(s.get("direction", "")).upper() in ["RISE", "BUY", "CALL"])
+        fall_count = sum(1 for s in signals if str(s.get("direction", "")).upper() in ["FALL", "SELL", "PUT"])
         
-        logger.info(f"Returning {len(signals)} signals: {bullish_count} bullish, {bearish_count} bearish")
+        logger.info(f"Returning {len(signals)} signals: {rise_count} RISE, {fall_count} FALL")
+        
+        # Convert signals to use consistent RISE/FALL terminology
+        standardized_signals = []
+        for signal in signals:
+            sig = signal.copy()
+            direction = str(sig.get("direction", "")).upper()
+            if direction in ["BUY", "CALL"]:
+                sig["direction"] = "RISE"
+            elif direction in ["SELL", "PUT"]:
+                sig["direction"] = "FALL"
+            standardized_signals.append(sig)
         
         return {
-            "signals": signals,
+            "signals": standardized_signals,
             "total_signals": len(signals),
-            "bullish_signals": bullish_count,
-            "bearish_signals": bearish_count,
+            "rise_signals": rise_count,
+            "fall_signals": fall_count,
             "bot_running": trading_bot.running,
             "signal_history_size": len(trading_bot.signal_history),
             "last_update": datetime.utcnow().isoformat()
@@ -111,8 +133,8 @@ async def get_signals(limit: int = 10):
         return {
             "signals": [],
             "total_signals": 0,
-            "bullish_signals": 0,
-            "bearish_signals": 0,
+            "rise_signals": 0,
+            "fall_signals": 0,
             "error": str(e),
             "last_update": datetime.utcnow().isoformat()
         }
@@ -138,22 +160,133 @@ async def get_market_data():
 # ============================================================
 @router.get("/trades")
 async def get_trades(limit: int = 100, offset: int = 0):
-    trades = TradeHistoryRepo.get_all_trades(limit=limit, offset=offset)
-    return {
-        "trades": trades,
-        "pagination": {
-            "limit": limit,
-            "offset": offset,
-            "total": len(trades)
+    """Fetch recent trades with contract details, using RISE/FALL terminology"""
+    db = SessionLocal()
+    try:
+        # Query trades with optional contract join
+        trades_query = db.query(Trade).join(
+            Contract, Trade.id == Contract.trade_id, isouter=True
+        ).order_by(Trade.created_at.desc())
+
+        total = trades_query.count()
+        trades = trades_query.limit(limit).offset(offset).all()
+
+        formatted_trades = []
+        for trade in trades:
+            # Convert side to RISE/FALL terminology
+            raw_side = trade.side or getattr(trade, "direction", None) or getattr(trade, "consensus_direction", None)
+            direction = "UNKNOWN"
+            if raw_side:
+                s = str(raw_side).upper()
+                if s in ["RISE", "BUY", "CALL"]:
+                    direction = "RISE"
+                elif s in ["FALL", "SELL", "PUT"]:
+                    direction = "FALL"
+            
+            # Determine if it's a Rise/Fall contract
+            is_rise_fall = True  # All your 1-tick contracts are Rise/Fall
+            
+            # Build trade dict
+            trade_dict = {
+                "id": trade.id,
+                "symbol": trade.symbol,
+                "original_side": trade.side,  # Keep original for reference
+                "direction": direction,  # Standardized direction (RISE/FALL)
+                "contract_type": "Rise/Fall" if is_rise_fall else "Other",
+                "amount": float(trade.amount) if trade.amount else 0,
+                "duration": trade.duration,
+                "status": trade.status,
+                "created_at": trade.created_at.isoformat() if trade.created_at else None,
+                "updated_at": trade.updated_at.isoformat() if hasattr(trade, "updated_at") and trade.updated_at else None
+            }
+
+            # Attach contract info if exists
+            contracts = db.query(Contract).filter(Contract.trade_id == trade.id).all()
+            if contracts:
+                # Get the latest contract
+                contract = contracts[0]
+                trade_dict["contract"] = {
+                    "profit": float(contract.profit) if contract.profit else 0,
+                    "entry_tick": contract.entry_tick if contract.entry_tick else "—",
+                    "exit_tick": contract.exit_tick if contract.exit_tick else "—",
+                    "is_sold": contract.is_sold,
+                    "sell_time": contract.sell_time.isoformat() if contract.sell_time else None
+                }
+                
+                # Calculate profit percentage for Rise/Fall contracts
+                if trade.amount and contract.profit:
+                    profit_pct = ((contract.profit - trade.amount) / trade.amount) * 100
+                    trade_dict["profit_percentage"] = round(profit_pct, 2)
+
+            formatted_trades.append(trade_dict)
+
+        return {
+            "trades": formatted_trades,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": total
+            }
         }
-    }
+
+    except Exception as e:
+        logger.error(f"Error fetching trades: {e}", exc_info=True)
+        return {
+            "trades": [],
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": 0
+            }
+        }
+    finally:
+        db.close()
+
 
 @router.get("/trades/{trade_id}")
 async def get_trade(trade_id: str):
-    trade = TradeHistoryRepo.get_trade_by_id(trade_id)
-    if not trade:
-        raise HTTPException(404, "Trade not found")
-    return trade
+    db = SessionLocal()
+    try:
+        trade = db.query(Trade).filter(Trade.id == trade_id).first()
+        if not trade:
+            raise HTTPException(404, "Trade not found")
+        
+        # Convert side to RISE/FALL
+        raw_side = trade.side or getattr(trade, "direction", None)
+        direction = "UNKNOWN"
+        if raw_side:
+            s = str(raw_side).upper()
+            if s in ["RISE", "BUY", "CALL"]:
+                direction = "RISE"
+            elif s in ["FALL", "SELL", "PUT"]:
+                direction = "FALL"
+        
+        trade_data = {
+            "id": trade.id,
+            "symbol": trade.symbol,
+            "original_side": trade.side,
+            "direction": direction,
+            "amount": float(trade.amount) if trade.amount else 0,
+            "duration": trade.duration,
+            "status": trade.status,
+            "created_at": trade.created_at.isoformat() if trade.created_at else None,
+            "contract_type": "Rise/Fall"
+        }
+        
+        # Add contract details
+        contract = db.query(Contract).filter(Contract.trade_id == trade_id).first()
+        if contract:
+            trade_data["contract"] = {
+                "profit": float(contract.profit) if contract.profit else 0,
+                "entry_tick": contract.entry_tick,
+                "exit_tick": contract.exit_tick,
+                "is_sold": contract.is_sold,
+                "sell_time": contract.sell_time.isoformat() if contract.sell_time else None
+            }
+        
+        return trade_data
+    finally:
+        db.close()
 
 @router.get("/trades/status/{status}")
 async def get_trades_by_status(status: str, limit: int = 100):
@@ -167,18 +300,66 @@ async def get_trades_by_status(status: str, limit: int = 100):
     trades = TradeHistoryRepo.get_trades_by_status(
         status.upper(), limit=limit
     )
-    return {"trades": trades}
+    
+    # Convert trades to use RISE/FALL terminology
+    formatted_trades = []
+    for trade in trades:
+        if isinstance(trade, dict):
+            formatted_trade = trade.copy()
+            direction = str(trade.get("side", "")).upper()
+            if direction in ["BUY", "CALL"]:
+                formatted_trade["direction"] = "RISE"
+            elif direction in ["SELL", "PUT"]:
+                formatted_trade["direction"] = "FALL"
+            else:
+                formatted_trade["direction"] = direction
+            formatted_trades.append(formatted_trade)
+    
+    return {"trades": formatted_trades}
 
 @router.get("/trades/stats/summary")
 async def get_trading_stats():
-    return TradeHistoryRepo.get_trading_stats()
+    stats = TradeHistoryRepo.get_trading_stats()
+    
+    # Add RISE/FALL breakdown if available
+    db = SessionLocal()
+    try:
+        rise_trades = db.query(Trade).filter(
+            (Trade.side == "CALL") | (Trade.side == "BUY")
+        ).count()
+        fall_trades = db.query(Trade).filter(
+            (Trade.side == "PUT") | (Trade.side == "SELL")
+        ).count()
+        
+        stats["rise_trades"] = rise_trades
+        stats["fall_trades"] = fall_trades
+        stats["rise_ratio"] = round((rise_trades / (rise_trades + fall_trades)) * 100, 2) if (rise_trades + fall_trades) > 0 else 0
+    finally:
+        db.close()
+    
+    return stats
 
 @router.get("/trades/date-range")
 async def get_trades_by_date_range(start_date: str, end_date: str):
     try:
         trades = TradeHistoryRepo.get_trades_by_date_range(start_date, end_date)
+        
+        # Convert trades to use RISE/FALL terminology
+        formatted_trades = []
+        for trade in trades:
+            if isinstance(trade, dict):
+                formatted_trade = trade.copy()
+                direction = str(trade.get("side", "")).upper()
+                if direction in ["BUY", "CALL"]:
+                    formatted_trade["direction"] = "RISE"
+                elif direction in ["SELL", "PUT"]:
+                    formatted_trade["direction"] = "FALL"
+                else:
+                    formatted_trade["direction"] = direction
+                formatted_trades.append(formatted_trade)
+        
         return {
-            "trades": trades,
+            "trades": formatted_trades,
             "date_range": {
                 "start_date": start_date,
                 "end_date": end_date
@@ -193,9 +374,22 @@ async def get_trades_by_date_range(start_date: str, end_date: str):
 # ============================================================
 @router.get("/debug/positions")
 async def debug_positions():
+    positions = position_manager.active_positions
+    
+    # Convert positions to use RISE/FALL terminology
+    formatted_positions = {}
+    for contract_id, pos in positions.items():
+        formatted_pos = pos.copy()
+        direction = str(pos.get("side", "")).upper()
+        if direction in ["CALL", "BUY"]:
+            formatted_pos["direction"] = "RISE"
+        elif direction in ["PUT", "SELL"]:
+            formatted_pos["direction"] = "FALL"
+        formatted_positions[contract_id] = formatted_pos
+    
     return {
         "open_positions": position_manager.get_open_count(),
-        "active_positions": position_manager.active_positions
+        "active_positions": formatted_positions
     }
 
 @router.get("/debug/bot")
@@ -204,7 +398,9 @@ async def debug_bot():
         "bot_running": trading_bot.running,
         "strategies": [s.name for s in trading_bot.strategies],
         "symbol": settings.SYMBOL,
-        "trade_amount": settings.TRADE_AMOUNT
+        "trade_amount": settings.TRADE_AMOUNT,
+        "contract_type": "Rise/Fall (1-tick)",
+        "duration": settings.CONTRACT_DURATION
     }
 
 
@@ -215,7 +411,7 @@ async def debug_bot():
 async def get_performance_metrics():
     """Get current bot performance metrics"""
     try:
-        metrics = await trading_bot.get_bot_metrics()
+        metrics = trading_bot.get_bot_metrics()  # Remove 'await' here
         return metrics
     except Exception as e:
         logger.error(f"Error getting performance metrics: {e}")
@@ -227,12 +423,17 @@ async def get_performance_metrics():
             "sharpe_ratio": 0,
             "total_profit": 0,
             "completed_trades": 0,
-            "winning_trades": 0
+            "winning_trades": 0,
+            "contract_type": "Rise/Fall"
         }
 
 @router.get("/risk/metrics")
 async def get_risk_metrics():
-    return trading_bot.risk.get_risk_metrics()
+    metrics = trading_bot.risk.get_risk_metrics()
+    # Add contract type info
+    metrics["contract_type"] = "Rise/Fall"
+    metrics["duration_ticks"] = settings.CONTRACT_DURATION
+    return metrics
 
 @router.post("/risk/reset")
 async def reset_risk():
@@ -283,7 +484,8 @@ async def get_lock_status():
         "is_locked": risk.state == RiskState.LOCKED,
         "lock_reason": "daily_loss" if daily_loss_pct >= risk.daily_loss_limit_pct * 100 else 
                       "daily_profit" if daily_profit_pct >= risk.daily_profit_limit_pct * 100 else 
-                      "none"
+                      "none",
+        "contract_type": "Rise/Fall"
     }
 
 # ============================================================
@@ -291,7 +493,14 @@ async def get_lock_status():
 # ============================================================
 @router.get("/strategies/performance")
 async def get_strategies_performance():
-    return trading_bot.strategy_performance
+    # Convert strategy performance to use RISE/FALL terminology
+    perf = trading_bot.strategy_performance.copy()
+    for strategy_name, data in perf.items():
+        # Rename "calls" to "rise_signals" and "puts" to "fall_signals"
+        if "calls" in data and "puts" in data:
+            data["rise_signals"] = data.pop("calls")
+            data["fall_signals"] = data.pop("puts")
+    return perf
 
 
 # ============================================================
@@ -302,7 +511,8 @@ async def get_ml_status():
     return {
         "ml_enabled": settings.ML_CONSENSUS_ENABLED,
         "model_trained": trading_bot.consensus.ml_consensus.is_trained,
-        "training_samples": len(trading_bot.consensus.ml_consensus.training_data)
+        "training_samples": len(trading_bot.consensus.ml_consensus.training_data),
+        "prediction_type": "RISE/FALL direction"
     }
 
 
@@ -314,12 +524,15 @@ async def reset_recovery():
     trading_bot.risk.reset_streak()
     return {
         "status": "Recovery system reset",
-        "next_amount": trading_bot.risk.get_next_trade_amount()
+        "next_amount": trading_bot.risk.get_next_trade_amount(),
+        "contract_type": "Rise/Fall"
     }
 
 @router.get("/recovery/status")
 async def get_recovery_status():
-    return trading_bot.risk.get_recovery_metrics()
+    status = trading_bot.risk.get_recovery_metrics()
+    status["contract_type"] = "Rise/Fall"
+    return status
 
 @router.get("/recovery/simulate")
 async def simulate_recovery(
@@ -335,7 +548,8 @@ async def simulate_recovery(
             "recovery_mode": settings.RECOVERY_MODE,
             "multiplier": settings.RECOVERY_MULTIPLIER,
             "max_streak": settings.MAX_RECOVERY_STREAK,
-            "smart_recovery": settings.SMART_RECOVERY
+            "smart_recovery": settings.SMART_RECOVERY,
+            "contract_type": "Rise/Fall"
         }
     }
 
@@ -366,7 +580,8 @@ async def configure_recovery(
 
     return {
         "status": "Recovery configuration updated",
-        "current": risk.get_recovery_metrics()
+        "current": risk.get_recovery_metrics(),
+        "contract_type": "Rise/Fall"
     }
 
 @router.post("/trades/manual-settle/{trade_id}")
@@ -388,7 +603,8 @@ async def manual_settle_trade(trade_id: str, result: str = None, payout: float =
         
         # Update trade
         trade.status = result
-        trade.updated_at = datetime.utcnow() if hasattr(trade, "updated_at") else None
+        if hasattr(trade, "updated_at"):
+            trade.updated_at = datetime.utcnow()
         
         # Update contract if exists
         contract = db.query(Contract).filter(Contract.trade_id == trade_id).first()
@@ -419,7 +635,8 @@ async def manual_settle_trade(trade_id: str, result: str = None, payout: float =
             "status": "Trade manually settled",
             "trade_id": trade_id,
             "result": result,
-            "payout": payout
+            "payout": payout,
+            "contract_type": "Rise/Fall"
         }
     finally:
         db.close()
@@ -459,7 +676,7 @@ async def auto_settle_expired_trades():
             })
             
             settled.append(trade.id)
-            logger.info(f"Auto-settled expired trade {trade.id} as LOST")
+            logger.info(f"Auto-settled expired Rise/Fall trade {trade.id} as LOST")
         
         db.commit()
         
@@ -471,7 +688,67 @@ async def auto_settle_expired_trades():
         
         return {
             "settled_count": len(settled),
-            "settled_trades": settled
+            "settled_trades": settled,
+            "contract_type": "Rise/Fall"
+        }
+    finally:
+        db.close()
+
+# ============================================================
+# RISE/FALL SPECIFIC ENDPOINTS
+# ============================================================
+@router.get("/contract-type")
+async def get_contract_type():
+    """Get information about the contract type being traded"""
+    return {
+        "type": "Rise/Fall (Up/Down)",
+        "description": "1-tick contract predicting if price will RISE (go up) or FALL (go down)",
+        "duration_ticks": settings.CONTRACT_DURATION,
+        "deriv_mapping": {
+            "RISE": "CALL",
+            "FALL": "PUT"
+        },
+        "payout_percentage": 82,  # Typical for Deriv Rise/Fall contracts
+        "symbol": settings.SYMBOL
+    }
+
+@router.get("/trades/direction/{direction}")
+async def get_trades_by_direction(direction: str, limit: int = 50):
+    """Get trades by direction (RISE or FALL)"""
+    if direction.upper() not in ["RISE", "FALL"]:
+        raise HTTPException(400, "Direction must be 'rise' or 'fall'")
+    
+    db = SessionLocal()
+    try:
+        # Map direction to Deriv sides
+        if direction.upper() == "RISE":
+            sides = ["CALL", "BUY"]
+        else:  # FALL
+            sides = ["PUT", "SELL"]
+        
+        trades = db.query(Trade).filter(
+            Trade.side.in_(sides)
+        ).order_by(Trade.created_at.desc()).limit(limit).all()
+        
+        formatted_trades = []
+        for trade in trades:
+            formatted_trade = {
+                "id": trade.id,
+                "symbol": trade.symbol,
+                "original_side": trade.side,
+                "direction": direction.upper(),
+                "amount": float(trade.amount) if trade.amount else 0,
+                "duration": trade.duration,
+                "status": trade.status,
+                "created_at": trade.created_at.isoformat() if trade.created_at else None,
+                "contract_type": "Rise/Fall"
+            }
+            formatted_trades.append(formatted_trade)
+        
+        return {
+            "direction": direction.upper(),
+            "trades": formatted_trades,
+            "count": len(formatted_trades)
         }
     finally:
         db.close()

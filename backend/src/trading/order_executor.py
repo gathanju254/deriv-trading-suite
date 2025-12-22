@@ -1,5 +1,4 @@
 # backend/src/trading/order_executor.py
-
 import uuid
 import asyncio
 import json
@@ -36,10 +35,10 @@ class OrderExecutor:
 
         self._listener_registered = False
 
-    # -------------------------------------------------------
-    # WS LISTENER
-    # -------------------------------------------------------
-    async def _ws_listener(self, msg):
+    # =====================================================
+    # DERIV WS LISTENER
+    # =====================================================
+    async def _ws_listener(self, msg: Dict[str, Any]):
         try:
             if "tick" not in msg:
                 logger.debug(f"📨 Deriv message: {json.dumps(msg)[:700]}")
@@ -69,9 +68,9 @@ class OrderExecutor:
         self._listener_registered = True
         logger.info("✅ OrderExecutor listener registered with Deriv WS")
 
-    # -------------------------------------------------------
+    # =====================================================
     # BUY HANDLER
-    # -------------------------------------------------------
+    # =====================================================
     async def _handle_buy(self, buy_data: Dict[str, Any]):
         logger.info(f"🛒 BUY response: {buy_data}")
 
@@ -113,7 +112,7 @@ class OrderExecutor:
                 position_manager.add_position(
                     trade_id=trade_id,
                     contract_id=str(contract_id),
-                    side=meta["side"],
+                    side=meta["side"],  # RISE / FALL
                     entry_price=float(meta["amount"]),
                 )
 
@@ -122,129 +121,190 @@ class OrderExecutor:
 
                 logger.info(f"🔗 Trade {trade_id} linked to contract_id {contract_id}")
 
-                # Subscribe to contract updates
                 await deriv.send({
                     "proposal_open_contract": 1,
                     "contract_id": contract_id,
                     "subscribe": 1,
                 })
-
             break
 
-    # -------------------------------------------------------
-    # CONTRACT UPDATE HANDLER (UUID + ID SAFE)
-    # -------------------------------------------------------
+    # =====================================================
+    # CONTRACT TYPE MAPPING
+    # =====================================================
+    def _map_to_deriv_contract_type(self, side: str) -> str:
+        side = side.upper()
+        if side == "RISE":
+            return "CALL"
+        if side == "FALL":
+            return "PUT"
+        if side in ("CALL", "PUT"):
+            return side
+        logger.warning(f"Unknown side '{side}', defaulting to CALL")
+        return "CALL"
+
+    def _map_from_deriv_contract_type(self, deriv_side: str) -> str:
+        deriv_side = deriv_side.upper()
+        if deriv_side == "CALL":
+            return "RISE"
+        if deriv_side == "PUT":
+            return "FALL"
+        return deriv_side
+
+    # =====================================================
+    # CONTRACT UPDATE HANDLER (FULL & SAFE)
+    # =====================================================
     async def _handle_contract_update(self, data: Dict[str, Any]):
         logger.debug(f"📡 Contract update: {data}")
 
-        contract_uuid = data.get("id")               # UUID (string)
-        contract_id_int = str(data.get("contract_id")) if data.get("contract_id") else None
+        contract_uuid = data.get("id")
+        contract_id = str(data.get("contract_id")) if data.get("contract_id") else None
 
-        # Skip already-cleaned contracts
-        if (contract_uuid and position_manager.is_cleaned(contract_uuid)) or \
-           (contract_id_int and position_manager.is_cleaned(contract_id_int)):
-            logger.debug("🧹 Contract already cleaned, skipping update")
+        if position_manager.is_cleaned(contract_uuid) or position_manager.is_cleaned(contract_id):
             return
 
-        # Resolve position
-        pos = None
-        if contract_uuid:
-            pos = position_manager.get_position(contract_uuid)
-        if not pos and contract_id_int:
-            pos = position_manager.get_position(contract_id_int)
-
+        pos = position_manager.get_position(contract_uuid) or position_manager.get_position(contract_id)
         if not pos:
-            logger.warning(f"⚠️ Update for unknown contract {contract_uuid or contract_id_int}")
             return
 
-        # Backfill UUID if missing
         if contract_uuid and not pos.get("uuid"):
             position_manager.update_contract_uuid(pos["contract_id"], contract_uuid)
 
-        # Settlement detection
         is_sold = (
-            data.get("is_sold") in (True, 1, "1") or
-            data.get("status") in {"sold", "won", "lost"} or
-            data.get("is_expired") in (True, 1)
+            data.get("is_sold") in (True, 1, "1")
+            or data.get("status") in ("sold", "won", "lost")
+            or data.get("is_expired") in (True, 1)
         )
-
         if not is_sold:
             return
 
-        # Extract payout
+        stake = float(pos["entry_price"])
         payout = 0.0
+
+        # Extract payout from various possible fields
         for field in ("sell_price", "bid_price", "payout", "buy_price"):
             if data.get(field) is not None:
-                try:
-                    payout = float(data[field])
-                    break
-                except Exception:
-                    pass
+                payout = float(data[field])
+                break
 
-        profit = float(data.get("profit", payout - pos["entry_price"]))
+        if payout == 0.0 and data.get("profit") is not None:
+            payout = stake + float(data["profit"])
+
+        profit = payout - stake
         result = "WON" if profit > 0 else "LOST"
 
         trade_id = pos["trade_id"]
         trade = TradeRepo.get(trade_id)
 
+        contract_type = data.get("contract_type", "UNKNOWN")
+        direction = self._map_from_deriv_contract_type(contract_type)
+
         logger.info(
-            f"🎯 CONTRACT SETTLED | trade={trade_id} result={result} payout={payout}"
+            f"🎯 SETTLED | trade={trade_id} direction={direction} "
+            f"result={result} payout={payout:.2f} profit={profit:.2f}"
         )
 
-        # Update DB trade
         if trade:
             trade.status = result
+            trade.side = direction
             TradeRepo.update(trade)
 
-        # Update Contract DB
         contract = ContractRepo.find(pos["contract_id"])
         if contract:
-            contract.exit_tick = data.get("exit_tick")
-            contract.profit = payout
+            # Extract entry price - try multiple possible fields
+            entry_price = None
+            for entry_field in ["entry_tick", "entry_spot", "entry_spot_time", "current_spot", "spot"]:
+                if data.get(entry_field) is not None:
+                    entry_price = data.get(entry_field)
+                    break
+            
+            # If no entry price found in data, use the stake/amount
+            if entry_price is None:
+                entry_price = str(stake)
+            
+            # Extract exit price - try multiple possible fields
+            exit_price = None
+            for exit_field in ["exit_tick", "current_spot", "sell_spot", "spot"]:
+                if data.get(exit_field) is not None:
+                    exit_price = data.get(exit_field)
+                    break
+            
+            # If no exit price found, use the payout
+            if exit_price is None:
+                exit_price = str(payout) if payout > 0 else "N/A"
+            
+            # If both are None/empty, use default placeholders
+            if not entry_price or entry_price == "":
+                entry_price = str(stake)
+            if not exit_price or exit_price == "":
+                exit_price = str(payout) if payout > 0 else "N/A"
+            
+            # Clean up the values - remove any "—" characters
+            entry_price = str(entry_price).strip().replace("—", "").replace("-", "")
+            exit_price = str(exit_price).strip().replace("—", "").replace("-", "")
+            
+            # If still empty after cleaning, set to stake/payout
+            if not entry_price or entry_price == "":
+                entry_price = str(stake)
+            if not exit_price or exit_price == "":
+                exit_price = str(payout) if payout > 0 else str(stake)
+
+            contract.entry_tick = entry_price
+            contract.exit_tick = exit_price
+            contract.profit = profit
             contract.is_sold = "1"
             contract.sell_time = datetime.utcnow()
             ContractRepo.update(contract)
 
-        # Risk + performance
+            logger.info(f"📊 Contract {contract.id} - Entry: {entry_price}, Exit: {exit_price}, Profit: {profit}")
+
         if trade:
             self.risk.update_trade_outcome(result, trade.amount)
 
             performance.add_trade({
                 "id": trade_id,
                 "symbol": trade.symbol,
-                "side": trade.side,
+                "side": direction,
                 "amount": trade.amount,
-                "profit": payout - trade.amount,
+                "profit": profit,
                 "result": result,
                 "closed_at": datetime.utcnow(),
                 "consensus_data": self.trades.get(trade_id, {}).get("consensus_data", {}),
             })
 
-        # ML training hook (unchanged logic)
-        if trade_id in self.trades:
-            consensus_data = self.trades[trade_id].get("consensus_data", {})
-            try:
-                self.consensus.add_training_sample(
-                    consensus_data.get("signals", []),
-                    result,
-                    data.get("entry_tick") or 0,
-                    consensus_data.get("side", "UNKNOWN"),
-                    consensus_data.get("session_open"),
-                )
-            except Exception:
-                logger.exception("ML training sample failed")
+        meta = self.trades.get(trade_id, {})
+        try:
+            consensus_data = meta.get("consensus_data", {})
+            price_for_ml = consensus_data.get("price_at_signal", data.get("entry_spot", 0))
 
-        position_manager.mark_closed(
-            contract_uuid or contract_id_int,
-            result,
-            payout,
-        )
+            normalized_signals = []
+            for sig in consensus_data.get("signals", []):
+                sig_side = sig.get("side", "").upper()
+                if sig_side in ("CALL", "BUY"):
+                    sig_side = "RISE"
+                elif sig_side in ("PUT", "SELL"):
+                    sig_side = "FALL"
 
-        logger.info(f"[CLOSED] Trade {trade_id} → {result} | Profit {payout - trade.amount:.2f}")
+                normalized_signals.append({
+                    "side": sig_side,
+                    "score": float(sig.get("score", 0)),
+                    "meta": sig.get("meta", {}),
+                })
 
-    # -------------------------------------------------------
+            self.consensus.add_training_sample(
+                normalized_signals,
+                result,
+                price_for_ml,
+                direction,
+                consensus_data.get("session_open"),
+            )
+        except Exception as e:
+            logger.error(f"ML training failed: {e}")
+
+        position_manager.mark_closed(contract_uuid or contract_id, result, payout)
+
+    # =====================================================
     # PLACE TRADE
-    # -------------------------------------------------------
+    # =====================================================
     async def place_trade(
         self,
         side: str,
@@ -255,10 +315,14 @@ class OrderExecutor:
     ):
         trade_id = str(uuid.uuid4())
 
+        side = side.upper()
+        deriv_type = self._map_to_deriv_contract_type(side)
+        user_side = self._map_from_deriv_contract_type(deriv_type)
+
         TradeRepo.create(Trade(
             id=trade_id,
             symbol=symbol,
-            side=side.upper(),
+            side=user_side,
             amount=amount,
             duration=duration,
             status="PENDING",
@@ -270,7 +334,7 @@ class OrderExecutor:
             "parameters": {
                 "amount": amount,
                 "basis": "stake",
-                "contract_type": side.upper(),
+                "contract_type": deriv_type,
                 "currency": settings.BASE_CURRENCY,
                 "duration": duration,
                 "duration_unit": duration_unit,
@@ -279,17 +343,29 @@ class OrderExecutor:
         })
 
         self.trades[trade_id] = {
-            "side": side.upper(),
+            "side": user_side,
+            "deriv_side": deriv_type,
             "amount": amount,
             "awaiting_contract": True,
             "consensus_data": {},
         }
 
-        logger.info(f"🚀 Placed trade {trade_id}: {side.upper()} {amount}")
+        logger.info(f"🚀 Placed {user_side} trade {trade_id} ({deriv_type}) ${amount}")
         return trade_id
 
+    # =====================================================
+    # HELPERS
+    # =====================================================
+    async def place_rise_fall_trade(self, direction: str, **kwargs):
+        if direction.upper() not in ("RISE", "FALL"):
+            raise ValueError("Direction must be RISE or FALL")
+        return await self.place_trade(side=direction.upper(), **kwargs)
 
-# -------------------------------------------------------
+    def get_trade_direction(self, trade_id: str) -> str:
+        return self.trades.get(trade_id, {}).get("side", "UNKNOWN")
+
+
+# =====================================================
 # SINGLETON
-# -------------------------------------------------------
+# =====================================================
 order_executor = OrderExecutor()

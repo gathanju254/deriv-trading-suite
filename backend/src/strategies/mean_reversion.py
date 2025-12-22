@@ -111,28 +111,28 @@ class MeanReversionStrategy(BaseStrategy):
         # current price
         current_price = prices[-1]
 
-        # Price near upper band -> potential reversal down
+        # Price near upper band -> potential reversal down → FALL signal
         # Use 99% of band for better sensitivity
         if current_price >= upper_last * 0.99:
-            result["side"] = "PUT"
+            result["side"] = "FALL"
             result["strength"] = 0.75  # Reduced from 0.8
             result["band_position"] = "upper"
 
-        # Price near lower band -> potential reversal up
+        # Price near lower band -> potential reversal up → RISE signal
         elif current_price <= lower_last * 1.01:
-            result["side"] = "CALL"
+            result["side"] = "RISE"
             result["strength"] = 0.75  # Reduced from 0.8
             result["band_position"] = "lower"
 
-        # Price crossing middle band upward
+        # Price crossing middle band upward → RISE signal
         elif (len(prices) >= 2) and (prices[-2] < middle_prev and current_price > middle_last):
-            result["side"] = "CALL"
+            result["side"] = "RISE"
             result["strength"] = 0.6
             result["band_position"] = "middle_up"
 
-        # Price crossing middle band downward
+        # Price crossing middle band downward → FALL signal
         elif (len(prices) >= 2) and (prices[-2] > middle_prev and current_price < middle_last):
-            result["side"] = "PUT"
+            result["side"] = "FALL"
             result["strength"] = 0.6
             result["band_position"] = "middle_down"
 
@@ -168,24 +168,24 @@ class MeanReversionStrategy(BaseStrategy):
         # price to long ratio
         price_to_long_ratio = (price - long_ema) / long_ema if long_ema != 0 else 0.0
 
-        # Strong PUT signal: Price significantly above long EMA + Bollinger upper band
+        # Strong FALL signal: Price significantly above long EMA + Bollinger upper band
         if (price_to_long_ratio > self.dynamic_threshold and
             bb_signal.get("band_position") in ["upper", "middle_down"]):
             strength = bb_signal.get("strength", 0.7) + 0.1
-            signals.append(("PUT", strength, "ema_bb_confirmation"))
+            signals.append(("FALL", strength, "ema_bb_confirmation"))
 
-        # Strong CALL signal: Price significantly below long EMA + Bollinger lower band
+        # Strong RISE signal: Price significantly below long EMA + Bollinger lower band
         elif (price_to_long_ratio < -self.dynamic_threshold and
               bb_signal.get("band_position") in ["lower", "middle_up"]):
             strength = bb_signal.get("strength", 0.7) + 0.1
-            signals.append(("CALL", strength, "ema_bb_confirmation"))
+            signals.append(("RISE", strength, "ema_bb_confirmation"))
 
         # Standard EMA mean reversion - BALANCED thresholds
         elif price_to_long_ratio > self.dynamic_threshold:
-            signals.append(("PUT", 0.65, "ema_reversion"))  # Increased from 0.6
+            signals.append(("FALL", 0.65, "ema_reversion"))  # Increased from 0.6
 
         elif price_to_long_ratio < -self.dynamic_threshold:
-            signals.append(("CALL", 0.65, "ema_reversion"))  # Increased from 0.6
+            signals.append(("RISE", 0.65, "ema_reversion"))  # Increased from 0.6
 
         # Bollinger Band standalone signals (strong ones only)
         elif bb_signal and bb_signal.get("strength", 0) >= 0.7:  # Reduced from 0.8

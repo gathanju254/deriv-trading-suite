@@ -24,7 +24,7 @@ class TradeHistoryRepo:
                 trade_data = {
                     "id": trade.id,
                     "symbol": trade.symbol,
-                    "side": trade.side,
+                    "side": trade.side,  # This should be "RISE" or "FALL"
                     "amount": trade.amount,
                     "duration": trade.duration,
                     "status": trade.status,
@@ -33,21 +33,31 @@ class TradeHistoryRepo:
                 
                 # Add contract data if exists
                 if trade.contract:
+                    # Ensure entry_tick and exit_tick have proper values
+                    entry_tick = trade.contract.entry_tick
+                    exit_tick = trade.contract.exit_tick
+                    
+                    # Clean up the tick values
+                    if entry_tick in ["—", "-", "", None]:
+                        entry_tick = "N/A"
+                    if exit_tick in ["—", "-", "", None]:
+                        exit_tick = "N/A"
+                    
                     trade_data["contract"] = {
                         "id": trade.contract.id,
-                        "entry_tick": trade.contract.entry_tick,
-                        "exit_tick": trade.contract.exit_tick,
+                        "entry_tick": entry_tick,
+                        "exit_tick": exit_tick,
                         "profit": trade.contract.profit,
                         "is_sold": trade.contract.is_sold,
                         "sell_time": trade.contract.sell_time.isoformat() if trade.contract.sell_time else None
                     }
-                
-                # Add proposal data if exists
-                if trade.proposal:
-                    trade_data["proposal"] = {
-                        "id": trade.proposal.id,
-                        "price": trade.proposal.price,
-                        "payout": trade.proposal.payout
+                else:
+                    # Add empty contract structure if no contract exists
+                    trade_data["contract"] = {
+                        "entry_tick": "N/A",
+                        "exit_tick": "N/A",
+                        "profit": 0.0,
+                        "is_sold": "0"
                     }
                 
                 result.append(trade_data)

@@ -81,16 +81,24 @@ const RecentTrades = () => {
   };
 
   // -------------------
-  // Direction helpers
+  // Direction helpers (RISE/FALL)
   // -------------------
-  const getDirectionDisplay = (side) => {
+  const getDirectionDisplay = (trade) => {
+    const side = trade.side || trade.direction || trade.consensus_data?.side;
     const s = side?.toUpperCase();
-    return s === 'CALL' ? 'BUY' : s === 'PUT' ? 'SELL' : 'UNKNOWN';
+
+    if (s === 'RISE' || s === 'BUY') return 'RISE';
+    if (s === 'FALL' || s === 'SELL') return 'FALL';
+    return 'UNKNOWN';
   };
 
-  const getDirectionClass = (side) => {
+  const getDirectionClass = (trade) => {
+    const side = trade.side || trade.direction || trade.consensus_data?.side;
     const s = side?.toUpperCase();
-    return s === 'CALL' ? 'direction-buy' : 'direction-sell';
+
+    if (s === 'RISE' || s === 'BUY') return 'direction-rise';
+    if (s === 'FALL' || s === 'SELL') return 'direction-fall';
+    return '';
   };
 
   // -------------------
@@ -178,7 +186,6 @@ const RecentTrades = () => {
 
               return (
                 <tr key={trade.id || index} className="trade-row">
-                  {/* ✅ DATETIME CELL */}
                   <td>
                     <div className="trade-datetime">
                       <span className="trade-date">{date}</span>
@@ -189,8 +196,8 @@ const RecentTrades = () => {
                   <td className="trade-symbol">{trade.symbol || 'N/A'}</td>
 
                   <td className="trade-direction">
-                    <span className={getDirectionClass(trade.side)}>
-                      {getDirectionDisplay(trade.side)}
+                    <span className={getDirectionClass(trade)}>
+                      {getDirectionDisplay(trade)}
                     </span>
                   </td>
 
@@ -201,9 +208,15 @@ const RecentTrades = () => {
                   <td className="trade-entry-exit">
                     {trade.contract ? (
                       <>
-                        <div>Entry: {trade.contract.entry_tick ?? '—'}</div>
-                        <div>Exit: {trade.contract.exit_tick ?? '—'}</div>
+                        <div>
+                          Entry: {trade.contract.entry_tick || trade.contract.entry_spot || '—'}
+                        </div>
+                        <div>
+                          Exit: {trade.contract.exit_tick || trade.contract.sell_spot || trade.contract.current_spot || '—'}
+                        </div>
                       </>
+                    ) : trade.status === 'ACTIVE' ? (
+                      'Active'
                     ) : (
                       'Pending'
                     )}
