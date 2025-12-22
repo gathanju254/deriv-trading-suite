@@ -8,7 +8,7 @@ from src.utils.logger import logger
 class MomentumStrategy(BaseStrategy):
     name = "momentum"
 
-    def __init__(self, rsi_period=14, overbought=70, oversold=30, macd_fast=12, macd_slow=26, macd_signal=9, optimize=True):
+    def __init__(self, rsi_period=14, overbought=75, oversold=25, macd_fast=12, macd_slow=26, macd_signal=9, optimize=True):
         self.rsi_period = rsi_period
         self.overbought = overbought
         self.oversold = oversold
