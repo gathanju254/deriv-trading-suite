@@ -68,7 +68,7 @@ class MLConsensus:
         else:
             features.append(0.0)
 
-        # Signal variance (chop detector)
+        # Signal variance (chop / noise detector)
         scores = [s["score"] for s in signals]
         features.append(np.var(scores) if len(scores) > 1 else 0.0)
 
@@ -99,7 +99,7 @@ class MLConsensus:
         joblib.dump(self.model, "models/consensus_model.pkl")
         joblib.dump(self.scaler, "models/scaler.pkl")
 
-        logger.info("ML consensus model trained (RISE/FALL prediction).")
+        logger.info("ML consensus model trained (RISE/FALL).")
 
     # -----------------------------------------------------
     # PREDICTION
@@ -159,9 +159,37 @@ class SignalConsensus:
         session_open: float = None,
     ) -> Optional[Dict]:
 
-        if not signals or len(signals) < 2:
+        if not signals:
             return None
 
+        # -------------------------------------------------
+        # SINGLE STRONG SIGNAL ACCEPTANCE (CONTROLLED)
+        # -------------------------------------------------
+        if len(signals) == 1:
+            signal = signals[0]
+            strategy_name = signal.get("meta", {}).get("strategy", "")
+            trusted_strategies = ["mean_reversion", "momentum"]
+
+            if (
+                signal.get("side", "").upper() in ALLOWED_SIDES
+                and signal.get("score", 0) >= 0.80
+                and strategy_name in trusted_strategies
+            ):
+                logger.info(f"✅ Accepting single strong signal from {strategy_name}")
+                return {
+                    "side": signal["side"].upper(),
+                    "score": round(signal["score"], 4),
+                    "sources": 1,
+                    "strategies": [strategy_name],
+                    "method": "single_trusted_signal",
+                    "traditional_score": round(signal["score"], 4),
+                    "ml_score": 0.0,
+                }
+            return None
+
+        # -------------------------------------------------
+        # MULTI-SIGNAL CONSENSUS
+        # -------------------------------------------------
         strong = [
             s for s in signals
             if float(s.get("score", 0)) >= 0.6
@@ -245,7 +273,7 @@ class SignalConsensus:
         }
 
     # -----------------------------------------------------
-    # ML TRAINING HOOK (REQUIRED BY OrderExecutor)
+    # ML TRAINING HOOK (CALLED BY OrderExecutor)
     # -----------------------------------------------------
     def add_training_sample(
         self,

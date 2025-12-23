@@ -59,6 +59,7 @@ class TradingBot:
         self.min_trade_interval = 15
         self.latest_price = None
 
+        # CHANGED: Uses RISE/FALL instead of CALL/PUT
         self.strategy_performance = {
             strat.name: {"rise": 0, "fall": 0, "success": 0}
             for strat in self.strategies
@@ -72,14 +73,14 @@ class TradingBot:
     # 📡 TICK HANDLER
     # ===============================================================
     async def _tick_handler(self, msg: Dict):
-        """Unified tick handler with proper signal processing"""
+        """Unified tick handler with proper signal processing - USING RISE/FALL"""
         try:
-            # ======== ADD TICK THROTTLE HERE ========
+            # ======== TICK THROTTLE ========
             current_time = time.time()
             if current_time - self._last_tick_time < self.min_tick_interval:
-                return  # Skip this tick, too soon
+                return
             self._last_tick_time = current_time
-            # ========================================
+            # ================================
             
             tick = msg.get("tick") if isinstance(msg, dict) and "tick" in msg else msg
             
@@ -117,15 +118,24 @@ class TradingBot:
             if time.time() - self.last_trade_time < self.min_trade_interval:
                 return
 
-            # 3. STRATEGY SIGNAL EXTRACTION
+            # 3. STRATEGY SIGNAL EXTRACTION - CONVERTING TO RISE/FALL
             signals = []
             for strat in self.strategies:
                 try:
                     sig = strat.on_tick({"quote": price, "symbol": settings.SYMBOL, "epoch": tick.get("epoch", int(time.time()))})
                     if sig:
+                        # CHANGED: Convert CALL/PUT to RISE/FALL
+                        original_side = sig.get("side", "").upper()
+                        if original_side == "CALL":
+                            converted_side = "RISE"
+                        elif original_side == "PUT":
+                            converted_side = "FALL"
+                        else:
+                            converted_side = original_side
+                        
                         # Normalize signal format for consensus
                         normalized_signal = {
-                            "side": sig.get("side", "").upper(),  # Ensure uppercase
+                            "side": converted_side,  # USING RISE/FALL
                             "score": float(sig.get("score", 0)),
                             "meta": sig.get("meta", {})
                         }
@@ -139,11 +149,11 @@ class TradingBot:
 
                 logger.info(f"📊 Got {len(signals)} signals from strategies")
 
-                # STORE AND BROADCAST SIGNALS
+                # STORE AND BROADCAST SIGNALS - USING RISE/FALL
                 for sig in signals:
                     signal_data = {
                         "id": f"sig_{self.signal_counter}_{int(time.time())}",
-                        "direction": sig.get("side") or "UNKNOWN",
+                        "direction": sig.get("side") or "UNKNOWN",  # RISE/FALL
                         "confidence": float(sig.get("score", 0)),
                         "price": price,
                         "symbol": symbol,
@@ -156,6 +166,15 @@ class TradingBot:
                     try:
                         self.signal_history.append(signal_data)
                         self.signal_counter += 1
+                        
+                        # Track strategy performance
+                        strat_name = sig.get("meta", {}).get("strategy")
+                        if strat_name in self.strategy_performance:
+                            if sig["side"] == "RISE":
+                                self.strategy_performance[strat_name]["rise"] += 1
+                            elif sig["side"] == "FALL":
+                                self.strategy_performance[strat_name]["fall"] += 1
+                                
                     except Exception as e:
                         logger.warning(f"Failed to append to signal history: {e}")
 
@@ -167,13 +186,20 @@ class TradingBot:
             else:
                 logger.info("📡 No signals from strategies")
 
-            # 4. CONSENSUS (USING SINGLE CONSENSUS INSTANCE)
+            # 4. CONSENSUS (USING SINGLE CONSENSUS INSTANCE) - NOW USING RISE/FALL
             consensus = self.consensus.aggregate(signals, price, self.session_open)
 
             logger.debug(f"Signals count: {len(signals)}")
             logger.debug(f"Consensus score: {consensus.get('score', 0) if consensus else 'No consensus'}")
 
             if consensus:
+                # CHANGED: Convert consensus side from CALL/PUT to RISE/FALL
+                consensus_side = consensus["side"]
+                if consensus_side == "CALL":
+                    consensus["side"] = "RISE"
+                elif consensus_side == "PUT":
+                    consensus["side"] = "FALL"
+                    
                 logger.info(f"✅ CONSENSUS PASSED → {consensus['side']}")
             else:
                 logger.info(f"❌ CONSENSUS FAILED - No consensus from {len(signals)} signals")
@@ -182,18 +208,35 @@ class TradingBot:
             if consensus.get("sources", 0) < 1:
                 return
             
-            min_consensus_score = 0.60
-            if consensus["score"] < min_consensus_score:
-                logger.info(f"❌ Consensus score too low: {consensus['score']} < {min_consensus_score}")
-                return
-
+            # ======== MARKET REGIME-AWARE CONSENSUS THRESHOLDS ========
             market_regime = market_status.get('regime')
-            threshold = 0.65 if market_regime == "RANGING" else 0.60
-            if consensus["score"] < threshold:
-                logger.info(f"❌ Consensus threshold not met for regime {market_regime}: {consensus['score']} < {threshold}")
+            
+            # Adjust consensus requirements based on regime
+            if market_regime == "RANGING":
+                # In ranging markets, require at least 1 strong signal
+                min_consensus_score = 0.70
+                if consensus.get("sources", 0) < 1:
+                    logger.info(f"❌ Need at least 1 strong signal in RANGING market, got {consensus.get('sources', 0)}")
+                    return
+            elif market_regime == "TRENDING":
+                # In trending markets, require 2+ signals
+                min_consensus_score = 0.60
+                if consensus.get("sources", 0) < 2:
+                    logger.info(f"❌ Need at least 2 signals in TRENDING market, got {consensus.get('sources', 0)}")
+                    return
+            else:
+                # Default: require 2+ signals
+                min_consensus_score = 0.65
+                if consensus.get("sources", 0) < 2:
+                    logger.info(f"❌ Need at least 2 signals, got {consensus.get('sources', 0)}")
+                    return
+            # ===========================================================
+            
+            if consensus["score"] < min_consensus_score:
+                logger.info(f"❌ Consensus score too low for regime {market_regime}: {consensus['score']} < {min_consensus_score}")
                 return
 
-            logger.info(f"✅ CONSENSUS OK → {consensus['side']} | Market Regime: {market_status.get('regime')}")
+            logger.info(f"✅ CONSENSUS OK → {consensus['side']} | Market Regime: {market_regime}, Score: {consensus['score']:.2f}")
 
             # 5. RISK MANAGER CHECKS
             try:
@@ -227,16 +270,20 @@ class TradingBot:
                 logger.info(f"⚠️ Price moved {price_move_pct:.2f}%, skipping trade")
                 return
 
-            # 7. EXECUTE TRADE
+            # 7. EXECUTE TRADE - USING RISE/FALL
             side = consensus["side"]  # RISE or FALL
             logger.info(
                 f"🚀 EXECUTING TRADE: side={side}, amount={trade_amount}, "
-                f"method={consensus.get('method')}, regime={market_status.get('regime')}"
+                f"method={consensus.get('method')}, regime={market_regime}"
             )
 
             try:
+                # CHANGED: Convert RISE/FALL back to CALL/PUT for order execution
+                # Some broker APIs use CALL/PUT terminology
+                order_side = "CALL" if side == "RISE" else "PUT"
+                
                 trade_id = await order_executor.place_trade(
-                    side=side,
+                    side=order_side,  # Using CALL/PUT for API
                     amount=trade_amount,
                     symbol=settings.SYMBOL
                 )
@@ -249,13 +296,16 @@ class TradingBot:
                     "ml_score": consensus.get("ml_score", 0),
                     "strategy_breakdown": {s.name: 0 for s in self.strategies},
                     "signals": signals,  # Store normalized signals for ML
-                    "market_regime": market_status.get("regime"),
+                    "market_regime": market_regime,
                     "volatility": market_status.get("volatility"),
                     "trend_strength": market_status.get("trend_strength"),
                     "recovery_data": recovery_metrics if settings.RECOVERY_ENABLED else None,
-                    "side": consensus["side"],
+                    "side": side,  # Store RISE/FALL
+                    "order_side": order_side,  # Store CALL/PUT used for order
                     "session_open": self.session_open,
-                    "price_at_signal": price  # Store actual price for ML training
+                    "price_at_signal": price,  # Store actual price for ML training
+                    "consensus_score": consensus["score"],
+                    "min_required_score": min_consensus_score
                 }
 
                 for sig in signals:
@@ -280,7 +330,7 @@ class TradingBot:
             return
 
         self.running = True
-        logger.info("🚀 Starting TradingBot with Enhanced Market Analyzer...")
+        logger.info("🚀 Starting TradingBot (RISE/FALL version)...")
         logger.info("📊 Collecting initial market data (20 ticks required)...")
         
         if settings.RECOVERY_ENABLED:
@@ -431,6 +481,15 @@ class TradingBot:
             logger.info(f"Daily Profit     : ${risk.get('daily_profit', 0):.2f}")
             logger.info(f"Daily Loss       : ${risk.get('daily_loss', 0):.2f}")
             
+            # Add strategy performance summary
+            logger.info("--- Strategy Performance (RISE/FALL) ---")
+            for strat_name, perf in self.strategy_performance.items():
+                total_signals = perf["rise"] + perf["fall"]
+                if total_signals > 0:
+                    rise_pct = (perf["rise"] / total_signals) * 100
+                    fall_pct = (perf["fall"] / total_signals) * 100
+                    logger.info(f"  {strat_name}: RISE={perf['rise']} ({rise_pct:.1f}%), FALL={perf['fall']} ({fall_pct:.1f}%)")
+            
             logger.info("=================================================")
 
         except Exception:
@@ -444,6 +503,10 @@ class TradingBot:
             
             stats = TradeHistoryRepo.get_trading_stats()
             perf_data = performance.get_performance_summary()
+            
+            # Calculate rise/fall counts from signal history
+            rise_count = sum(1 for sig in self.signal_history if sig.get("direction") == "RISE")
+            fall_count = sum(1 for sig in self.signal_history if sig.get("direction") == "FALL")
             
             base_metrics = {
                 "running": self.running,
@@ -470,7 +533,14 @@ class TradingBot:
                 "risk_metrics": self.risk.get_risk_metrics(),
                 "market_metrics": self.market_analyzer.get_market_metrics(),
                 "strategy_performance": self.strategy_performance,
-                "consensus_method": "ML" if settings.ML_CONSENSUS_ENABLED else "Traditional"
+                "consensus_method": "ML" if settings.ML_CONSENSUS_ENABLED else "Traditional",
+                "signal_stats": {
+                    "total_signals": len(self.signal_history),
+                    "rise_signals": rise_count,
+                    "fall_signals": fall_count,
+                    "rise_percentage": (rise_count / len(self.signal_history) * 100) if self.signal_history else 0,
+                    "fall_percentage": (fall_count / len(self.signal_history) * 100) if self.signal_history else 0
+                }
             }
             
             if settings.RECOVERY_ENABLED:
@@ -565,8 +635,19 @@ class TradingBot:
         return self.risk.get_recovery_metrics()
 
     def get_recent_signals(self, limit: int = 10):
+        """Return the most recent signals from history"""
         return self.signal_history[-limit:] if self.signal_history else []
     
+    # ===============================================================
+    # NEW: UPDATE STRATEGY PERFORMANCE
+    # ===============================================================
+    def update_strategy_performance(self, trade_result: str, strategy_name: str, side: str):
+        """Update strategy performance tracking"""
+        if strategy_name in self.strategy_performance:
+            if trade_result == "WON":
+                self.strategy_performance[strategy_name]["success"] += 1
+            # Note: We track rise/fall counts in _tick_handler
+
 
 # Singleton bot instance
 trading_bot = TradingBot()

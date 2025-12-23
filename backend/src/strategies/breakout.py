@@ -45,7 +45,7 @@ class BreakoutStrategy(BaseStrategy):
                     # Adjust threshold based on volatility (ATR as % of price) - BALANCED
                     atr_percentage = current_atr / avg_price if avg_price > 0 else 0.001
                     # More sensitive thresholds for synthetic indices
-                    self.dynamic_threshold = max(0.0006, min(0.004, atr_percentage * 1.8))
+                    self.dynamic_threshold = max(0.0003, min(0.002, atr_percentage * 1.2))
             
             # Performance-based optimization
             if self.performance_history:
