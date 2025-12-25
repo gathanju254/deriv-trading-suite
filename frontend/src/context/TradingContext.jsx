@@ -1,4 +1,5 @@
 // frontend/src/context/TradingContext.jsx
+// frontend/src/context/TradingContext.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { derivService } from '../services/derivService';
 import { websocketService } from '../services/websocket';
@@ -22,7 +23,7 @@ export const TradingProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [marketData, setMarketData] = useState({});
   const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
-  const [balance, setBalance] = useState(0);  // New: Balance state
+  const [balance, setBalance] = useState(0);
   
   // Refs to prevent unnecessary state updates
   const tradeHistoryRef = useRef([]);
@@ -35,7 +36,7 @@ export const TradingProvider = ({ children }) => {
       await websocketService.connect('ws://localhost:8000/ws');
       setWsConnectionStatus('connected');
       
-      // Subscribe to all events
+      // Subscribe to all events - CORRECTED: Use raw data directly
       websocketService.subscribe('signal', handleSignal);     // Real-time signals
       websocketService.subscribe('tick', handleTick);         // Market data
       websocketService.subscribe('trade', handleTrade);       // Trade updates
@@ -49,7 +50,7 @@ export const TradingProvider = ({ children }) => {
   }, []);
 
   const handleTick = (data) => {
-    // Handle real-time tick data
+    // Handle real-time tick data - CORRECTED: Data is already the payload
     setMarketData(prev => ({
       ...prev,
       lastPrice: data.quote,
@@ -60,34 +61,31 @@ export const TradingProvider = ({ children }) => {
   };
 
   const handleTrade = (data) => {
-    // Handle trade updates - only refresh specific data
+    // Handle trade updates - CORRECTED: Data is already the payload
     console.log('Trade update:', data);
     
-    // Only refresh trade history, not everything
-    derivService.getTradeHistory(20).then(historyData => {
-      if (JSON.stringify(historyData.trades) !== JSON.stringify(tradeHistoryRef.current)) {
-        tradeHistoryRef.current = historyData.trades || [];
-        setTradeHistory(historyData.trades || []);
-      }
-    });
+    // Refresh trade history when trades occur
+    refreshTradeHistory();
     
     // Update performance if needed
-    if (data.data?.type === 'trade' && (data.data.result === 'WON' || data.data.result === 'LOST')) {
-      derivService.getPerformance().then(performanceData => {
-        if (JSON.stringify(performanceData) !== JSON.stringify(performanceRef.current)) {
-          performanceRef.current = performanceData;
-          setPerformance(performanceData);
-        }
-      });
+    if (data.type === 'trade' && (data.result === 'WON' || data.result === 'LOST')) {
+      refreshPerformance();
     }
   };
 
   const handleSignal = (data) => {
-    // Handle real-time signal updates from WebSocket
+    // Handle real-time signal updates from WebSocket - CORRECTED: Data is already the payload
     console.log('📡 New signal from WebSocket:', data);
     
+    // Accept raw RISE/FALL signals without transformation
     setSignals(prev => {
-      const updated = [data.data, ...prev].slice(0, 50);
+      const newSignal = {
+        ...data,
+        id: data.id || Date.now(),
+        timestamp: data.timestamp || Date.now()
+      };
+      
+      const updated = [newSignal, ...prev].slice(0, 50);
       signalsRef.current = updated;
       return updated;
     });
@@ -102,7 +100,6 @@ export const TradingProvider = ({ children }) => {
     try {
       await derivService.startBot();
       setBotStatus('running');
-      // Only refresh performance after bot start
       await refreshPerformance();
     } catch (error) {
       console.error('Failed to start bot:', error);
@@ -116,7 +113,6 @@ export const TradingProvider = ({ children }) => {
     try {
       await derivService.stopBot();
       setBotStatus('stopped');
-      // Only refresh performance after bot stop
       await refreshPerformance();
     } catch (error) {
       console.error('Failed to stop bot:', error);
@@ -166,22 +162,24 @@ export const TradingProvider = ({ children }) => {
       setBalance(balanceData.balance || 0);
     } catch (error) {
       console.error('Failed to refresh balance:', error);
-      setBalance(0);  // Fallback to 0 on error
+      setBalance(0);
     }
   };
 
-  // Update refreshAllData to include balance
+  // CORRECTED: Update refreshAllData to fix Promise.all bug
   const refreshAllData = async () => {
     setLoading(true);
     try {
-      // Fetch all data in parallel but update individually
+      // Fetch all data in parallel with proper destructuring
       const [performanceData, historyData, signalsData, botMetrics] = await Promise.all([
         derivService.getPerformance(),
         derivService.getTradeHistory(),
         derivService.getSignals(),
-        derivService.getBotMetrics(),
-        refreshBalance()  // New: Fetch balance in parallel
+        derivService.getBotMetrics()
       ]);
+      
+      // Fetch balance separately to avoid Promise.all mismatch
+      await refreshBalance();
       
       // Only update if data has changed
       if (JSON.stringify(performanceData) !== JSON.stringify(performanceRef.current)) {
@@ -194,10 +192,10 @@ export const TradingProvider = ({ children }) => {
         setTradeHistory(historyData.trades || []);
       }
       
-      if (JSON.stringify(signalsData.signals) !== JSON.stringify(signalsRef.current)) {
-        signalsRef.current = signalsData.signals || [];
-        setSignals(signalsData.signals || []);
-      }
+      // Signals: Accept any format from backend
+      const rawSignals = signalsData.signals || [];
+      signalsRef.current = rawSignals;
+      setSignals(rawSignals);
       
       // Update bot status from metrics
       if (botMetrics.running !== undefined) {
@@ -227,30 +225,27 @@ export const TradingProvider = ({ children }) => {
     refreshAllData();
     
     // Initialize WebSocket
-    const cleanup = initWebSocket();
+    initWebSocket();
     
-    // Set up more frequent balance refresh (30 seconds instead of 5 minutes)
-    const balanceInterval = setInterval(refreshBalance, 30 * 1000);  // New: Refresh balance every 30 seconds
-    const fullRefreshInterval = setInterval(refreshAllData, 5 * 60 * 1000);  // Keep full refresh less frequent
+    // Set up more frequent balance refresh
+    const balanceInterval = setInterval(refreshBalance, 30 * 1000);
+    const fullRefreshInterval = setInterval(refreshAllData, 5 * 60 * 1000);
     
     return () => {
-      clearInterval(balanceInterval);  // New: Clear balance interval
+      clearInterval(balanceInterval);
       clearInterval(fullRefreshInterval);
       websocketService.disconnect();
-      if (cleanup && typeof cleanup.then === 'function') {
-        cleanup.then(fn => fn && fn());
-      }
     };
   }, [initWebSocket]);
 
-  // Update WebSocket status - less frequent
+  // Update WebSocket status
   useEffect(() => {
     const updateStatus = () => {
       const status = websocketService.getConnectionStatus();
       setWsConnectionStatus(status);
     };
     
-    const interval = setInterval(updateStatus, 5000); // Every 5 seconds
+    const interval = setInterval(updateStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -263,7 +258,7 @@ export const TradingProvider = ({ children }) => {
     loading,
     marketData,
     lastUpdateTime,
-    balance,  // New: Expose balance
+    balance,
     startBot,
     stopBot,
     refreshAllData,
