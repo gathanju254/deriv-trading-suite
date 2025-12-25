@@ -68,14 +68,45 @@ class WebSocketService {
   handleMessage(data) {
     try {
       const message = JSON.parse(data);
-      const subscribers = this.subscribers.get(message.type) || [];
+      console.log('📡 WebSocket message received:', message); // Debug log
+      
+      // Handle both formats: {type, data} or direct payload
+      let messageType = message.type;
+      let messageData = message.data || message;
+      
+      // If no type in message, try to infer from content
+      if (!messageType) {
+        if (message.symbol && message.quote) messageType = 'tick';
+        else if (message.balance !== undefined) messageType = 'balance';
+        else if (message.side) messageType = 'trade';
+        else if (message.pnl !== undefined || message.win_rate !== undefined) messageType = 'performance';
+        else if (message.direction) messageType = 'signal';
+        else messageType = 'unknown';
+      }
+      
+      // Log the inferred type for debugging
+      console.log(`📡 Inferred message type: ${messageType}`);
+      
+      // Notify specific type subscribers
+      const subscribers = this.subscribers.get(messageType) || [];
       subscribers.forEach(callback => {
         try {
-          callback(message.data);
+          callback(messageData);
         } catch (error) {
           console.error('Error in WebSocket callback:', error);
         }
       });
+      
+      // Also broadcast to 'all' subscribers
+      const allSubscribers = this.subscribers.get('all') || [];
+      allSubscribers.forEach(callback => {
+        try {
+          callback({ type: messageType, data: messageData });
+        } catch (error) {
+          console.error('Error in "all" WebSocket callback:', error);
+        }
+      });
+      
     } catch (error) {
       console.error('Error parsing WebSocket message:', error, data);
     }
@@ -86,6 +117,9 @@ class WebSocketService {
       this.subscribers.set(messageType, []);
     }
     this.subscribers.get(messageType).push(callback);
+    
+    console.log(`📡 Subscribed to ${messageType}, total subscribers: ${this.subscribers.get(messageType).length}`);
+    
     return () => this.unsubscribe(messageType, callback); // Return unsubscribe function
   }
 
@@ -95,6 +129,7 @@ class WebSocketService {
       const index = subscribers.indexOf(callback);
       if (index > -1) {
         subscribers.splice(index, 1);
+        console.log(`📡 Unsubscribed from ${messageType}, remaining: ${subscribers.length}`);
       }
     }
   }
@@ -134,6 +169,11 @@ class WebSocketService {
       default:
         return 'unknown';
     }
+  }
+
+  // Helper method to get all subscribed types (for debugging)
+  getSubscribedTypes() {
+    return Array.from(this.subscribers.keys());
   }
 }
 

@@ -3,6 +3,7 @@ import asyncio
 import time
 from typing import Dict
 from datetime import datetime
+import uuid  # Add this import at the top
 
 from src.core.deriv_api import deriv
 from src.utils.logger import logger
@@ -21,8 +22,16 @@ from src.core.risk_manager import risk_manager
 from src.trading.order_executor import order_executor
 from src.trading.position_manager import position_manager
 from src.trading.performance import performance
-import numpy as np
 
+# WebSocket broadcasting
+from src.api.websocket import (
+    broadcast_balance_update,
+    broadcast_performance_update,
+    broadcast_trade_update,
+    broadcast_signal
+)
+
+import numpy as np
 from src.config.settings import settings
 
 
@@ -70,7 +79,7 @@ class TradingBot:
         self.session_open = None
 
     # ===============================================================
-    # 📡 TICK HANDLER
+    # 📡 TICK HANDLER WITH WEBSOCKET BROADCASTING
     # ===============================================================
     async def _tick_handler(self, msg: Dict):
         """Unified tick handler with proper signal processing - USING RISE/FALL"""
@@ -137,7 +146,8 @@ class TradingBot:
                         normalized_signal = {
                             "side": converted_side,  # USING RISE/FALL
                             "score": float(sig.get("score", 0)),
-                            "meta": sig.get("meta", {})
+                            "meta": sig.get("meta", {}),
+                            "strategy": strat.name
                         }
                         signals.append(normalized_signal)
                 except Exception as e:
@@ -152,14 +162,14 @@ class TradingBot:
                 # STORE AND BROADCAST SIGNALS - USING RISE/FALL
                 for sig in signals:
                     signal_data = {
-                        "id": f"sig_{self.signal_counter}_{int(time.time())}",
+                        "id": str(uuid.uuid4()),  # Use UUID for guaranteed uniqueness instead of counter + timestamp
                         "direction": sig.get("side") or "UNKNOWN",  # RISE/FALL
                         "confidence": float(sig.get("score", 0)),
                         "price": price,
                         "symbol": symbol,
                         "timestamp": tick.get("epoch", int(time.time())),
-                        "strategy": sig.get("meta", {}).get("strategy", "unknown"),
-                        "message": f"{sig.get('side', 'UNKNOWN')} signal from {sig.get('meta', {}).get('strategy', 'unknown')}",
+                        "strategy": sig.get("strategy", "unknown"),
+                        "message": f"{sig.get('side', 'UNKNOWN')} signal from {sig.get('strategy', 'unknown')}",
                         "score": sig.get("score", 0)
                     }
 
@@ -168,21 +178,20 @@ class TradingBot:
                         self.signal_counter += 1
                         
                         # Track strategy performance
-                        strat_name = sig.get("meta", {}).get("strategy")
+                        strat_name = sig.get("strategy")
                         if strat_name in self.strategy_performance:
                             if sig["side"] == "RISE":
                                 self.strategy_performance[strat_name]["rise"] += 1
                             elif sig["side"] == "FALL":
                                 self.strategy_performance[strat_name]["fall"] += 1
                                 
+                        # BROADCAST SIGNAL VIA WEBSOCKET
+                        await broadcast_signal(signal_data)
+                        logger.debug(f"📡 Signal broadcasted: {signal_data['direction']} from {strat_name}")
+                                
                     except Exception as e:
-                        logger.warning(f"Failed to append to signal history: {e}")
+                        logger.warning(f"Failed to process signal: {e}")
 
-                    try:
-                        from src.api.websocket import ws_manager
-                        await ws_manager.broadcast_signal(signal_data)
-                    except Exception as e:
-                        logger.exception(f"Failed to broadcast signal: {e}")
             else:
                 logger.info("📡 No signals from strategies")
 
@@ -241,6 +250,8 @@ class TradingBot:
             # 5. RISK MANAGER CHECKS
             try:
                 balance = await deriv.get_balance()
+                # BROADCAST BALANCE UPDATE
+                await broadcast_balance_update(balance)
             except Exception:
                 logger.exception("Failed to get balance")
                 return
@@ -309,12 +320,25 @@ class TradingBot:
                 }
 
                 for sig in signals:
-                    strat_name = sig.get("meta", {}).get("strategy")
+                    strat_name = sig.get("strategy")
                     if strat_name in order_executor.trades[trade_id]["consensus_data"]["strategy_breakdown"]:
                         order_executor.trades[trade_id]["consensus_data"]["strategy_breakdown"][strat_name] += 1
 
                 self.last_trade_time = time.time()
                 logger.info(f"✅ Trade placed: {trade_id}")
+                
+                # BROADCAST TRADE UPDATE
+                trade_data = {
+                    "trade_id": trade_id,
+                    "side": side,
+                    "amount": trade_amount,
+                    "symbol": settings.SYMBOL,
+                    "status": "PENDING",
+                    "timestamp": time.time(),
+                    "consensus_score": consensus["score"]
+                }
+                await broadcast_trade_update(trade_data)
+                logger.debug(f"📤 Trade broadcasted: {trade_id}")
 
             except Exception as e:
                 logger.exception(f"❌ Trade execution failed: {e}")
@@ -364,6 +388,9 @@ class TradingBot:
             self.risk.start_session(balance)
             self.risk.reset_streak()
             logger.info(f"✅ Risk manager session started with balance: {balance:.2f}")
+            
+            # BROADCAST INITIAL BALANCE
+            await broadcast_balance_update(balance)
         except Exception as e:
             logger.error(f"Failed to start risk session: {e}")
 
@@ -375,6 +402,7 @@ class TradingBot:
         last_monitor_time = 0
         cleanup_interval = 60
         last_cleanup = 0
+        last_performance_broadcast = 0
 
         while self.running:
             now = asyncio.get_event_loop().time()
@@ -382,6 +410,11 @@ class TradingBot:
             if now - last_monitor_time > monitor_interval:
                 await self._report_performance()
                 last_monitor_time = now
+
+            # Broadcast performance every 30 seconds
+            if now - last_performance_broadcast > 30:
+                await self._broadcast_performance_metrics()
+                last_performance_broadcast = now
 
             if now - last_cleanup > cleanup_interval:
                 await self._cleanup_expired_trades()
@@ -419,17 +452,59 @@ class TradingBot:
                 logger.warning(f"Trade {trade.id} expired (created at {trade.created_at}) - marking as LOST")
                 trade.status = "LOST"
                 self.risk.update_trade_outcome("LOST", trade.amount)
+                
+                # BROADCAST TRADE CLOSURE
+                trade_data = {
+                    "trade_id": trade.id,
+                    "status": "LOST",
+                    "profit": -trade.amount,
+                    "timestamp": time.time()
+                }
+                await broadcast_trade_update(trade_data)
 
             db.commit()
             db.close()
 
             if expired:
                 logger.info(f"Cleaned up {len(expired)} expired trades")
+                # BROADCAST PERFORMANCE UPDATE AFTER CLEANUP
+                await self._broadcast_performance_metrics()
 
         except Exception as e:
             logger.error(f"Error in cleanup: {e}")
 
+    async def _broadcast_performance_metrics(self):
+        """Broadcast performance metrics via WebSocket"""
+        try:
+            metrics = self.performance.get_performance_metrics()
+            
+            perf_data = {
+                "win_rate": metrics.get('win_rate', 0),
+                "pnl": metrics.get('total_profit', 0),
+                "total_profit": metrics.get('total_profit', 0),
+                "total_trades": metrics.get('total_trades', 0),
+                "sharpe_ratio": metrics.get('sharpe_ratio', 0),
+                "max_drawdown": metrics.get('max_drawdown', 0),
+                "volatility": metrics.get('volatility', 0),
+                "daily_pnl": metrics.get('daily_pnl', 0),
+                "monthly_pnl": metrics.get('monthly_pnl', 0),
+                "avg_profit": metrics.get('avg_profit', 0),
+                "completed_trades": metrics.get('total_trades', 0),
+                "winning_trades": metrics.get('winning_trades', 0),
+                "profit_factor": metrics.get('profit_factor'),
+                "best_day": metrics.get('best_day'),
+                "worst_day": metrics.get('worst_day'),
+                "timestamp": time.time()
+            }
+            
+            await broadcast_performance_update(perf_data)
+            logger.debug("📊 Performance metrics broadcasted via WebSocket")
+            
+        except Exception as e:
+            logger.error(f"Failed to broadcast performance: {e}")
+
     async def _report_performance(self):
+        """Report and broadcast performance metrics"""
         try:
             metrics = self.performance.get_performance_metrics()
             risk = self.risk.get_risk_metrics()
@@ -491,6 +566,9 @@ class TradingBot:
                     logger.info(f"  {strat_name}: RISE={perf['rise']} ({rise_pct:.1f}%), FALL={perf['fall']} ({fall_pct:.1f}%)")
             
             logger.info("=================================================")
+
+            # BROADCAST PERFORMANCE UPDATE
+            await self._broadcast_performance_metrics()
 
         except Exception:
             logger.exception("Performance reporting error")

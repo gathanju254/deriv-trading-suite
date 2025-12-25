@@ -77,6 +77,7 @@ const SignalIndicator = () => {
   const [activeSignals, setActiveSignals] = useState([]);
   const [signalStrength, setSignalStrength] = useState(0);
   const [lastSignalUpdate, setLastSignalUpdate] = useState(null);
+  const [showAllSignals, setShowAllSignals] = useState(false); // Add state for toggle
   const prevSignalsRef = useRef(null);
 
   useEffect(() => {
@@ -233,28 +234,36 @@ const SignalIndicator = () => {
         <div className="signals-header">
           <h3>Recent Signals</h3>
           <div className="signals-count">
-            Showing {Math.min(activeSignals.length, 10)} of {activeSignals.length}
+            Showing {Math.min(activeSignals.length, showAllSignals ? 20 : 5)} of {activeSignals.length}
+            {activeSignals.length > 5 && (
+              <button 
+                className="toggle-btn" 
+                onClick={() => setShowAllSignals(!showAllSignals)}
+                title={showAllSignals ? 'Show fewer signals' : 'Show more signals'}
+              >
+                {showAllSignals ? 'Show Less' : 'Show More'}
+              </button>
+            )}
           </div>
         </div>
 
         {activeSignals.length === 0 ? (
           <div className="no-signals" aria-live="polite">
-            <AlertTriangle size={24} />
-            <p style={{marginTop:8}}>No active signals</p>
-            <small style={{color:'#94a3b8'}}>
-              Signals will appear when the trading bot is active
-            </small>
+            <AlertTriangle size={32} />
+            <p>No active signals</p>
+            <small>Signals will appear when the trading bot is active</small>
           </div>
         ) : (
           <div className="signals-grid" role="list">
-            {activeSignals.slice(0, 10).map(sig => (
+            {activeSignals.slice(0, showAllSignals ? 20 : 5).map((sig, idx) => (
               <div
-                key={sig.id}
+                key={`${sig.id}-${sig.timestamp || idx}`}
                 role="listitem"
                 className="signal-card"
                 style={{
                   borderLeftColor: getSignalColor(sig.direction)
                 }}
+                title={`Signal from ${sig.source || 'unknown'} strategy`}
               >
                 <div className="signal-header">
                   <div className="signal-direction">
@@ -276,14 +285,14 @@ const SignalIndicator = () => {
                   <p className="signal-message">{sig.message}</p>
 
                   <div className="signal-details" aria-hidden>
-                    <div>
+                    <div className="detail-item">
                       <div className="price-label">Price</div>
                       <div className="price-value">
                         ${safeNum(sig.price, 0).toFixed(4)}
                       </div>
                     </div>
 
-                    <div>
+                    <div className="detail-item">
                       <div className="confidence-label">Confidence</div>
                       <div className="confidence-bar" aria-hidden>
                         <div 
@@ -291,10 +300,7 @@ const SignalIndicator = () => {
                           style={{ width: `${(sig.confidence ?? 0.5) * 100}%` }} 
                         />
                       </div>
-                      <div 
-                        className="confidence-value" 
-                        style={{textAlign:'right', marginTop:4}}
-                      >
+                      <div className="confidence-value">
                         {Math.round((sig.confidence ?? 0.5) * 100)}%
                       </div>
                     </div>

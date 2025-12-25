@@ -1,7 +1,8 @@
 # backend/src/db/repositories/trade_history_repo.py
-# backend/src/db/repositories/trade_history_repo.py
+import json  # Add this import if not present
 import logging
 from sqlalchemy import desc, func, case
+from sqlalchemy.orm import joinedload
 from src.db.session import SessionLocal
 from src.db.models.trade import Trade
 from src.db.models.contract import Contract
@@ -17,7 +18,13 @@ class TradeHistoryRepo:
         """Get all trades with related contract and proposal data"""
         db = SessionLocal()
         try:
-            trades = db.query(Trade).order_by(desc(Trade.created_at)).offset(offset).limit(limit).all()
+            # Use joinedload to eagerly load contract data
+            trades = db.query(Trade)\
+                    .options(joinedload(Trade.contract))\
+                    .order_by(desc(Trade.created_at))\
+                    .offset(offset)\
+                    .limit(limit)\
+                    .all()
             
             result = []
             for trade in trades:
@@ -31,33 +38,51 @@ class TradeHistoryRepo:
                     "created_at": trade.created_at.isoformat() if trade.created_at else None
                 }
                 
-                # Add contract data if exists
+                # Add contract data if exists - FIXED
                 if trade.contract:
-                    # Ensure entry_tick and exit_tick have proper values
                     entry_tick = trade.contract.entry_tick
                     exit_tick = trade.contract.exit_tick
                     
-                    # Clean up the tick values
-                    if entry_tick in ["—", "-", "", None]:
-                        entry_tick = "N/A"
-                    if exit_tick in ["—", "-", "", None]:
-                        exit_tick = "N/A"
+                    # Handle missing values by extracting from audit_details
+                    if (entry_tick in [None, "", "—", "-", "N/A"] or exit_tick in [None, "", "—", "-", "N/A"]) and trade.contract.audit_details:
+                        try:
+                            audit = json.loads(trade.contract.audit_details)
+                            all_ticks = audit.get("all_ticks", [])
+                            if all_ticks:
+                                if entry_tick in [None, "", "—", "-", "N/A"]:
+                                    entry_tick = float(all_ticks[0]["tick"])  # First tick is entry
+                                if exit_tick in [None, "", "—", "-", "N/A"]:
+                                    exit_tick = float(all_ticks[-1]["tick"])  # Last tick is exit
+                        except (json.JSONDecodeError, KeyError, ValueError):
+                            pass
+                    
+                    # Apply the existing condition
+                    if entry_tick in [None, "", "—", "-", "N/A"]:
+                        entry_tick = None
+                    if exit_tick in [None, "", "—", "-", "N/A"]:
+                        exit_tick = None
                     
                     trade_data["contract"] = {
                         "id": trade.contract.id,
-                        "entry_tick": entry_tick,
-                        "exit_tick": exit_tick,
-                        "profit": trade.contract.profit,
+                        "entry_tick": entry_tick,  # Will be float or None
+                        "exit_tick": exit_tick,    # Will be float or None
+                        "profit": trade.contract.profit or 0.0,
                         "is_sold": trade.contract.is_sold,
                         "sell_time": trade.contract.sell_time.isoformat() if trade.contract.sell_time else None
                     }
                 else:
-                    # Add empty contract structure if no contract exists
+                    # Add calculated contract structure if no contract exists
+                    profit = 0.0
+                    if trade.status == "WON":
+                        profit = trade.amount * 0.95  # Assuming 95% payout
+                    elif trade.status == "LOST":
+                        profit = -trade.amount
+                    
                     trade_data["contract"] = {
                         "entry_tick": "N/A",
                         "exit_tick": "N/A",
-                        "profit": 0.0,
-                        "is_sold": "0"
+                        "profit": profit,
+                        "is_sold": "1" if trade.status in ["WON", "LOST"] else "0"
                     }
                 
                 result.append(trade_data)

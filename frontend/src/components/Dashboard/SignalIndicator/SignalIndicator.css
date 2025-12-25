@@ -132,38 +132,83 @@
   gap: 10px;
   margin-bottom: 8px;
 }
+.signals-header h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
 .signals-count {
-  color: var(--muted);
-  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* Signals grid: Enhanced for Recent Signals - more compact cards */
+.toggle-btn {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.2));
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.3));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-light);
+}
+
+/* No signals state: Centered and visually balanced */
+.no-signals {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+.no-signals p {
+  margin: 8px 0 4px 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+.no-signals small {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* Signals grid: Tighter gap for modern look */
 .signals-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px; /* Reduced from 10px for better fit */
+  gap: 10px;
 }
+
+/* Signal card: Enhanced with gradient, better shadows, and animations */
 .signal-card {
   display: flex;
   flex-direction: column;
-  gap: 6px; /* Reduced from 8px */
-  padding: 10px; /* Reduced from 12px for compactness */
-  border-radius: 8px;
-  border-left: 4px solid transparent;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(0, 0, 0, 0.2));
-  transition: transform 150ms ease, box-shadow 150ms ease, border-left-color 0.2s ease;
-  cursor: pointer; /* Added for interactivity */
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border-left: 5px solid transparent;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.1));
+  box-shadow: var(--shadow-light);
+  transition: all 0.3s ease;
+  cursor: pointer;
 }
 .signal-card:hover {
-  transform: translateY(-2px); /* Reduced lift for subtlety */
+  transform: translateY(-3px);
   box-shadow: var(--shadow-hover);
-  border-left-color: currentColor; /* Dynamic based on direction */
-}
-.signal-card:focus {
-  outline: 2px solid var(--info);
-  outline-offset: 2px; /* Accessibility: Focus state */
+  border-left-color: currentColor;
 }
 
+/* Signal header: Better alignment */
 .signal-header {
   display: flex;
   justify-content: space-between;
@@ -177,66 +222,71 @@
 }
 .direction-text {
   font-weight: 700;
-  font-size: 0.85rem; /* Reduced from 0.9rem for fit */
+  font-size: 0.9rem;
   text-transform: uppercase;
 }
 .signal-meta {
   text-align: right;
   color: var(--muted);
-  font-size: 0.75rem; /* Reduced from 0.8rem */
+  font-size: 0.75rem;
 }
 
+/* Signal body: Improved layout with flex for details */
 .signal-body {
   display: flex;
   justify-content: space-between;
-  gap: 10px; /* Reduced from 12px */
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
 }
 .signal-message {
   flex: 1;
   color: var(--text);
-  font-size: 0.85rem; /* Reduced from 0.9rem */
+  font-size: 0.9rem;
   margin: 0;
-  line-height: 1.4; /* Added for readability */
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap; /* Prevent wrap on small screens */
+  white-space: nowrap;
 }
 .signal-details {
-  min-width: 180px; /* Reduced from 220px for better fit */
   display: flex;
-  gap: 8px; /* Reduced from 10px */
-  align-items: center;
-  justify-content: flex-end;
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-direction: column;
+  gap: 8px;
+  min-width: 160px;
 }
-
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.price-label, .confidence-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
 .price-value {
   font-family: 'SF Mono', monospace;
   font-weight: 700;
   color: var(--text);
-  font-size: 0.8rem; /* Reduced for compactness */
+  font-size: 0.85rem;
 }
 .confidence-bar {
-  width: 70px; /* Reduced from 88px */
-  height: 8px;
-  background: rgba(71, 85, 105, 0.18);
-  border-radius: 6px;
+  width: 80px;
+  height: 6px;
+  background: rgba(71, 85, 105, 0.2);
+  border-radius: 3px;
   overflow: hidden;
 }
 .confidence-fill {
   height: 100%;
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.95), rgba(148, 163, 184, 0.6), rgba(16, 185, 129, 0.95));
-  transition: width 200ms ease;
+  background: linear-gradient(90deg, var(--danger), var(--muted), var(--success));
+  transition: width 0.3s ease;
 }
-
-.last-update-info {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--muted);
-  font-size: 0.8rem; /* Reduced from 0.82rem */
-  margin-top: 6px;
+.confidence-value {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
 }
 
 /* Enhanced responsiveness: Added tablet breakpoint, adjusted for Recent Signals */
@@ -292,8 +342,8 @@
     gap: 4px;
   }
   .signal-details {
-    justify-content: flex-start; /* Align to start for better fit */
-    min-width: unset; /* Remove min-width for full flexibility */
+    flex-direction: row;
+    justify-content: space-between;
   }
   .direction-text {
     font-size: 0.8rem;

@@ -1,5 +1,4 @@
 # backend/src/api/websocket.py
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from src.core.deriv_api import deriv
 from src.utils.logger import logger
@@ -106,12 +105,96 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 # ==================================================
+#           SPECIALIZED BROADCAST FUNCTIONS
+# ==================================================
+async def broadcast_balance_update(balance: float):
+    """Broadcast balance updates to all clients"""
+    try:
+        await ws_manager.broadcast({
+            "type": "balance",
+            "data": {
+                "balance": balance,
+                "timestamp": time.time()
+            }
+        })
+        logger.debug(f"Broadcast balance update: {balance}")
+    except Exception as e:
+        logger.error(f"Error broadcasting balance: {e}")
+
+
+async def broadcast_performance_update(performance_data: dict):
+    """Broadcast performance updates to all clients"""
+    try:
+        await ws_manager.broadcast({
+            "type": "performance",
+            "data": performance_data
+        })
+        logger.debug(f"Broadcast performance update: {performance_data}")
+    except Exception as e:
+        logger.error(f"Error broadcasting performance: {e}")
+
+
+async def broadcast_trade_update(trade_data: dict):
+    """Broadcast trade updates to all clients"""
+    try:
+        await ws_manager.broadcast({
+            "type": "trade",
+            "data": trade_data
+        })
+        logger.debug(f"Broadcast trade update: {trade_data}")
+    except Exception as e:
+        logger.error(f"Error broadcasting trade: {e}")
+
+
+# ==================================================
 #           DERIV MESSAGE FORWARDER
 # ==================================================
 async def broadcast_deriv_messages(msg: dict):
     """Forward Deriv API messages to clients (with filtering & throttling)."""
 
     try:
+        # ------------- BALANCE UPDATES ----------------
+        if "authorize" in msg and "balance" in msg.get("authorize", {}):
+            balance = msg["authorize"]["balance"]
+            await broadcast_balance_update(balance)
+        
+        if "buy" in msg and "balance_after" in msg.get("buy", {}):
+            balance = msg["buy"]["balance_after"]
+            await broadcast_balance_update(balance)
+        
+        if "sell" in msg and "balance_after" in msg.get("sell", {}):
+            balance = msg["sell"]["balance_after"]
+            await broadcast_balance_update(balance)
+
+        # ------------- CONTRACT CLOSURE ----------------
+        if "proposal_open_contract" in msg:
+            contract = msg["proposal_open_contract"]
+            if contract.get("is_sold") == "1" or contract.get("status") == "sold":
+                logger.info(f"Contract closed: {contract.get('contract_id')}")
+                
+                # When a contract closes, update performance and trades
+                try:
+                    from src.trading.performance import performance
+                    
+                    # Get updated performance metrics
+                    perf_data = await performance.calculate_metrics()
+                    await broadcast_performance_update(perf_data)
+                    
+                    # Broadcast trade update
+                    await broadcast_trade_update({
+                        "contract_id": contract.get("contract_id"),
+                        "status": contract.get("status", "sold"),
+                        "profit": contract.get("profit"),
+                        "symbol": contract.get("symbol"),
+                        "buy_price": contract.get("buy_price"),
+                        "sell_price": contract.get("sell_price"),
+                        "timestamp": time.time(),
+                        "is_sold": contract.get("is_sold"),
+                        "type": "contract_closed"
+                    })
+                except Exception as e:
+                    logger.error(f"Error processing contract closure: {e}")
+
         # ------------- TICK THROTTLING ----------------
         if "tick" in msg:
             now = time.time()
@@ -131,15 +214,33 @@ async def broadcast_deriv_messages(msg: dict):
             return
 
         # ------------- TRADE MESSAGES ----------------
-        if "buy" in msg or "sell" in msg or "proposal_open_contract" in msg:
-            await ws_manager.broadcast({
-                "type": "trade",
-                "data": msg
+        if "buy" in msg:
+            buy_data = msg.get("buy", {})
+            await broadcast_trade_update({
+                "type": "buy",
+                "contract_id": buy_data.get("contract_id"),
+                "balance_after": buy_data.get("balance_after"),
+                "amount": buy_data.get("amount"),
+                "symbol": buy_data.get("symbol"),
+                "timestamp": time.time()
+            })
+            return
+        
+        if "sell" in msg:
+            sell_data = msg.get("sell", {})
+            await broadcast_trade_update({
+                "type": "sell",
+                "contract_id": sell_data.get("contract_id"),
+                "balance_after": sell_data.get("balance_after"),
+                "profit": sell_data.get("profit"),
+                "timestamp": time.time()
             })
             return
 
-        # Other messages (optional)
-        # logger.debug(f"WS ignored Deriv message: {msg}")
+        # ------------- SIGNAL MESSAGES ----------------
+        # You can also handle signal messages from Deriv if needed
+        # Example: if "signal" in msg:
+        #     await ws_manager.broadcast_signal(msg["signal"])
 
     except Exception as e:
         logger.error(f"WebSocket broadcast error: {e}")
@@ -157,8 +258,33 @@ async def register_ws_broadcaster():
         logger.error(f"Failed to register WS broadcaster: {e}")
 
 
-# IMPORTANT:
-# Register the broadcaster only when the event loop is ready.
+# ==================================================
+#     PUBLIC FUNCTIONS FOR OTHER MODULES TO USE
+# ==================================================
+async def broadcast_balance(balance: float):
+    """Public function for other modules to broadcast balance updates"""
+    await broadcast_balance_update(balance)
+
+
+async def broadcast_performance(performance_data: dict):
+    """Public function for other modules to broadcast performance updates"""
+    await broadcast_performance_update(performance_data)
+
+
+async def broadcast_trade(trade_data: dict):
+    """Public function for other modules to broadcast trade updates"""
+    await broadcast_trade_update(trade_data)
+
+
+async def broadcast_signal(signal_data: dict):
+    """Public function for other modules to broadcast signals"""
+    await ws_manager.broadcast_signal(signal_data)
+
+
+# ==================================================
+#     REGISTER BROADCASTER ON APP STARTUP
+# ==================================================
+# IMPORTANT: Register the broadcaster only when the event loop is ready.
 # FastAPI lifespan event triggers registration safely.
 asyncio.get_event_loop().call_soon_threadsafe(
     lambda: asyncio.create_task(register_ws_broadcaster())

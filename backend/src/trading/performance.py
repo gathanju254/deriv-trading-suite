@@ -11,6 +11,9 @@ from src.db.repositories.trade_repo import TradeRepo
 from src.db.repositories.contract_repo import ContractRepo
 from src.db.session import SessionLocal
 
+# Import WebSocket broadcasting
+from src.api.websocket import broadcast_performance
+
 
 class PerformanceTracker:
     def __init__(self):
@@ -60,7 +63,24 @@ class PerformanceTracker:
         except Exception as e:
             logger.error(f"Failed to load existing trades: {e}")
 
-    def add_trade(self, trade: Dict):
+    async def calculate_metrics(self) -> Dict:
+        """Calculate and broadcast performance metrics"""
+        try:
+            metrics = self.get_performance_metrics()
+            
+            # Broadcast the metrics via WebSocket
+            try:
+                await broadcast_performance(metrics)
+                logger.debug("📊 Performance metrics broadcasted via WebSocket")
+            except Exception as e:
+                logger.error(f"Failed to broadcast performance metrics: {e}")
+            
+            return metrics
+        except Exception as e:
+            logger.error(f"Error calculating/broadcasting metrics: {e}")
+            return {}
+
+    async def add_trade(self, trade: Dict):
         """Add a completed trade with PnL data and save to database"""
         try:
             # Add to memory
@@ -69,6 +89,9 @@ class PerformanceTracker:
             
             # Also update the trade in database
             self._update_trade_in_database(trade)
+            
+            # Recalculate and broadcast performance metrics
+            await self.calculate_metrics()
             
         except Exception:
             logger.exception("Failed to add trade to performance tracker")
@@ -89,7 +112,7 @@ class PerformanceTracker:
             if contract:
                 # Update existing contract
                 contract.profit = trade.get("profit", 0.0)
-                contract.is_sold = "1" if trade["result"] in ["WON", "LOST"] else "0"
+                contract.is_sold = True if trade["result"] in ["WON", "LOST"] else False
                 contract.sell_time = datetime.utcnow()
                 if not contract.exit_tick:
                     # Try to get exit tick from market data if available
@@ -142,22 +165,26 @@ class PerformanceTracker:
             if not completed:
                 return {
                     "total_trades": 0,
+                    "completed_trades": 0,
                     "winning_trades": 0,
                     "losing_trades": 0,
                     "win_rate": 0.0,
                     "total_profit": 0.0,
+                    "pnl": 0.0,
                     "average_profit": 0.0,
                     "average_loss": 0.0,
-                    "profit_factor": 0.0,
+                    "profit_factor": None,
                     "sharpe_ratio": 0.0,
                     "max_drawdown": 0.0,
-                    "daily_pnl": self.daily_pnl,
-                    "weekly_pnl": self.weekly_pnl,
-                    "monthly_pnl": self.monthly_pnl,
-                    "best_day": 0.0,  # NEW
-                    "worst_day": 0.0,  # NEW
-                    "avg_trade_duration": 0.0,  # NEW
-                    "volatility": 0.0  # NEW
+                    "daily_pnl": 0.0,
+                    "monthly_pnl": 0.0,
+                    "best_day": None,
+                    "worst_day": None,
+                    "avg_trade_duration": 0.0,
+                    "volatility": 0.0,
+                    "active_trades": 0,
+                    "avg_trades_per_day": 0.0,
+                    "timestamp": datetime.utcnow().isoformat()
                 }
 
             profits = [t["profit"] for t in completed]
@@ -171,14 +198,20 @@ class PerformanceTracker:
             avg_win = statistics.mean(wins) if wins else 0.0
             avg_loss = statistics.mean(losses) if losses else 0.0
 
-            profit_factor = (
-                abs(sum(wins) / sum(losses)) if losses else float("inf")
-            )
+            # Calculate profit factor
+            profit_factor = None
+            if losses:
+                total_wins = sum(wins)
+                total_losses = sum(losses)
+                if total_losses != 0:
+                    profit_factor = abs(total_wins / total_losses)
 
+            # Calculate Sharpe ratio
             avg_ret = statistics.mean(profits) if profits else 0.0
             std_ret = statistics.stdev(profits) if len(profits) > 1 else 0.0
             sharpe_ratio = avg_ret / std_ret if std_ret > 0 else 0.0
 
+            # Calculate max drawdown
             running = 0
             peak = 0
             max_drawdown = 0
@@ -187,57 +220,86 @@ class PerformanceTracker:
                 peak = max(peak, running)
                 max_drawdown = max(max_drawdown, peak - running)
 
-            # NEW: Calculate best and worst day
-            best_day = max(self.daily_pnl.values()) if self.daily_pnl else 0.0
-            worst_day = min(self.daily_pnl.values()) if self.daily_pnl else 0.0
+            # Calculate daily P&L (most recent day)
+            daily_pnl = 0.0
+            if self.daily_pnl:
+                today_key = datetime.utcnow().strftime("%Y-%m-%d")
+                daily_pnl = self.daily_pnl.get(today_key, 0.0)
             
-            # NEW: Calculate average trade duration (simplified - use 5 ticks as default)
+            # Calculate monthly P&L (current month)
+            monthly_pnl = 0.0
+            if self.monthly_pnl:
+                current_month_key = datetime.utcnow().strftime("%Y-%m")
+                monthly_pnl = self.monthly_pnl.get(current_month_key, 0.0)
+
+            # Calculate best and worst day
+            best_day = None
+            worst_day = None
+            if self.daily_pnl:
+                best_day = max(self.daily_pnl.values()) if self.daily_pnl else 0.0
+                worst_day = min(self.daily_pnl.values()) if self.daily_pnl else 0.0
+            
+            # Calculate average trade duration (simplified - use 5 ticks as default)
             avg_trade_duration = 5.0  # Default for binary options contracts
             
-            # NEW: Calculate volatility (std of daily returns)
+            # Calculate volatility (std of daily returns)
             daily_returns = list(self.daily_pnl.values())
             volatility = statistics.stdev(daily_returns) if len(daily_returns) > 1 else 0.0
+            
+            # Calculate average trades per day
+            unique_days = len(self.daily_pnl)
+            avg_trades_per_day = total_trades / unique_days if unique_days > 0 else 0.0
 
             return {
                 "total_trades": total_trades,
+                "completed_trades": total_trades,
                 "winning_trades": len(wins),
                 "losing_trades": len(losses),
                 "win_rate": round(win_rate, 2),
                 "total_profit": round(total_profit, 2),
+                "pnl": round(total_profit, 2),
                 "average_profit": round(avg_win, 2),
+                "avg_profit": round(avg_win, 2),
                 "average_loss": round(avg_loss, 2),
-                "profit_factor": round(profit_factor, 2) if profit_factor != float("inf") else 0.0,
+                "profit_factor": round(profit_factor, 2) if profit_factor is not None else None,
                 "sharpe_ratio": round(sharpe_ratio, 2),
                 "max_drawdown": round(max_drawdown, 2),
-                "daily_pnl": self.daily_pnl,
-                "weekly_pnl": self.weekly_pnl,
-                "monthly_pnl": self.monthly_pnl,
-                "best_day": round(best_day, 2),  # NEW
-                "worst_day": round(worst_day, 2),  # NEW
-                "avg_trade_duration": round(avg_trade_duration, 2),  # NEW
-                "volatility": round(volatility, 4)  # NEW
+                "daily_pnl": round(daily_pnl, 2),
+                "monthly_pnl": round(monthly_pnl, 2),
+                "best_day": round(best_day, 2) if best_day is not None else None,
+                "worst_day": round(worst_day, 2) if worst_day is not None else None,
+                "avg_trade_duration": round(avg_trade_duration, 2),
+                "volatility": round(volatility, 4),
+                "active_trades": 0,  # This should come from position_manager
+                "avg_trades_per_day": round(avg_trades_per_day, 2),
+                "timestamp": datetime.utcnow().isoformat()
             }
 
         except Exception:
             logger.exception("Performance calculation crashed — returning safe defaults")
             return {
                 "total_trades": 0,
+                "completed_trades": 0,
                 "winning_trades": 0,
                 "losing_trades": 0,
                 "win_rate": 0.0,
                 "total_profit": 0.0,
+                "pnl": 0.0,
                 "average_profit": 0.0,
+                "avg_profit": 0.0,
                 "average_loss": 0.0,
-                "profit_factor": 0.0,
+                "profit_factor": None,
                 "sharpe_ratio": 0.0,
                 "max_drawdown": 0.0,
-                "daily_pnl": self.daily_pnl,
-                "weekly_pnl": self.weekly_pnl,
-                "monthly_pnl": self.monthly_pnl,
-                "best_day": 0.0,  # NEW
-                "worst_day": 0.0,  # NEW
-                "avg_trade_duration": 0.0,  # NEW
-                "volatility": 0.0  # NEW
+                "daily_pnl": 0.0,
+                "monthly_pnl": 0.0,
+                "best_day": None,
+                "worst_day": None,
+                "avg_trade_duration": 0.0,
+                "volatility": 0.0,
+                "active_trades": 0,
+                "avg_trades_per_day": 0.0,
+                "timestamp": datetime.utcnow().isoformat()
             }
 
     def get_performance_summary(self) -> Dict:
@@ -264,11 +326,11 @@ class PerformanceTracker:
                 "volatility": metrics.get("volatility", 0.0),
                 "daily_pnl": round(daily_pnl, 2),
                 "monthly_pnl": round(monthly_pnl, 2),
-                "avg_profit": metrics.get("average_profit", 0.0),
+                "avg_profit": metrics.get("avg_profit", 0.0),
                 "avg_trade_duration": metrics.get("avg_trade_duration", 0.0),
-                "profit_factor": metrics.get("profit_factor", None),  # Can be None if no losses
-                "best_day": metrics.get("best_day", None),  # Can be None if no trades
-                "worst_day": metrics.get("worst_day", None)  # Can be None if no trades
+                "profit_factor": metrics.get("profit_factor", None),
+                "best_day": metrics.get("best_day", None),
+                "worst_day": metrics.get("worst_day", None)
             }
             
         except Exception as e:

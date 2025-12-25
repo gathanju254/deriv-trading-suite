@@ -2,6 +2,7 @@
 import uuid
 import asyncio
 import json
+import time
 from datetime import datetime
 from typing import Dict, Any
 
@@ -23,6 +24,13 @@ from src.trading.performance import performance
 from src.core.risk_manager import risk_manager
 from src.core.signal_consensus import SignalConsensus
 from src.config.settings import settings
+
+# WebSocket broadcasting
+from src.api.websocket import (
+    broadcast_trade_update,
+    broadcast_performance_update,
+    broadcast_balance_update
+)
 
 
 class OrderExecutor:
@@ -47,7 +55,7 @@ class OrderExecutor:
                 await self._handle_buy(msg["buy"])
 
             elif msg.get("msg_type") == "buy" and "error" in msg:
-                await self._handle_buy({"error": msg.get("error")})
+                await self._handle_buy_error(msg.get("error"))
 
             if msg.get("proposal_open_contract"):
                 await self._handle_contract_update(msg["proposal_open_contract"])
@@ -83,6 +91,16 @@ class OrderExecutor:
                         trade.status = "REJECTED"
                         TradeRepo.update(trade)
                     meta["awaiting_contract"] = False
+                    
+                    # BROADCAST TRADE REJECTION
+                    await self._broadcast_trade_update({
+                        "trade_id": trade_id,
+                        "status": "REJECTED",
+                        "error": buy_data['error'],
+                        "timestamp": time.time(),
+                        "type": "trade_rejected"
+                    })
+                    
                     logger.error(f"❌ BUY rejected for trade {trade_id}: {buy_data['error']}")
                     return
 
@@ -119,7 +137,29 @@ class OrderExecutor:
                 meta["contract_id"] = str(contract_id)
                 meta["awaiting_contract"] = False
 
+                # New contract instance
+                contract = Contract(
+                    id=str(contract_id),
+                    trade_id=trade_id,
+                    entry_tick=None,  # Will be updated later
+                    exit_tick=None,   # Will be updated later
+                    profit=0.0,
+                    is_sold=False
+                )
+                ContractRepo.save(contract)
+
                 logger.info(f"🔗 Trade {trade_id} linked to contract_id {contract_id}")
+
+                # BROADCAST TRADE ACTIVE
+                await self._broadcast_trade_update({
+                    "trade_id": trade_id,
+                    "contract_id": str(contract_id),
+                    "direction": meta["side"],
+                    "status": "ACTIVE",
+                    "amount": meta["amount"],
+                    "timestamp": time.time(),
+                    "type": "trade_active"
+                })
 
                 await deriv.send({
                     "proposal_open_contract": 1,
@@ -127,6 +167,29 @@ class OrderExecutor:
                     "subscribe": 1,
                 })
             break
+
+    async def _handle_buy_error(self, error_data: Dict[str, Any]):
+        """Handle buy errors specifically"""
+        for trade_id, meta in list(self.trades.items()):
+            if meta.get("awaiting_contract"):
+                trade = TradeRepo.get(trade_id)
+                if trade:
+                    trade.status = "REJECTED"
+                    TradeRepo.update(trade)
+                meta["awaiting_contract"] = False
+                
+                # BROADCAST TRADE REJECTION
+                await self._broadcast_trade_update({
+                    "trade_id": trade_id,
+                    "status": "REJECTED",
+                    "error": error_data.get('message', 'Unknown error'),
+                    "error_code": error_data.get('code'),
+                    "timestamp": time.time(),
+                    "type": "trade_rejected"
+                })
+                
+                logger.error(f"❌ BUY error for trade {trade_id}: {error_data}")
+                break
 
     # =====================================================
     # CONTRACT TYPE MAPPING
@@ -175,6 +238,8 @@ class OrderExecutor:
             or data.get("is_expired") in (True, 1)
         )
         if not is_sold:
+            # Broadcast position update (price changes)
+            await self._broadcast_position_update(pos, data)
             return
 
         stake = float(pos["entry_price"])
@@ -208,66 +273,86 @@ class OrderExecutor:
             trade.side = direction
             TradeRepo.update(trade)
 
+        # Get sell_time from Deriv API response or use current time
+        sell_time = None
+        for time_field in ["sell_time", "settlement_time", "expiry_time", "date_end"]:
+            if data.get(time_field):
+                try:
+                    # Try to parse different time formats from Deriv API
+                    if isinstance(data[time_field], (int, float)):
+                        # Unix timestamp
+                        sell_time = datetime.fromtimestamp(data[time_field])
+                    elif isinstance(data[time_field], str):
+                        # ISO string
+                        sell_time = datetime.fromisoformat(data[time_field].replace('Z', '+00:00'))
+                    else:
+                        sell_time = datetime.utcnow()
+                    break
+                except (ValueError, TypeError):
+                    continue
+        
+        if not sell_time:
+            sell_time = datetime.utcnow()  # Fallback to current time
+
         contract = ContractRepo.find(pos["contract_id"])
         if contract:
-            # Extract entry price - try multiple possible fields
+            # Extract entry price - try multiple possible fields, ensure float
             entry_price = None
             for entry_field in ["entry_tick", "entry_spot", "entry_spot_time", "current_spot", "spot"]:
-                if data.get(entry_field) is not None:
-                    entry_price = data.get(entry_field)
-                    break
-            
-            # If no entry price found in data, use the stake/amount
+                val = data.get(entry_field)
+                if val is not None:
+                    try:
+                        entry_price = float(val)
+                        break
+                    except (ValueError, TypeError):
+                        continue  # Skip invalid values
+
             if entry_price is None:
-                entry_price = str(stake)
-            
-            # Extract exit price - try multiple possible fields
+                entry_price = stake  # stake is already a float
+
+            # Extract exit price - try multiple possible fields, ensure float
             exit_price = None
             for exit_field in ["exit_tick", "current_spot", "sell_spot", "spot"]:
-                if data.get(exit_field) is not None:
-                    exit_price = data.get(exit_field)
-                    break
-            
-            # If no exit price found, use the payout
+                val = data.get(exit_field)
+                if val is not None:
+                    try:
+                        exit_price = float(val)
+                        break
+                    except (ValueError, TypeError):
+                        continue
+
             if exit_price is None:
-                exit_price = str(payout) if payout > 0 else "N/A"
-            
-            # If both are None/empty, use default placeholders
-            if not entry_price or entry_price == "":
-                entry_price = str(stake)
-            if not exit_price or exit_price == "":
-                exit_price = str(payout) if payout > 0 else "N/A"
-            
-            # Clean up the values - remove any "—" characters
-            entry_price = str(entry_price).strip().replace("—", "").replace("-", "")
-            exit_price = str(exit_price).strip().replace("—", "").replace("-", "")
-            
-            # If still empty after cleaning, set to stake/payout
-            if not entry_price or entry_price == "":
-                entry_price = str(stake)
-            if not exit_price or exit_price == "":
-                exit_price = str(payout) if payout > 0 else str(stake)
+                exit_price = payout if payout > 0 else stake  # Default to payout or stake as float
 
-            contract.entry_tick = entry_price
-            contract.exit_tick = exit_price
-            contract.profit = profit
-            contract.is_sold = "1"
-            contract.sell_time = datetime.utcnow()
-            ContractRepo.update(contract)
+            # Update contract with float values (or None if still invalid)
+            if contract:
+                if entry_price is not None:
+                    contract.entry_tick = entry_price
+                if exit_price is not None:
+                    contract.exit_tick = exit_price
+                contract.profit = profit
+                contract.is_sold = True if result in ["WON", "LOST"] else False  # This is always True when contract is sold
+                contract.sell_time = sell_time  # Now defined!
+                
+                # New: Save audit_details for tick history
+                if data.get("audit_details"):
+                    contract.audit_details = json.dumps(data["audit_details"])
+                
+                ContractRepo.update(contract)
 
-            logger.info(f"📊 Contract {contract.id} - Entry: {entry_price}, Exit: {exit_price}, Profit: {profit}")
+                logger.info(f"📊 Contract {contract.id} - Entry: {entry_price}, Exit: {exit_price}, Profit: {profit}")
 
         if trade:
             self.risk.update_trade_outcome(result, trade.amount)
 
-            performance.add_trade({
+            await performance.add_trade({
                 "id": trade_id,
                 "symbol": trade.symbol,
                 "side": direction,
                 "amount": trade.amount,
                 "profit": profit,
                 "result": result,
-                "closed_at": datetime.utcnow(),
+                "closed_at": sell_time,  # Use the same sell_time
                 "consensus_data": self.trades.get(trade_id, {}).get("consensus_data", {}),
             })
 
@@ -302,6 +387,73 @@ class OrderExecutor:
 
         position_manager.mark_closed(contract_uuid or contract_id, result, payout)
 
+        # BROADCAST TRADE CLOSURE
+        await self._broadcast_trade_closed(trade_id, pos, direction, result, profit, payout, stake)
+
+    async def _broadcast_position_update(self, position: Dict, data: Dict):
+        """Broadcast position updates (price changes)"""
+        try:
+            current_price = None
+            for price_field in ["current_spot", "spot", "bid_price", "ask_price"]:
+                if data.get(price_field) is not None:
+                    current_price = float(data[price_field])
+                    break
+            
+            if current_price is not None:
+                await broadcast_trade_update({
+                    "trade_id": position["trade_id"],
+                    "contract_id": position.get("contract_id"),
+                    "direction": position.get("side"),
+                    "status": "ACTIVE",
+                    "current_price": current_price,
+                    "timestamp": time.time(),
+                    "type": "position_update"
+                })
+        except Exception as e:
+            logger.error(f"Failed to broadcast position update: {e}")
+
+    async def _broadcast_trade_closed(self, trade_id: str, position: Dict, direction: str, 
+                                     result: str, profit: float, payout: float, stake: float):
+        """Broadcast trade closure with all related updates"""
+        try:
+            # Get current balance
+            current_balance = await deriv.get_balance()
+            
+            # Broadcast trade closure
+            await self._broadcast_trade_update({
+                "trade_id": trade_id,
+                "contract_id": position.get("contract_id"),
+                "direction": direction,
+                "status": result,
+                "profit": profit,
+                "payout": payout,
+                "stake": stake,
+                "timestamp": time.time(),
+                "type": "trade_closed"
+            })
+            
+            # Broadcast performance update
+            try:
+                perf_data = await performance.calculate_metrics()
+                await broadcast_performance_update(perf_data)
+            except Exception as e:
+                logger.error(f"Failed to calculate/broadcast performance: {e}")
+            
+            # Broadcast balance update
+            await broadcast_balance_update(current_balance)
+            
+            logger.debug(f"📡 Trade {trade_id} closure broadcasted via WebSocket")
+            
+        except Exception as e:
+            logger.error(f"Failed to broadcast trade closure: {e}")
+
+    async def _broadcast_trade_update(self, data: Dict[str, Any]):
+        """Helper to broadcast trade updates"""
+        try:
+            await broadcast_trade_update(data)
+        except Exception as e:
+            logger.error(f"Failed to broadcast trade update: {e}")
+
     # =====================================================
     # PLACE TRADE
     # =====================================================
@@ -319,6 +471,7 @@ class OrderExecutor:
         deriv_type = self._map_to_deriv_contract_type(side)
         user_side = self._map_from_deriv_contract_type(deriv_type)
 
+        # Create trade in database
         TradeRepo.create(Trade(
             id=trade_id,
             symbol=symbol,
@@ -328,6 +481,18 @@ class OrderExecutor:
             status="PENDING",
         ))
 
+        # BROADCAST TRADE PLACEMENT
+        await self._broadcast_trade_update({
+            "trade_id": trade_id,
+            "direction": user_side,
+            "amount": amount,
+            "symbol": symbol,
+            "status": "PENDING",
+            "timestamp": time.time(),
+            "type": "trade_placed"
+        })
+
+        # Send buy request to Deriv
         await deriv.send({
             "buy": 1,
             "price": f"{amount:.2f}",
@@ -363,6 +528,19 @@ class OrderExecutor:
 
     def get_trade_direction(self, trade_id: str) -> str:
         return self.trades.get(trade_id, {}).get("side", "UNKNOWN")
+
+    def get_active_trades(self) -> Dict[str, Dict]:
+        """Get all active trades"""
+        return {k: v for k, v in self.trades.items() if v.get("awaiting_contract") or v.get("contract_id")}
+
+    async def broadcast_performance_metrics(self):
+        """Broadcast current performance metrics"""
+        try:
+            perf_data = await performance.calculate_metrics()
+            await broadcast_performance_update(perf_data)
+            logger.debug("📊 Performance metrics broadcasted via WebSocket")
+        except Exception as e:
+            logger.error(f"Failed to broadcast performance metrics: {e}")
 
 
 # =====================================================

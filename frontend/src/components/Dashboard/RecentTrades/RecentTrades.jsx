@@ -1,4 +1,5 @@
 // frontend/src/components/Dashboard/RecentTrades/RecentTrades.jsx
+// frontend/src/components/Dashboard/RecentTrades/RecentTrades.jsx
 import React, { useMemo } from 'react';
 import { useTrading } from '../../../context/TradingContext';
 import {
@@ -41,25 +42,69 @@ const RecentTrades = () => {
   };
 
   // -------------------
-  // Profit helpers
+  // Profit helpers - UPDATED
   // -------------------
   const formatProfit = (trade) => {
-    const profit = trade.contract?.profit ?? 0;
+    // Try multiple ways to get profit
+    const profit = trade.contract?.profit ?? 
+                   trade.profit ?? 
+                   (trade.status?.toUpperCase() === 'WON' ? trade.amount * 0.95 : 
+                    trade.status?.toUpperCase() === 'LOST' ? -trade.amount : 0) ?? 
+                   0;
     return Number(profit).toFixed(2);
   };
 
   const getProfitColor = (trade) => {
-    const profit = trade.contract?.profit ?? 0;
+    const profit = trade.contract?.profit ?? 
+                   trade.profit ?? 
+                   (trade.status?.toUpperCase() === 'WON' ? trade.amount * 0.95 : 
+                    trade.status?.toUpperCase() === 'LOST' ? -trade.amount : 0) ?? 
+                   0;
     if (profit > 0) return 'profit-positive';
     if (profit < 0) return 'profit-negative';
     return 'profit-neutral';
   };
 
   const getProfitIcon = (trade) => {
-    const profit = trade.contract?.profit ?? 0;
+    const profit = trade.contract?.profit ?? 
+                   trade.profit ?? 
+                   (trade.status?.toUpperCase() === 'WON' ? trade.amount * 0.95 : 
+                    trade.status?.toUpperCase() === 'LOST' ? -trade.amount : 0) ?? 
+                   0;
     if (profit > 0) return <ArrowUpRight size={14} />;
     if (profit < 0) return <ArrowDownRight size={14} />;
     return null;
+  };
+
+  // -------------------
+  // Entry/Exit helpers - UPDATED
+  // -------------------
+  const getEntryExitDisplay = (trade) => {
+    if (trade.contract) {
+      const entry = (trade.contract.entry_tick !== null && trade.contract.entry_tick !== undefined) 
+        ? trade.contract.entry_tick 
+        : trade.contract.entry_spot || '—';
+      const exit = (trade.contract.exit_tick !== null && trade.contract.exit_tick !== undefined) 
+        ? trade.contract.exit_tick 
+        : trade.contract.exit_spot || trade.contract.sell_spot || trade.contract.current_spot || '—';
+      return (
+        <>
+          <div>Entry: {entry}</div>
+          <div>Exit: {exit}</div>
+        </>
+      );
+    } else if (trade.status?.toUpperCase() === 'ACTIVE' && trade.current_price) {
+      // For active trades, show current price from WebSocket updates
+      return (
+        <>
+          <div>Entry: Pending</div>
+          <div>Current: ${trade.current_price.toFixed(4)}</div>
+        </>
+      );
+    } else {
+      // Show a neutral placeholder for pending or unknown states
+      return 'N/A';
+    }
   };
 
   // -------------------
@@ -102,7 +147,7 @@ const RecentTrades = () => {
   };
 
   // -------------------
-  // Summary (memoized)
+  // Summary (memoized) - UPDATED
   // -------------------
   const summary = useMemo(() => {
     if (!tradeHistory?.length) {
@@ -113,9 +158,15 @@ const RecentTrades = () => {
     const won = tradeHistory.filter(t => t.status?.toUpperCase() === 'WON').length;
     const lost = tradeHistory.filter(t => t.status?.toUpperCase() === 'LOST').length;
     const winRate = ((won / total) * 100).toFixed(1);
-    const totalProfit = tradeHistory
-      .reduce((sum, t) => sum + (t.contract?.profit ?? 0), 0)
-      .toFixed(2);
+    
+    // Calculate total profit with fallback logic
+    const totalProfit = tradeHistory.reduce((sum, t) => {
+      const profit = t.contract?.profit ?? 
+                     t.profit ?? 
+                     (t.status?.toUpperCase() === 'WON' ? t.amount * 0.95 : 
+                      t.status?.toUpperCase() === 'LOST' ? -t.amount : 0);
+      return sum + profit;
+    }, 0).toFixed(2);
 
     return { total, won, lost, winRate, totalProfit };
   }, [tradeHistory]);
@@ -156,7 +207,7 @@ const RecentTrades = () => {
   }
 
   // -------------------
-  // MAIN TABLE
+  // MAIN TABLE - UPDATED
   // -------------------
   return (
     <div className="recent-trades">
@@ -206,20 +257,7 @@ const RecentTrades = () => {
                   <td>{trade.duration ? `${trade.duration}t` : 'N/A'}</td>
 
                   <td className="trade-entry-exit">
-                    {trade.contract ? (
-                      <>
-                        <div>
-                          Entry: {trade.contract.entry_tick || trade.contract.entry_spot || '—'}
-                        </div>
-                        <div>
-                          Exit: {trade.contract.exit_tick || trade.contract.sell_spot || trade.contract.current_spot || '—'}
-                        </div>
-                      </>
-                    ) : trade.status === 'ACTIVE' ? (
-                      'Active'
-                    ) : (
-                      'Pending'
-                    )}
+                    {getEntryExitDisplay(trade)}
                   </td>
 
                   <td className={`trade-profit ${getProfitColor(trade)}`}>
