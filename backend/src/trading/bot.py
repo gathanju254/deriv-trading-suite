@@ -62,6 +62,7 @@ class TradingBot:
         self.performance = performance
 
         self.running = False
+        self._bot_task = None  # Add this to track the bot task
         self._last_tick_time = 0
         self.min_tick_interval = 0.05
         self.last_trade_time = 0
@@ -352,9 +353,11 @@ class TradingBot:
     # MAIN BOT LOOP
     # ===============================================================
     async def run(self):
+        # Prevent multiple instances
         if self.running:
+            logger.warning("Bot is already running")
             return
-
+            
         self.running = True
         logger.info("🚀 Starting TradingBot (RISE/FALL version)...")
         logger.info("📊 Collecting initial market data (20 ticks required)...")
@@ -467,6 +470,23 @@ class TradingBot:
                     continue
 
             await asyncio.sleep(1)
+
+    async def stop(self):
+        """Properly stop the bot"""
+        if not self.running:
+            return
+            
+        logger.info("🛑 Stopping Trading Bot...")
+        self.running = False
+        
+        # Wait for the bot task to finish
+        if self._bot_task and not self._bot_task.done():
+            try:
+                await asyncio.wait_for(self._bot_task, timeout=10)
+            except asyncio.TimeoutError:
+                logger.warning("Bot task didn't stop gracefully")
+                
+        logger.info("✅ Trading Bot stopped")
 
     async def _cleanup_expired_trades(self):
         """Clean up trades that should have expired"""

@@ -62,9 +62,10 @@ async def start_bot():
     """Start the trading bot"""
     try:
         if not trading_bot.running:
+            # Use asyncio.create_task to run in background
             asyncio.create_task(trading_bot.run())
-            return {"status": "Bot started"}
-        return {"status": "Bot already running"}
+            return {"status": "Bot started", "running": True}
+        return {"status": "Bot already running", "running": True}
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
         raise HTTPException(500, f"Failed to start bot: {e}")
@@ -73,11 +74,21 @@ async def start_bot():
 async def stop_bot():
     """Stop the trading bot"""
     try:
-        trading_bot.running = False
-        return {"status": "Bot stopped"}
+        if trading_bot.running:
+            await trading_bot.stop()  # Call the new stop method
+            return {"status": "Bot stopped", "running": False}
+        return {"status": "Bot already stopped", "running": False}
     except Exception as e:
         logger.error(f"Failed to stop bot: {e}")
         raise HTTPException(500, f"Failed to stop bot: {e}")
+
+@router.get("/bot/status")
+async def get_bot_status():
+    return {
+        "running": trading_bot.running,
+        "symbol": settings.SYMBOL,
+        "active_positions": position_manager.get_open_count()
+    }
 
 # ============================================================
 # SIGNALS ENDPOINT

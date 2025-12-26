@@ -103,8 +103,8 @@ async def startup_event():
     # Initialize performance tracker after DB is ready
     performance.initialize_after_db()
 
-    logger.info("Launching Trading Bot background task...")
-    asyncio.create_task(trading_bot.run())
+    logger.info("✅ Database initialized. Bot is NOT auto-started.")
+    # REMOVED: asyncio.create_task(trading_bot.run())
 
 
 # ==========================================================
