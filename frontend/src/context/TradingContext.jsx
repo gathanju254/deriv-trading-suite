@@ -300,7 +300,7 @@ export const TradingProvider = ({ children }) => {
     if (!notificationSettings.soundEnabled) return;
     try {
       const audio = new Audio(`/sounds/${soundFile}`);
-      audio.volume = 0.5;  // Adjust volume (0.0 to 1.0)
+      audio.volume = 0.7;  // Adjust volume (0.0 to 1.0)
       audio.play().catch((error) => {
         console.warn('Audio play failed:', error);  // Handle browser restrictions (e.g., autoplay policy)
       });
