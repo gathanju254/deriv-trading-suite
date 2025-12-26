@@ -1,6 +1,6 @@
 // frontend/src/components/Dashboard/MarketOverview/MarketOverview.jsx
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Activity, BarChart3, Zap, Shield } from 'lucide-react';
 import './MarketOverview.css';
 

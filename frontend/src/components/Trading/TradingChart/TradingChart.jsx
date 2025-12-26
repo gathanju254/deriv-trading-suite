@@ -1,6 +1,7 @@
 // frontend/src/components/Trading/TradingChart/TradingChart.jsx
 import React, { useEffect, useRef, useState } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
+
 import { TrendingUp, TrendingDown, Maximize2, Minimize2 } from 'lucide-react';
 import './TradingChart.css';
 

@@ -1,6 +1,6 @@
 // frontend/src/components/Analytics/TradingHistory/TradingHistory.jsx
 import React, { useMemo } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { BarChart3, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import './TradingHistory.css';
 

@@ -1,6 +1,6 @@
 // frontend/src/components/Trading/TradeControls/TradeControls.jsx
 import React, { useState, useEffect } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { useToast } from '../../../context/ToastContext';
 import { 
   Send, 

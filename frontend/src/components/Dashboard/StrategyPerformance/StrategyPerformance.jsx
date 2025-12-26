@@ -1,7 +1,7 @@
 // frontend/src/components/Dashboard/StrategyPerformance/StrategyPerformance.jsx
 
 import React from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { TrendingUp, TrendingDown, Target, Activity, PieChart, Shield, Zap } from 'lucide-react';
 import './StrategyPerformance.css';
 

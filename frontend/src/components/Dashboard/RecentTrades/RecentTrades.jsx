@@ -1,7 +1,8 @@
 // frontend/src/components/Dashboard/RecentTrades/RecentTrades.jsx
 // frontend/src/components/Dashboard/RecentTrades/RecentTrades.jsx
 import React, { useMemo } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
+
 import {
   ArrowUpRight,
   ArrowDownRight,

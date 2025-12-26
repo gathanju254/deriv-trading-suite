@@ -1,6 +1,6 @@
 // frontend/src/components/Trading/MarketOverview/MarketOverview.jsx
 import React, { useEffect, useState } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { 
   TrendingUp, 
   TrendingDown, 

@@ -1,6 +1,6 @@
 // frontend/src/components/Dashboard/SignalIndicator/SignalIndicator.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { 
   TrendingUp, 
   TrendingDown, 

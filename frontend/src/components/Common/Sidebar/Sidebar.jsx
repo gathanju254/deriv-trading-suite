@@ -10,7 +10,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import './Sidebar.css';
 
 const Sidebar = () => {

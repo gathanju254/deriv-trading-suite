@@ -1,6 +1,7 @@
 // frontend/src/components/Dashboard/StatCards/StatCards.jsx
 import React, { useEffect, useState, useRef } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
+
 import { 
   DollarSign, 
   Percent,

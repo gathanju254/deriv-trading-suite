@@ -1,6 +1,6 @@
 // frontend/src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { useTrading } from '../../context/TradingContext';
+import { useTrading } from '../../hooks/useTrading';
 import { useToast } from '../../context/ToastContext';
 import LoadingSpinner from '../../components/Common/LoadingSpinner/LoadingSpinner';
 import {

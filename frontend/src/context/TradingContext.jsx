@@ -4,15 +4,7 @@ import { derivService } from '../services/derivService';
 import { websocketService } from '../services/websocket';
 import { useToast } from './ToastContext';  // Assuming you have this for notifications
 
-const TradingContext = createContext();
-
-export const useTrading = () => {
-  const context = useContext(TradingContext);
-  if (!context) {
-    throw new Error('useTrading must be used within a TradingProvider');
-  }
-  return context;
-};
+export const TradingContext = createContext(null);
 
 export const TradingProvider = ({ children }) => {
   const [botStatus, setBotStatus] = useState('stopped');
@@ -105,10 +97,10 @@ export const TradingProvider = ({ children }) => {
     
     // Play sound based on trade result
     if (data.status === 'WON') {  // Changed from data.result to data.status
-      playSound('win.wav');  // Also fix file extension (see below)
+      playSound('win.mp3');  // Also fix file extension (see below)
       addToast('Trade Won!', 'success');
     } else if (data.status === 'LOST') {  // Changed from data.result to data.status
-      playSound('lose.wav');  // Also fix file extension (see below)
+      playSound('lose.mp3');  // Also fix file extension (see below)
       addToast('Trade Lost!', 'error');
     }
     
@@ -300,7 +292,7 @@ export const TradingProvider = ({ children }) => {
     if (!notificationSettings.soundEnabled) return;
     try {
       const audio = new Audio(`/sounds/${soundFile}`);
-      audio.volume = 0.7;  // Adjust volume (0.0 to 1.0)
+      audio.volume = 0.5;  // Adjust volume (0.0 to 1.0)
       audio.play().catch((error) => {
         console.warn('Audio play failed:', error);  // Handle browser restrictions (e.g., autoplay policy)
       });

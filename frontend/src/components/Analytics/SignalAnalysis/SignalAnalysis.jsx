@@ -1,6 +1,6 @@
 // frontend/src/components/Analytics/SignalAnalysis/SignalAnalysis.jsx
 import React, { useMemo } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { Activity, TrendingUp, TrendingDown, Target } from 'lucide-react';
 import './SignalAnalysis.css';
 

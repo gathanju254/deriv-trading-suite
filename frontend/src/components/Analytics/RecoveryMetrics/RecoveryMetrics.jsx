@@ -1,6 +1,6 @@
 // frontend/src/components/Analytics/RecoveryMetrics/RecoveryMetrics.jsx
 import React, { useEffect, useState } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { RefreshCw, TrendingUp, AlertTriangle } from 'lucide-react';
 import './RecoveryMetrics.css';
 

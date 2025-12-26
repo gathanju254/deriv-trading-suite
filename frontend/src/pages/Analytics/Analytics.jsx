@@ -5,7 +5,7 @@ import SignalAnalysis from '../../components/Analytics/SignalAnalysis/SignalAnal
 import RecoveryMetrics from '../../components/Analytics/RecoveryMetrics/RecoveryMetrics';
 import TradingHistory from '../../components/Analytics/TradingHistory/TradingHistory';
 import LoadingSpinner from '../../components/Common/LoadingSpinner/LoadingSpinner';
-import { useTrading } from '../../context/TradingContext';
+import { useTrading } from '../../hooks/useTrading';
 import './Analytics.css';
 
 const Analytics = () => {

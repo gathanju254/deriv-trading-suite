@@ -1,6 +1,6 @@
 // frontend/src/components/Analytics/PerformanceChart/PerformanceChart.jsx
 import React, { useRef, useEffect } from 'react';
-import { useTrading } from '../../../context/TradingContext';
+import { useTrading } from '../../../hooks/useTrading';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import './PerformanceChart.css';
 
