@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { derivService } from '../services/derivService';
 import { websocketService } from '../services/websocket';
+import { useToast } from './ToastContext';  // Assuming you have this for notifications
 
 const TradingContext = createContext();
 
@@ -28,6 +29,11 @@ export const TradingProvider = ({ children }) => {
   const tradeHistoryRef = useRef([]);
   const signalsRef = useRef([]);
   const performanceRef = useRef({});
+
+  // Add state for notification settings (or fetch from a global context if available)
+  const [notificationSettings, setNotificationSettings] = useState({
+    soundEnabled: localStorage.getItem('soundEnabled') === 'true' || true,  // Load from localStorage, default to true
+  });
 
   // ================== WEBSOCKET HANDLERS ==================
 
@@ -95,6 +101,15 @@ export const TradingProvider = ({ children }) => {
     // Update balance if included in trade data
     if (data.balance_after !== undefined) {
       setBalance(data.balance_after);
+    }
+    
+    // Play sound based on trade result
+    if (data.status === 'WON') {  // Changed from data.result to data.status
+      playSound('win.wav');  // Also fix file extension (see below)
+      addToast('Trade Won!', 'success');
+    } else if (data.status === 'LOST') {  // Changed from data.result to data.status
+      playSound('lose.wav');  // Also fix file extension (see below)
+      addToast('Trade Lost!', 'error');
     }
     
     setLastUpdateTime(Date.now());
@@ -278,6 +293,22 @@ export const TradingProvider = ({ children }) => {
     }
   };
 
+  // ================== SOUND NOTIFICATIONS ==================
+
+  // Function to play sound
+  const playSound = (soundFile) => {
+    if (!notificationSettings.soundEnabled) return;
+    try {
+      const audio = new Audio(`/sounds/${soundFile}`);
+      audio.volume = 0.5;  // Adjust volume (0.0 to 1.0)
+      audio.play().catch((error) => {
+        console.warn('Audio play failed:', error);  // Handle browser restrictions (e.g., autoplay policy)
+      });
+    } catch (error) {
+      console.error('Error playing sound:', error);
+    }
+  };
+
   // ================== USE EFFECTS ==================
 
   // Load initial data and setup WebSocket
@@ -316,6 +347,18 @@ export const TradingProvider = ({ children }) => {
     
     const interval = setInterval(updateStatus, 3000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Optional: Add an effect to listen for changes (if needed for real-time sync)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setNotificationSettings(prev => ({
+        ...prev,
+        soundEnabled: localStorage.getItem('soundEnabled') === 'true',
+      }));
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   // ================== CONTEXT VALUE ==================

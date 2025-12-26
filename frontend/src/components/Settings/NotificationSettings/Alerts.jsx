@@ -8,9 +8,14 @@ import './NotificationSettings.css';
 const Alerts = () => {
   const { addToast } = useToast();
   const [pushEnabled, setPushEnabled] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    // Load from localStorage
+    return localStorage.getItem('soundEnabled') === 'true';
+  });
 
   const handleSave = () => {
+    // Save to localStorage
+    localStorage.setItem('soundEnabled', soundEnabled);
     addToast('Alert settings saved', 'success');
   };
 
