@@ -185,10 +185,12 @@ class TradingBot:
                             elif sig["side"] == "FALL":
                                 self.strategy_performance[strat_name]["fall"] += 1
                                 
+
                         # BROADCAST SIGNAL VIA WEBSOCKET
                         await broadcast_signal(signal_data)
                         logger.debug(f"📡 Signal broadcasted: {signal_data['direction']} from {strat_name}")
                                 
+
                     except Exception as e:
                         logger.warning(f"Failed to process signal: {e}")
 
@@ -365,16 +367,42 @@ class TradingBot:
             logger.info(f"   Smart Recovery: {settings.SMART_RECOVERY}")
             logger.info(f"   Reset on Win: {settings.RESET_ON_WIN}")
 
-        try:
-            await deriv.connect()
-            ok = await deriv.authorize()
-            if not ok:
-                logger.error("❌ Authorization failed")
-                return
-        except Exception:
-            logger.exception("Connection/authorization failed")
-            return
-
+        # Add connection retry logic
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Connection attempt {attempt + 1}/{max_retries}")
+                
+                # Connect to Deriv
+                await deriv.connect()
+                
+                # Authorize with retry
+                ok = await deriv.authorize()
+                if not ok:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Authorization failed, retrying in {2**attempt} seconds...")
+                        await asyncio.sleep(2**attempt)  # Exponential backoff
+                        continue
+                    else:
+                        logger.error("❌ Authorization failed after all retries")
+                        self.running = False
+                        return
+                        
+                # Authorization successful, break retry loop
+                break
+                
+            except Exception as e:
+                logger.error(f"Connection attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2**attempt)
+                else:
+                    logger.error("❌ All connection attempts failed")
+                    self.running = False
+                    return
+        
+        logger.info("✅ Connected and authorized to Deriv API")
+        
+        # Rest of your existing code...
         try:
             if hasattr(order_executor, 'start'):
                 await order_executor.start()
@@ -420,16 +448,23 @@ class TradingBot:
                 await self._cleanup_expired_trades()
                 last_cleanup = now
 
+            # Health check: verify connection is still active
             if not deriv.authorized:
-                logger.warning("⚠ WebSocket disconnected — retrying...")
+                logger.warning("⚠️ Connection lost, attempting to reconnect...")
                 try:
                     await deriv.connect()
-                    await deriv.authorize()
-                    await deriv.subscribe_ticks(settings.SYMBOL)
-                except Exception:
-                    logger.exception("Reconnect failed")
-                await asyncio.sleep(1)
-                continue
+                    ok = await deriv.authorize()
+                    if ok:
+                        await deriv.subscribe_ticks(settings.SYMBOL)
+                        logger.info("✅ Reconnected to Deriv API")
+                    else:
+                        logger.error("❌ Reauthorization failed")
+                        await asyncio.sleep(5)
+                        continue
+                except Exception as e:
+                    logger.error(f"Reconnection failed: {e}")
+                    await asyncio.sleep(5)
+                    continue
 
             await asyncio.sleep(1)
 

@@ -17,19 +17,51 @@ class DerivAPIClient:
         self._listeners = []  # callback functions(msg)
         self._reader_task = None
         self._balance = 0.0  # cache latest balance
+        self._connection_lock = asyncio.Lock()  # Prevent multiple simultaneous connections
+        self._authorize_event = asyncio.Event()  # Synchronize authorization
+        self._connect_timeout = 30  # Increased timeout for connection
 
     async def connect(self):
-        if self.ws and not getattr(self.ws, "closed", False):
-            return
-        logger.info("Connecting to Deriv WebSocket...")
-        self.ws = await websockets.connect(self.url, ping_interval=30, ping_timeout=10)
-        # start background reader
-        if self._reader_task is None or self._reader_task.done():
-            self._reader_task = asyncio.create_task(self._reader())
-
+        # Use lock to prevent multiple simultaneous connections
+        async with self._connection_lock:
+            if self.ws and not getattr(self.ws, "closed", False):
+                return
+            
+            logger.info("Connecting to Deriv WebSocket...")
+            try:
+                # Increase timeout and add better error handling
+                self.ws = await asyncio.wait_for(
+                    websockets.connect(
+                        self.url, 
+                        ping_interval=30, 
+                        ping_timeout=10,
+                        close_timeout=1
+                    ),
+                    timeout=self._connect_timeout
+                )
+                
+                # Reset authorization state on new connection
+                self.authorized = False
+                self._authorize_event.clear()
+                
+                # Start reader if not already running
+                if self._reader_task is None or self._reader_task.done():
+                    self._reader_task = asyncio.create_task(self._reader())
+                    
+                logger.info("✅ WebSocket connection established")
+                
+            except asyncio.TimeoutError:
+                logger.error(f"Connection timeout after {self._connect_timeout}s")
+                raise
+            except Exception as e:
+                logger.error(f"Connection failed: {e}")
+                raise
+    
     async def close(self):
         if self.ws:
             await self.ws.close()
+            self.authorized = False
+            self._authorize_event.clear()
 
     async def send(self, payload: Dict[str, Any]):
         await self.connect()
@@ -78,23 +110,43 @@ class DerivAPIClient:
             self._listeners.remove(callback)
 
     async def authorize(self) -> bool:
+        # Check if already authorized
         if self.authorized:
             return True
+        
+        # Ensure connected
+        await self.connect()
+        
+        # Clear previous authorization state
+        self._authorize_event.clear()
+        
+        # Send authorization request
         await self.send({"authorize": settings.DERIV_API_TOKEN})
-        # quick wait loop for authorize to set by incoming msg handler
-        for _ in range(10):
-            await asyncio.sleep(0.2)
-            if self.authorized:
-                return True
-        # fallback - try to read a message (non-blocking best-effort)
+        logger.debug("Authorization request sent")
+        
+        # Wait for authorization response with timeout
         try:
-            msg = await self._recv()
-            if msg.get("authorize") or not msg.get("error"):
-                self.authorized = True
-                return True
-        except Exception:
-            logger.exception("authorize fallback failed")
-        return False
+            await asyncio.wait_for(self._authorize_event.wait(), timeout=10.0)
+            return self.authorized
+        except asyncio.TimeoutError:
+            logger.error("Authorization timeout - no response from Deriv")
+            
+            # Try direct read as fallback
+            try:
+                # Give it one more quick try
+                for _ in range(3):
+                    try:
+                        msg = await asyncio.wait_for(self._recv(), timeout=1.0)
+                        if "authorize" in msg:
+                            await self.handle_incoming(msg)
+                            if self.authorized:
+                                return True
+                    except asyncio.TimeoutError:
+                        continue
+            except Exception as e:
+                logger.debug(f"Fallback authorization failed: {e}")
+            
+            return False
 
     async def handle_incoming(self, msg: dict):
         """
@@ -104,32 +156,34 @@ class DerivAPIClient:
         # Update authorization status + cached balance from authorize message
         try:
             if "authorize" in msg:
-                self.authorized = True
-                bal = msg["authorize"].get("balance")
-                if bal is not None:
-                    try:
-                        self._balance = float(bal)
-                        logger.info("Updated balance from authorize: %s", self._balance)
-                    except Exception:
-                        logger.exception("Failed to parse balance from authorize")
-        except Exception:
-            logger.exception("Error handling authorize message")
-
-        # Update cached balance from buy responses
-        try:
+                auth_data = msg["authorize"]
+                if "error" in auth_data:
+                    logger.error(f"Authorization error: {auth_data['error']}")
+                    self.authorized = False
+                else:
+                    self.authorized = True
+                    bal = auth_data.get("balance")
+                    if bal is not None:
+                        try:
+                            self._balance = float(bal)
+                            logger.info("Updated balance from authorize: %s", self._balance)
+                        except Exception:
+                            logger.exception("Failed to parse balance from authorize")
+                self._authorize_event.set()  # Signal authorization complete
+                
+            # Update cached balance from buy responses
             if "buy" in msg:
                 bal = msg["buy"].get("balance_after")
                 if bal is not None:
                     try:
                         self._balance = float(bal)
-                        logger.info("Updated balance from buy: %s", self._balance)
+                        logger.debug("Updated balance from buy: %s", self._balance)
                     except Exception:
                         logger.exception("Failed to parse balance from buy")
-        except Exception:
-            logger.exception("Error handling buy message")
-
-        # Do NOT update contract/trade status here. This is now handled by OrderExecutor's listener.
-
+                        
+        except Exception as e:
+            logger.error(f"Error handling incoming message: {e}")
+    
     async def get_balance(self) -> float:
         """Return latest known balance (cached)"""
         return self._balance
