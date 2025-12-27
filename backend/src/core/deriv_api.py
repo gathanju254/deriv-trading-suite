@@ -150,11 +150,12 @@ class DerivAPIClient:
 
     async def handle_incoming(self, msg: dict):
         """
-        Update authorization / balance and process contract lifecycle messages.
-        Only update cached balance and authorization here. Contract closure and trade status updates are handled by OrderExecutor.
+        Update authorization / balance ONLY.
+        Contract lifecycle messages are handled by OrderExecutor.
+        WebSocket broadcasting is handled by websocket.py.
         """
-        # Update authorization status + cached balance from authorize message
         try:
+            # ONLY handle authorization and balance updates
             if "authorize" in msg:
                 auth_data = msg["authorize"]
                 if "error" in auth_data:
@@ -166,23 +167,28 @@ class DerivAPIClient:
                     if bal is not None:
                         try:
                             self._balance = float(bal)
-                            logger.info("Updated balance from authorize: %s", self._balance)
+                            # Log only once at INFO level
+                            logger.info(f"Balance updated from authorize: {self._balance}")
                         except Exception:
                             logger.exception("Failed to parse balance from authorize")
                 self._authorize_event.set()  # Signal authorization complete
-                
-            # Update cached balance from buy responses
+            
+            # ONLY update cached balance from buy responses (no logging)
             if "buy" in msg:
                 bal = msg["buy"].get("balance_after")
                 if bal is not None:
                     try:
                         self._balance = float(bal)
-                        logger.debug("Updated balance from buy: %s", self._balance)
+                        # Balance updates are logged by websocket.py
                     except Exception:
-                        logger.exception("Failed to parse balance from buy")
+                        # Silently fail for balance parsing errors
+                        pass
                         
+            # DO NOT handle or log any other messages here
+            # (ticks, signals, contracts, etc. are handled by other listeners)
+                
         except Exception as e:
-            logger.error(f"Error handling incoming message: {e}")
+            logger.error(f"Error in internal message handler: {e}")
     
     async def get_balance(self) -> float:
         """Return latest known balance (cached)"""
@@ -263,8 +269,12 @@ async def _internal_hook(msg):
 
 # automatically attach internal hook when module imported
 async def _ensure_internal():
+    """Register minimal internal hook for authorization/balance only."""
     try:
+        # Remove any existing internal hook first
+        await deriv.remove_listener(_internal_hook)
         await deriv.add_listener(_internal_hook)
+        logger.debug("Internal authorization hook registered")
     except Exception:
         logger.exception("Failed to attach internal hook")
 

@@ -343,7 +343,9 @@ class OrderExecutor:
                 logger.info(f"📊 Contract {contract.id} - Entry: {entry_price}, Exit: {exit_price}, Profit: {profit}")
 
         if trade:
-            self.risk.update_trade_outcome(result, trade.amount)
+            # Pass ACTUAL profit to risk manager, not the stake amount
+            actual_profit = profit  # This is already calculated as payout - stake
+            self.risk.update_trade_outcome(result, trade.amount, actual_profit)
 
             await performance.add_trade({
                 "id": trade_id,

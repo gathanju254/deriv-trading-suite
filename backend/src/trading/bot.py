@@ -80,9 +80,9 @@ class TradingBot:
         self.signal_counter = 0
         self.session_open = None
 
-    # ===============================================================
+    # ===============================================================  
     # 📡 TICK HANDLER WITH WEBSOCKET BROADCASTING
-    # ===============================================================
+    # ===============================================================  
     async def _tick_handler(self, msg: Dict):
         """Unified tick handler with proper signal processing - USING RISE/FALL"""
         try:
@@ -227,9 +227,13 @@ class TradingBot:
             
             # ======== MARKET REGIME-AWARE CONSENSUS THRESHOLDS ========
             market_regime = market_status.get('regime')
-            
-            # Adjust consensus requirements based on regime
-            if market_regime == "RANGING":
+
+            # Check if this is a single trusted signal (already validated by consensus)
+            if consensus.get("method") == "single_trusted_signal":
+                # Single trusted signal is always acceptable regardless of regime
+                logger.info(f"✅ Accepting single trusted signal from {consensus.get('strategies', ['unknown'])[0]}")
+                min_consensus_score = consensus.get("score", 0)  # Use the signal's own score
+            elif market_regime == "RANGING":
                 # In ranging markets, require at least 1 strong signal
                 min_consensus_score = 0.70
                 if consensus.get("sources", 0) < 1:
@@ -354,9 +358,9 @@ class TradingBot:
         except Exception as e:
             logger.error(f"Error in _tick_handler: {e}")
 
-    # ===============================================================
+    # ===============================================================  
     # MAIN BOT LOOP
-    # ===============================================================
+    # ===============================================================  
     async def run(self):
         # Prevent multiple instances
         if self.running:
@@ -430,6 +434,13 @@ class TradingBot:
         except Exception as e:
             logger.error(f"Failed to start risk session: {e}")
 
+        # Remove any existing tick handler first to prevent duplicates
+        try:
+            await deriv.remove_listener(self._tick_handler)
+        except:
+            pass  # It's okay if it doesn't exist yet
+
+        # Then add it
         await deriv.add_listener(self._tick_handler)
         await deriv.subscribe_ticks(settings.SYMBOL)
         logger.info(f"📡 Subscribed to ticks: {settings.SYMBOL}")
@@ -623,8 +634,13 @@ class TradingBot:
                     lock_status += f" (auto-unlock in {lock_time_left:.0f}s)"
             
             logger.info(f"Lock Status      : {lock_status}")
-            logger.info(f"Daily Profit     : ${risk.get('daily_profit', 0):.2f}")
-            logger.info(f"Daily Loss       : ${risk.get('daily_loss', 0):.2f}")
+            
+            # Get net daily P&L
+            net_daily_pnl = self.risk.get_net_daily_pnl()
+            
+            logger.info(f"Daily Profit     : ${net_daily_pnl['daily_profit']:.2f}")
+            logger.info(f"Daily Loss       : ${net_daily_pnl['daily_loss']:.2f}")
+            logger.info(f"Net Daily P&L    : ${net_daily_pnl['net_daily_pnl']:.2f} ({net_daily_pnl['net_daily_pnl_pct']:.1f}%)")
             
             # Add strategy performance summary
             logger.info("--- Strategy Performance (RISE/FALL) ---")
@@ -732,9 +748,9 @@ class TradingBot:
                 "worst_day": None
             }
 
-    # ===============================================================
+    # ===============================================================  
     # RECOVERY SYSTEM CONTROL METHODS
-    # ===============================================================
+    # ===============================================================  
     def reset_recovery_system(self):
         self.risk.reset_streak()
         logger.info("Recovery system reset")
@@ -786,9 +802,9 @@ class TradingBot:
         """Return the most recent signals from history"""
         return self.signal_history[-limit:] if self.signal_history else []
     
-    # ===============================================================
+    # ===============================================================  
     # NEW: UPDATE STRATEGY PERFORMANCE
-    # ===============================================================
+    # ===============================================================  
     def update_strategy_performance(self, trade_result: str, strategy_name: str, side: str):
         """Update strategy performance tracking"""
         if strategy_name in self.strategy_performance:

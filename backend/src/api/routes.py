@@ -465,7 +465,17 @@ async def manual_unlock():
     """Manually unlock trading if locked"""
     success = trading_bot.risk.manual_unlock()
     if success:
-        return {"status": "Trading unlocked"}
+        # Also reset daily profit tracking
+        trading_bot.risk.daily_profit = 0.0
+        trading_bot.risk.daily_loss = 0.0
+        logger.info("💰 Manual unlock: Reset daily profit/loss tracking")
+        
+        return {
+            "status": "Trading unlocked and daily P&L reset",
+            "daily_profit": trading_bot.risk.daily_profit,
+            "daily_loss": trading_bot.risk.daily_loss,
+            "net_daily_pnl": trading_bot.risk.get_net_daily_pnl()["net_daily_pnl"]
+        }
     return {"status": "No lock to unlock"}
 
 @router.post("/risk/reset-daily-profit")

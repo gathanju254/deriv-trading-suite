@@ -1,12 +1,11 @@
-#backend/src/core/risk_manager.py
-import time
-import math
+# backend/src/core/risk_manager.py
 from typing import Dict, List, Optional
 from src.config.settings import settings
 from src.utils.logger import logger
 from enum import Enum
 from dataclasses import dataclass
-
+import time
+import math
 
 # ======================================================
 # RISK STATES
@@ -17,7 +16,6 @@ class RiskState(Enum):
     RECOVERY = "recovery"
     PANIC = "panic"
     LOCKED = "locked"
-
 
 # ======================================================
 # CONFIG
@@ -46,7 +44,6 @@ class RiskConfig:
     lock_auto_expiry_seconds: int = 3600  # 1 hour
 
     fib_sequence = [1, 1, 2, 3, 5, 8]  # For hybrid recovery
-
 
 # ======================================================
 # RISK MANAGER (ENHANCED WITH HYBRID RECOVERY & HARD DRAWDOWN)
@@ -224,28 +221,22 @@ class RiskManager:
             logger.warning(f"RiskManager: Balance {balance} below dynamic floor {min_required:.2f}. Blocking!")
             return False
 
-        # Daily loss limit (triggers lock with auto-expiry) - NOW BASED ON NET P&L
-        if self.start_day_balance is None and self.start_day_balance > 0:
-            net_pnl = self.daily_profit - self.daily_loss  # Net profit/loss for the day
-            net_pnl_pct = (net_pnl / self.start_day_balance) * 100
-            if net_pnl_pct <= -self.daily_loss_limit_pct:  # Only lock if net P&L is below the loss limit
-                self._enter_lock("daily_net_loss")
+        # Daily profit/loss calculations should use NET P&L
+        if self.start_day_balance and self.start_day_balance > 0:
+            # Calculate NET P&L (daily_profit - daily_loss)
+            net_daily_pnl = self.daily_profit - self.daily_loss
+            net_daily_pnl_pct = (net_daily_pnl / self.start_day_balance) * 100
+            
+            # Daily loss lock (based on NET P&L)
+            if net_daily_pnl_pct <= -self.daily_loss_limit_pct:
+                self._enter_lock(f"daily_net_loss ({net_daily_pnl_pct:.1f}% <= -{self.daily_loss_limit_pct:.1f}%)")
                 return False
-        else:
-            # Skip daily loss checks if balance is zero or invalid
-            pass
-
-        # Daily profit limit (triggers lock with auto-expiry) - NOW BASED ON NET P&L
-        if self.start_day_balance is not None and self.start_day_balance > 0:
-            net_pnl = self.daily_profit - self.daily_loss  # Net profit/loss for the day
-            net_pnl_pct = (net_pnl / self.start_day_balance) * 100
-            if net_pnl_pct >= self.daily_profit_limit_pct:  # Only lock if net P&L exceeds the limit
-                self._enter_lock("daily_profit")
-                logger.info(f"💰 DAILY PROFIT TARGET REACHED: Net P&L ${net_pnl:.2f} ({net_pnl_pct:.1f}% >= {self.daily_profit_limit_pct:.1f}%)")
+            
+            # Daily profit lock (based on NET P&L)
+            if net_daily_pnl_pct >= self.daily_profit_limit_pct:
+                self._enter_lock(f"daily_profit ({net_daily_pnl_pct:.1f}% >= {self.daily_profit_limit_pct:.1f}%)")
+                logger.info(f"💰 DAILY NET PROFIT TARGET REACHED: ${net_daily_pnl:.2f} ({net_daily_pnl_pct:.1f}%)")
                 return False
-        else:
-            # Skip daily profit checks if balance is zero or invalid
-            pass
 
         # Hard drawdown stop (non-negotiable)
         if self.peak_balance is not None and self.start_day_balance is not None:
@@ -333,10 +324,10 @@ class RiskManager:
     # TRADE OUTCOME (FIXED TOTAL_LOSSES TRACKING)
     # ==================================================
 
-    def update_trade_outcome(self, trade_result: str, trade_amount: float):
+    def update_trade_outcome(self, trade_result: str, trade_amount: float, actual_profit: float = None):
         """
-        Update risk state based on wins/losses and compute next trade amount.
-        Fixed: Properly tracks total_losses for accurate recovery targets.
+        Update risk state based on wins/losses.
+        actual_profit: The real profit amount (can be negative for losses)
         """
         now = time.time()
         self.last_trade_time = now
@@ -348,48 +339,46 @@ class RiskManager:
 
         self.last_trade_amount = trade_amount
 
-        # WIN handling (enhanced: Reduce total_losses by WIN PROFIT, not trade amount)
+        # If actual_profit not provided, calculate it
+        if actual_profit is None:
+            if trade_result == "WON":
+                actual_profit = trade_amount * 0.82  # Approximate
+            else:
+                actual_profit = -trade_amount  # Loss
+
+        # WIN handling - FIXED for recovery logic
         if trade_result == "WON":
-            # FIXED: Calculate actual win profit (assuming ~88% payout for binary options)
-            win_profit = trade_amount * 0.88  # Approximate profit; consider using actual payout if available
-            
-            # Reduce total_losses by the actual profit made
-            self.total_losses = max(0.0, self.total_losses - win_profit)
-            self.net_loss = max(0.0, self.net_loss - win_profit)
-            
-            # NEW: Track daily profit and check limit - USE ACTUAL PROFIT
-            self.daily_profit += win_profit  # Use actual profit, not stake
-
-            if self.start_day_balance:
-                daily_profit_pct = self.daily_profit / self.start_day_balance
-                if daily_profit_pct >= self.daily_profit_limit_pct:
-                    self._enter_lock(f"Daily profit target reached ({daily_profit_pct:.1%} >= {self.daily_profit_limit_pct:.1%})")
-                    logger.info(f"📈 Daily Profit: ${self.daily_profit:.2f} ({daily_profit_pct:.1%} of ${self.start_day_balance:.2f})")
-
-            # Safe step-back: Reduce streak aggressively on win
-            self.recovery_streak = max(0, self.recovery_streak - 2)
-
-            # Record recovery result
-            if self.recovery_streak > 0:
+            # FIX: Only add to daily_profit if NOT in recovery mode
+            if not self.recovery_enabled or self.recovery_streak == 0:
+                # Normal trade win - count toward daily profit
+                self.daily_profit += actual_profit
+            else:
+                # Recovery win - should offset losses, not count toward daily profit
+                # Reduce total_losses by the actual profit made
+                self.total_losses = max(0.0, self.total_losses - actual_profit)
+                
+                # Record recovery result
                 recovery_data = {
                     "streak": self.recovery_streak,
                     "amount": trade_amount,
-                    "profit": win_profit,
+                    "profit": actual_profit,
                     "total_losses": self.total_losses,
                     "timestamp": now,
                     "recovered": True
                 }
                 self.recovery_history.append(recovery_data)
-
-            # Reset recovery if streak hits 0
-            if self.reset_on_win and self.recovery_streak == 0:
-                self.total_losses = 0.0
-                self.recovery_target = 0.0
-                self.next_trade_amount = self.base_amount
-                self.state = RiskState.NORMAL
-                # ADD THIS LINE: Reset daily loss when recovery completes
-                self.daily_loss = 0.0
-                logger.info("RiskManager: Recovery system reset after win (daily loss cleared)")
+                
+                # Safe step-back: Reduce streak aggressively on win
+                self.recovery_streak = max(0, self.recovery_streak - 2)
+                
+                # Reset recovery if streak hits 0
+                if self.reset_on_win and self.recovery_streak == 0:
+                    self.total_losses = 0.0
+                    self.recovery_target = 0.0
+                    self.next_trade_amount = self.base_amount
+                    # ADD THIS LINE: Reset daily loss when recovery completes
+                    self.daily_loss = 0.0
+                    logger.info("RiskManager: Recovery complete (daily loss cleared)")
 
         # LOSS handling (fixed: Increment total_losses)
         if trade_result == "LOST":
@@ -684,6 +673,31 @@ class RiskManager:
             total_loss += next_amount
         
         return sequence
+
+    def get_net_daily_pnl(self) -> Dict[str, float]:
+        """Get net daily P&L (profit minus losses) with proper recovery accounting"""
+        
+        # Calculate net P&L (daily_profit - daily_loss)
+        net_pnl = self.daily_profit - self.daily_loss
+        
+        # Calculate percentages if we have a starting balance
+        net_pnl_pct = 0.0
+        if self.start_day_balance and self.start_day_balance > 0:
+            net_pnl_pct = (net_pnl / self.start_day_balance) * 100
+        
+        return {
+            "daily_profit": round(self.daily_profit, 2),
+            "daily_loss": round(self.daily_loss, 2),
+            "net_daily_pnl": round(net_pnl, 2),
+            "net_daily_pnl_pct": round(net_pnl_pct, 2),
+            "daily_profit_limit_pct": self.daily_profit_limit_pct * 100,  # Convert to percentage
+            "daily_loss_limit_pct": self.daily_loss_limit_pct * 100,      # Convert to percentage
+            "start_day_balance": round(self.start_day_balance, 2) if self.start_day_balance else 0,
+            "is_locked": self.state == RiskState.LOCKED,
+            "lock_reason": "daily_profit" if net_pnl_pct >= self.daily_profit_limit_pct * 100 else 
+                          "daily_loss" if net_pnl_pct <= -self.daily_loss_limit_pct * 100 else 
+                          "none"
+        }
 
 
 # ======================================================

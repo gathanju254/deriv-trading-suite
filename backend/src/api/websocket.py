@@ -150,52 +150,31 @@ async def broadcast_trade_update(trade_data: dict):
 #           DERIV MESSAGE FORWARDER
 # ==================================================
 async def broadcast_deriv_messages(msg: dict):
-    """Forward Deriv API messages to clients (with filtering & throttling)."""
-
+    """Single point for all Deriv message broadcasting and logging."""
+    
     try:
-        # ------------- BALANCE UPDATES ----------------
-        if "authorize" in msg and "balance" in msg.get("authorize", {}):
-            balance = msg["authorize"]["balance"]
-            await broadcast_balance_update(balance)
-        
-        if "buy" in msg and "balance_after" in msg.get("buy", {}):
-            balance = msg["buy"]["balance_after"]
-            await broadcast_balance_update(balance)
-        
-        if "sell" in msg and "balance_after" in msg.get("sell", {}):
-            balance = msg["sell"]["balance_after"]
-            await broadcast_balance_update(balance)
-
-        # ------------- CONTRACT CLOSURE ----------------
-        if "proposal_open_contract" in msg:
-            contract = msg["proposal_open_contract"]
-            if contract.get("is_sold") == "1" or contract.get("status") == "sold":
-                logger.info(f"Contract closed: {contract.get('contract_id')}")
+        # ============== BALANCE UPDATES ==============
+        if "authorize" in msg:
+            auth_data = msg.get("authorize", {})
+            if "error" not in auth_data:
+                balance = auth_data.get("balance")
+                if balance is not None:
+                    await broadcast_balance_update(balance)
+                    logger.info(f"💰 Balance from authorize: {balance}")
+                    
+        if "buy" in msg:
+            balance = msg["buy"].get("balance_after")
+            if balance is not None:
+                await broadcast_balance_update(balance)
+                logger.debug(f"💰 Balance from buy: {balance}")
                 
-                # When a contract closes, update performance and trades
-                try:
-                    from src.trading.performance import performance
-                    
-                    # Get updated performance metrics
-                    perf_data = await performance.calculate_metrics()
-                    await broadcast_performance_update(perf_data)
-                    
-                    # Broadcast trade update
-                    await broadcast_trade_update({
-                        "contract_id": contract.get("contract_id"),
-                        "status": contract.get("status", "sold"),
-                        "profit": contract.get("profit"),
-                        "symbol": contract.get("symbol"),
-                        "buy_price": contract.get("buy_price"),
-                        "sell_price": contract.get("sell_price"),
-                        "timestamp": time.time(),
-                        "is_sold": contract.get("is_sold"),
-                        "type": "contract_closed"
-                    })
-                except Exception as e:
-                    logger.error(f"Error processing contract closure: {e}")
-
-        # ------------- TICK THROTTLING ----------------
+        if "sell" in msg:
+            balance = msg["sell"].get("balance_after")
+            if balance is not None:
+                await broadcast_balance_update(balance)
+                logger.debug(f"💰 Balance from sell: {balance}")
+        
+        # ============== TICK MESSAGES ==============
         if "tick" in msg:
             now = time.time()
             if now - ws_manager.last_tick_sent < ws_manager.tick_interval:
@@ -203,44 +182,85 @@ async def broadcast_deriv_messages(msg: dict):
             ws_manager.last_tick_sent = now
 
             tick = msg.get("tick", {})
+            symbol = tick.get("symbol")
+            quote = tick.get("quote")
+            
+            # Broadcast tick to all clients
             await ws_manager.broadcast({
                 "type": "tick",
                 "data": {
-                    "symbol": tick.get("symbol"),
-                    "quote": tick.get("quote"),
+                    "symbol": symbol,
+                    "quote": quote,
                     "epoch": tick.get("epoch")
                 }
             })
-            return
-
-        # ------------- TRADE MESSAGES ----------------
-        if "buy" in msg:
-            buy_data = msg.get("buy", {})
-            await broadcast_trade_update({
-                "type": "buy",
-                "contract_id": buy_data.get("contract_id"),
-                "balance_after": buy_data.get("balance_after"),
-                "amount": buy_data.get("amount"),
-                "symbol": buy_data.get("symbol"),
-                "timestamp": time.time()
-            })
+            
+            # Optional: Log only every 10th tick to reduce noise
+            tick_counter = getattr(broadcast_deriv_messages, '_tick_counter', 0)
+            broadcast_deriv_messages._tick_counter = tick_counter + 1
+            
+            if tick_counter % 10 == 0:  # Log every 10th tick
+                logger.debug(f"📈 Tick: {symbol} @ {quote}")
             return
         
-        if "sell" in msg:
-            sell_data = msg.get("sell", {})
-            await broadcast_trade_update({
-                "type": "sell",
-                "contract_id": sell_data.get("contract_id"),
-                "balance_after": sell_data.get("balance_after"),
-                "profit": sell_data.get("profit"),
-                "timestamp": time.time()
-            })
-            return
-
-        # ------------- SIGNAL MESSAGES ----------------
-        # You can also handle signal messages from Deriv if needed
-        # Example: if "signal" in msg:
-        #     await ws_manager.broadcast_signal(msg["signal"])
+        # ============== CONTRACT UPDATES ==============
+        if "proposal_open_contract" in msg:
+            contract = msg["proposal_open_contract"]
+            contract_id = contract.get("contract_id")
+            status = contract.get("status", "")
+            is_sold = contract.get("is_sold") in ("1", 1, True)
+            
+            if is_sold or status == "sold":
+                logger.info(f"✅ Contract {contract_id} settled: {status}")
+                
+                try:
+                    from src.trading.performance import performance
+                    
+                    # Update performance metrics
+                    perf_data = await performance.calculate_metrics()
+                    await broadcast_performance_update(perf_data)
+                    
+                    # Broadcast trade closure
+                    await broadcast_trade_update({
+                        "contract_id": contract_id,
+                        "status": status,
+                        "profit": contract.get("profit"),
+                        "symbol": contract.get("symbol"),
+                        "buy_price": contract.get("buy_price"),
+                        "sell_price": contract.get("sell_price"),
+                        "timestamp": time.time(),
+                        "type": "contract_closed"
+                    })
+                except Exception as e:
+                    logger.error(f"Error processing contract closure: {e}")
+        
+        # ============== TRADE EXECUTION ==============
+        if "buy" in msg:
+            buy_data = msg.get("buy", {})
+            if "error" not in buy_data:
+                contract_id = buy_data.get("contract_id")
+                if contract_id:
+                    logger.info(f"🛒 Buy executed: contract {contract_id}")
+                    
+                    await broadcast_trade_update({
+                        "type": "buy",
+                        "contract_id": contract_id,
+                        "balance_after": buy_data.get("balance_after"),
+                        "amount": buy_data.get("amount"),
+                        "symbol": buy_data.get("symbol"),
+                        "timestamp": time.time()
+                    })
+        
+        # ============== ERROR HANDLING ==============
+        if "error" in msg or ("buy" in msg and "error" in msg.get("buy", {})):
+            error_data = msg.get("error") or msg.get("buy", {}).get("error", {})
+            error_code = error_data.get("code")
+            error_message = error_data.get("message", "Unknown error")
+            
+            if error_code:
+                logger.warning(f"⚠️ Deriv error {error_code}: {error_message}")
+            else:
+                logger.warning(f"⚠️ Deriv error: {error_message}")
 
     except Exception as e:
         logger.error(f"WebSocket broadcast error: {e}")
