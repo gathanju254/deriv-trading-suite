@@ -86,6 +86,10 @@ class TradingBot:
     async def _tick_handler(self, msg: Dict):
         """Unified tick handler with proper signal processing - USING RISE/FALL"""
         try:
+            if not self.running:
+                logger.debug("Bot not running, skipping tick processing")
+                return
+            
             # ======== TICK THROTTLE ========
             current_time = time.time()
             if current_time - self._last_tick_time < self.min_tick_interval:
@@ -475,18 +479,28 @@ class TradingBot:
     async def stop(self):
         """Properly stop the bot"""
         if not self.running:
+            logger.debug("Bot is already stopped")
             return
-            
+        
         logger.info("🛑 Stopping Trading Bot...")
+        
+        # Remove the listener FIRST to prevent any new tick processing
+        try:
+            await deriv.remove_listener(self._tick_handler)
+            logger.debug("Tick handler listener removed")
+        except Exception as e:
+            logger.error(f"Error removing tick handler: {e}")
+        
+        # Then set running to False and cancel the task
         self.running = False
         
-        # Wait for the bot task to finish
         if self._bot_task and not self._bot_task.done():
+            self._bot_task.cancel()
             try:
-                await asyncio.wait_for(self._bot_task, timeout=10)
-            except asyncio.TimeoutError:
-                logger.warning("Bot task didn't stop gracefully")
-                
+                await self._bot_task
+            except asyncio.CancelledError:
+                pass
+    
         logger.info("✅ Trading Bot stopped")
 
     async def _cleanup_expired_trades(self):
