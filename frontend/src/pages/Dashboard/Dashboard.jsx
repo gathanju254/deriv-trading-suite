@@ -192,16 +192,19 @@ const Dashboard = () => {
           </div>
 
           <div className="market-card">
-            <div className="section-header">
-              <h2><TrendingUp size={20} /> Market Overview</h2>
-              {marketData.lastPrice && (
-                <div className="market-price">
-                  <span className="price">
-                    ${parseFloat(marketData.lastPrice).toFixed(4)}
-                  </span>
-                  <span className="symbol">{marketData.symbol || 'R_100'}</span>
-                </div>
-              )}
+            {/* Moved market-header from MarketOverview.jsx to here for consistency */}
+            <div className="market-header">
+              <div className="market-title">
+                <BarChart3 size={18} />
+                <h3>Market Overview</h3>
+                <span className="market-symbol">{marketData.symbol || 'R_100'}</span>
+              </div>
+              <div className="connection-status">
+                <div className={`status-dot ${wsConnectionStatus}`} />
+                <span className={`status-text status-${wsConnectionStatus}`}>
+                  {wsConnectionStatus === 'connected' ? 'Live' : wsConnectionStatus}
+                </span>
+              </div>
             </div>
             <MarketOverview />
           </div>

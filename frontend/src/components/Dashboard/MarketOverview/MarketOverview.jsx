@@ -171,19 +171,7 @@ const MarketOverview = () => {
 
   return (
     <div className="market-overview">
-      <div className="market-header">
-        <div className="market-title">
-          <BarChart3 size={18} />
-          <h3>Market Overview</h3>
-          <span className="market-symbol">{marketData.symbol || 'R_100'}</span>
-        </div>
-        <div className="connection-status">
-          <div className={`status-dot ${wsConnectionStatus}`} />
-          <span className={`status-text status-${wsConnectionStatus}`}>
-            {wsConnectionStatus === 'connected' ? 'Live' : wsConnectionStatus}
-          </span>
-        </div>
-      </div>
+      {/* Removed market-header - now handled in Dashboard.jsx for consistency */}
 
       <div className="price-section">
         <div className="price-primary">

@@ -15,96 +15,6 @@
 }
 
 /* ===========================
-   HEADER
-   =========================== */
-
-.controls-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.controls-header h2 {
-  color: #f1f5f9;
-  font-size: 1.25rem;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* Websocket Status */
-.ws-status {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.ws-status.connected {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-}
-
-.ws-status.disconnected {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.ws-status.connected .status-dot {
-  background: #22c55e;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
-}
-
-.ws-status.disconnected .status-dot {
-  background: #ef4444;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
-}
-
-/* ===========================
-   BOT STATUS DISPLAY
-   =========================== */
-
-.status-display {
-  padding: 1rem;
-  background: rgba(15, 23, 42, 0.55);
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.status-label {
-  color: #94a3b8;
-  font-size: 0.9rem;
-}
-
-.status-value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.status-display.running .status-value {
-  color: #22c55e;
-}
-
-.status-display.stopped .status-value {
-  color: #ef4444;
-}
-
-/* ===========================
    ALERT MESSAGES
    =========================== */
 
@@ -241,11 +151,5 @@
 @media (max-width: 768px) {
   .button-group {
     flex-direction: column;
-  }
-
-  .controls-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
   }
 }

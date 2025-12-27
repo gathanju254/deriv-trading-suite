@@ -1,3 +1,4 @@
+// frontend/src/components/Dashboard/BotControls/BotControls.jsx
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTrading } from '../../../hooks/useTrading';
@@ -92,42 +93,6 @@ const BotControls = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      {/* HEADER */}
-      <div className="controls-header">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          🤖 Bot Control
-        </motion.h2>
-
-        <motion.div
-          className={`ws-status ${wsConnected ? 'connected' : 'disconnected'}`}
-          animate={{
-            scale: wsConnected ? 1 : 1,
-            opacity: 1
-          }}
-          transition={{ duration: 0.3 }}
-        >
-          <span className="status-dot" />
-          <span className="status-text">
-            {wsConnected ? '🟢 Connected' : '🔴 Disconnected'}
-          </span>
-        </motion.div>
-      </div>
-
-      {/* BOT STATUS PANEL */}
-      <motion.div
-        className={`status-display ${isRunning ? 'running' : 'stopped'}`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        <div className="status-label">Current Status:</div>
-        <div className="status-value">
-          {isRunning ? '▶️ RUNNING' : '⏹️ STOPPED'}
-        </div>
-      </motion.div>
-
       {/* MESSAGES */}
       <AnimatePresence mode="popLayout">
         {error && (

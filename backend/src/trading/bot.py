@@ -22,6 +22,7 @@ from src.core.risk_manager import risk_manager
 from src.trading.order_executor import order_executor
 from src.trading.position_manager import position_manager
 from src.trading.performance import performance
+from src.config.settings import settings
 
 # WebSocket broadcasting
 from src.api.websocket import (

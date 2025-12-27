@@ -110,13 +110,6 @@ const StrategyPerformance = () => {
 
   return (
     <div className="strategy-performance">
-      <div className="performance-header">
-        <h2>
-          <PieChart size={20} />
-          Performance Overview
-        </h2>
-      </div>
-
       <div className="metrics-grid">
         {strategyMetrics.map((metric) => {
           const Icon = metric.icon;

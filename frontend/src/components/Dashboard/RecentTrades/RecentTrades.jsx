@@ -178,9 +178,6 @@ const RecentTrades = () => {
   if (loading && !tradeHistory?.length) {
     return (
       <div className="recent-trades">
-        <div className="section-header">
-          <h2><BarChart3 size={20} /> Recent Trades</h2>
-        </div>
         <div className="trades-loading">
           <div className="loading-spinner" />
           <p>Loading trade history...</p>
@@ -195,9 +192,6 @@ const RecentTrades = () => {
   if (!tradeHistory?.length) {
     return (
       <div className="recent-trades">
-        <div className="section-header">
-          <h2><BarChart3 size={20} /> Recent Trades</h2>
-        </div>
         <div className="no-trades">
           <DollarSign size={32} />
           <p>No trades found</p>
@@ -212,11 +206,6 @@ const RecentTrades = () => {
   // -------------------
   return (
     <div className="recent-trades">
-      <div className="section-header">
-        <h2><BarChart3 size={20} /> Recent Trades</h2>
-        <div className="trade-count">{summary.total} trades loaded</div>
-      </div>
-
       <div className="trades-table-container">
         <table className="trades-table">
           <thead>

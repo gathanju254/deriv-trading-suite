@@ -41,30 +41,6 @@
   box-shadow: 0 8px 22px rgba(0,0,0,0.55);
 }
 
-/* Header */
-.performance-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap: 0.75rem;
-  padding-bottom: .75rem;
-  border-bottom: 1px solid rgba(148,163,184,0.08);
-}
-.performance-header h2{
-  display:flex;
-  gap:.5rem;
-  align-items:center;
-  font-size:1.1rem;
-  font-weight:600;
-  color:var(--text);
-  margin:0;
-}
-.performance-header .meta{
-  color:var(--muted);
-  opacity:.9;
-  font-size:0.82rem;
-}
-
 /* Metrics grid */
 .metrics-grid{
   display:grid;
