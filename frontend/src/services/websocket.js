@@ -12,11 +12,13 @@ class WebSocketService {
   }
 
   connect(url) {
-    // If no URL provided, use default
+    // If no URL provided, use the backend WebSocket URL
     if (!url) {
-      url = import.meta.env.PROD
-        ? `wss://${window.location.host}/ws`
-        : 'ws://localhost:8000/ws';
+      // Use environment variable or default to backend URL
+      url = import.meta.env.VITE_WS_URL || 
+            (import.meta.env.PROD
+              ? 'wss://deriv-trading-backend.onrender.com/ws'  // Backend WebSocket
+              : 'ws://localhost:8000/ws');  // Local backend
     }
 
     return new Promise((resolve, reject) => {

@@ -1,5 +1,4 @@
 // frontend/src/context/TradingContext.jsx
-// frontend/src/context/TradingContext.jsx
 import React, {
   createContext,
   useContext,
@@ -112,10 +111,11 @@ export const TradingProvider = ({ children }) => {
 
   const initWebSocket = useCallback(async () => {
     try {
-      // Use relative URL based on current host
-      const wsUrl = import.meta.env.PROD
-        ? `wss://${window.location.host}/ws`
-        : 'ws://localhost:8000/ws';
+      // Use backend WebSocket URL from environment
+      const wsUrl = import.meta.env.VITE_WS_URL || 
+                    (import.meta.env.PROD
+                      ? 'wss://deriv-trading-backend.onrender.com/ws'  // Backend WebSocket
+                      : 'ws://localhost:8000/ws');  // Local backend
 
       console.log('🌐 Attempting WebSocket connection to:', wsUrl);
       
