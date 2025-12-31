@@ -62,7 +62,7 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
       },
     },
-    // Add this for SPA fallback
+    // Add this for SPA fallback.
     target: 'esnext',
     minify: 'terser',
   }
