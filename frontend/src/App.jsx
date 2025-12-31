@@ -1,4 +1,5 @@
 // frontend/src/App.jsx
+// frontend/src/App.jsx
 import React from 'react';
 import {
   BrowserRouter as Router,
@@ -6,6 +7,7 @@ import {
   Route,
   Navigate,
   Outlet,
+  useLocation,
 } from 'react-router-dom';
 
 import { AppProvider } from './context/AppContext';
@@ -70,6 +72,21 @@ const MainLayoutWrapper = () => {
    App Routes
 -------------------------------------------- */
 const AppRoutes = () => {
+  // Add a useEffect to handle initial redirect from backend
+  React.useEffect(() => {
+    // Check if we're at the root path with OAuth parameters
+    const searchParams = new URLSearchParams(window.location.search);
+    const user_id = searchParams.get('user_id');
+    const session_token = searchParams.get('session_token');
+    
+    if (window.location.pathname === '/' && user_id && session_token) {
+      // Redirect to proper OAuth callback route
+      const newUrl = `/oauth/callback?${window.location.search}`;
+      window.history.replaceState(null, '', newUrl);
+      window.location.reload(); // Force React Router to recognize the new route
+    }
+  }, []);
+
   return (
     <Routes>
       {/* Public */}
@@ -101,6 +118,9 @@ const AppRoutes = () => {
         {/* Catch-all for any other protected routes */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
+      
+      {/* Catch-all for any unknown route */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 };
@@ -114,7 +134,7 @@ function App() {
       <ToastProvider>
         <AuthProvider>
           <TradingProvider>
-            <Router>
+            <Router basename="/">
               <AppRoutes />
             </Router>
           </TradingProvider>

@@ -1,4 +1,5 @@
 // frontend/vite.config.js
+// frontend/vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -53,7 +54,6 @@ export default defineConfig({
     },
   },
 
-  // IMPORTANT: Add this for SPA routing
   build: {
     outDir: 'dist',
     rollupOptions: {

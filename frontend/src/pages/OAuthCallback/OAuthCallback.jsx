@@ -1,4 +1,5 @@
 // frontend/src/pages/OAuthCallback/OAuthCallback.jsx
+// frontend/src/pages/OAuthCallback/OAuthCallback.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -9,7 +10,7 @@ import './OAuthCallback.css';
 const OAuthCallback = () => {
   const [status, setStatus] = useState('processing'); // processing | success | error
   const [error, setError] = useState(null);
-  const [hasProcessed, setHasProcessed] = useState(false); // NEW: Prevent double execution
+  const [hasProcessed, setHasProcessed] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -17,30 +18,19 @@ const OAuthCallback = () => {
   const { addToast } = useToast();
 
   useEffect(() => {
-    // NEW: Check if we need to fix the URL path
-    const searchParams = new URLSearchParams(location.search);
-    
-    // If we have auth parameters but not at the /oauth/callback path
-    if (searchParams.has('user_id') && searchParams.has('session_token') && 
-        !location.pathname.includes('/oauth/callback')) {
-      
-      // Construct the proper URL
-      const newPath = '/oauth/callback?' + location.search;
-      
-      // Use replaceState to update URL without reloading
-      window.history.replaceState(null, '', newPath);
-      
-      // Force React Router to recognize the new path by navigating
+    // NEW: Handle URL if we're at root with OAuth params
+    if (location.pathname === '/' && location.search.includes('user_id')) {
+      const newPath = `/oauth/callback${location.search}`;
       navigate(newPath, { replace: true });
       return;
     }
-    
-    // NEW: Only run authentication once
+
+    // Only run authentication once
     if (hasProcessed) return;
     
     const runAuth = async () => {
       try {
-        setHasProcessed(true); // NEW: Mark as processed
+        setHasProcessed(true);
         
         const params = new URLSearchParams(location.search);
 
@@ -91,7 +81,7 @@ const OAuthCallback = () => {
         addToast('Login successful 🎉', 'success');
 
         setTimeout(() => {
-          navigate('/dashboard', { replace: true }); // NEW: Use replace
+          navigate('/dashboard', { replace: true });
         }, 1200);
 
       } catch (err) {
@@ -101,13 +91,13 @@ const OAuthCallback = () => {
         addToast(`Authentication failed: ${err.message}`, 'error');
 
         setTimeout(() => {
-          navigate('/login', { replace: true }); // NEW: Use replace
+          navigate('/login', { replace: true });
         }, 2500);
       }
     };
 
     runAuth();
-  }, [location, navigate, login, addToast, hasProcessed]); // NEW: Add hasProcessed to dependencies
+  }, [location, navigate, login, addToast, hasProcessed]);
 
   // ---------------- UI ----------------
 
