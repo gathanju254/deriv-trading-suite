@@ -1,6 +1,5 @@
-// frontend/src/App.jsx
-// frontend/src/App.jsx
-import React from 'react';
+// frontend/src/App.jsx - UPDATED VERSION
+import React, { useEffect } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,6 +7,7 @@ import {
   Navigate,
   Outlet,
   useLocation,
+  useNavigate
 } from 'react-router-dom';
 
 import { AppProvider } from './context/AppContext';
@@ -72,24 +72,24 @@ const MainLayoutWrapper = () => {
    App Routes
 -------------------------------------------- */
 const AppRoutes = () => {
-  // Add a useEffect to handle initial redirect from backend
-  React.useEffect(() => {
-    // Check if we're at the root path with OAuth parameters
-    const searchParams = new URLSearchParams(window.location.search);
-    const user_id = searchParams.get('user_id');
-    const session_token = searchParams.get('session_token');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Fix for OAuth callback from backend redirect
+  useEffect(() => {
+    console.log('Current path:', location.pathname);
     
-    if (window.location.pathname === '/' && user_id && session_token) {
-      // Redirect to proper OAuth callback route
-      const newUrl = `/oauth/callback?${window.location.search}`;
-      window.history.replaceState(null, '', newUrl);
-      window.location.reload(); // Force React Router to recognize the new route
+    // Check if we're coming from backend OAuth redirect
+    if (location.pathname === '/oauth/callback' && location.search) {
+      console.log('OAuth callback detected with params:', location.search);
+      // React Router should handle this automatically
+      // No need to manually redirect
     }
-  }, []);
+  }, [location]);
 
   return (
     <Routes>
-      {/* Public */}
+      {/* Public routes */}
       <Route
         path="/login"
         element={
@@ -99,6 +99,7 @@ const AppRoutes = () => {
         }
       />
 
+      {/* IMPORTANT: OAuth callback route MUST be defined before protected routes */}
       <Route path="/oauth/callback" element={<OAuthCallback />} />
 
       {/* Protected routes with MainLayout */}
@@ -115,12 +116,10 @@ const AppRoutes = () => {
         <Route path="trading" element={<Trading />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="settings" element={<Settings />} />
-        {/* Catch-all for any other protected routes */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
       
-      {/* Catch-all for any unknown route */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Catch-all route - redirect to login if not authenticated */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 };
