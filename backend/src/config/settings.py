@@ -1,5 +1,7 @@
 # backend/src/config/settings.py
 
+# backend/src/config/settings.py
+
 import os
 from dotenv import load_dotenv
 
@@ -10,19 +12,33 @@ class Settings:
     # =======================
     # Environment
     # =======================
-    DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
+    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
 
     # =======================
-    # Security / JWT / Auth
+    # URLs (CRITICAL)
+    # =======================
+    BACKEND_URL: str = os.getenv(
+        "BACKEND_URL",
+        "http://localhost:8000"
+    )
+
+    FRONTEND_URL: str = os.getenv(
+        "FRONTEND_URL",
+        "http://localhost:5173"
+    )
+
+    # =======================
+    # Security / JWT
     # =======================
     SECRET_KEY: str = os.getenv(
         "SECRET_KEY",
-        "fallback-dev-key"
+        "dev-secret-key-change-this"
     )
 
     JWT_SECRET_KEY: str = os.getenv(
         "JWT_SECRET_KEY",
-        SECRET_KEY  # fallback for consistency
+        SECRET_KEY
     )
 
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
@@ -40,20 +56,34 @@ class Settings:
     DERIV_API_TOKEN: str = os.getenv("DERIV_API_TOKEN")
 
     DERIV_OAUTH_CLIENT_ID: str = os.getenv("DERIV_OAUTH_CLIENT_ID")
-    DERIV_OAUTH_REDIRECT_URI: str = os.getenv(
-        "DERIV_OAUTH_REDIRECT_URI",
-        "http://localhost:5173/oauth/callback"
-    )
+
+    @property
+    def DERIV_OAUTH_REDIRECT_URI(self) -> str:
+        return f"{self.BACKEND_URL}/auth/callback"
+
     DERIV_OAUTH_AUTHORIZE_URL: str = "https://oauth.deriv.com/oauth2/authorize"
     DERIV_OAUTH_TOKEN_URL: str = "https://oauth.deriv.com/oauth2/token"
 
     # =======================
-    # Frontend
+    # CORS
     # =======================
-    FRONTEND_URL: str = os.getenv(
-        "FRONTEND_URL",
-        "http://localhost:5173"
-    )
+    @property
+    def ALLOWED_ORIGINS(self):
+        return [
+            self.FRONTEND_URL,
+            "https://deriv-trading-suite.onrender.com",
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:3000",
+        ]
+
+    # =======================
+    # WebSocket
+    # =======================
+    @property
+    def WEBSOCKET_URL(self):
+        return self.BACKEND_URL.replace("http", "ws")
 
     # =======================
     # App earnings
@@ -100,20 +130,24 @@ class Settings:
     # =======================
     # ML & optimization
     # =======================
-    ML_CONSENSUS_ENABLED: bool = os.getenv("ML_CONSENSUS_ENABLED", "True").lower() == "true"
-    STRATEGY_OPTIMIZATION_ENABLED: bool = os.getenv("STRATEGY_OPTIMIZATION_ENABLED", "True").lower() == "true"
+    ML_CONSENSUS_ENABLED: bool = os.getenv(
+        "ML_CONSENSUS_ENABLED", "True"
+    ).lower() == "true"
+
+    STRATEGY_OPTIMIZATION_ENABLED: bool = os.getenv(
+        "STRATEGY_OPTIMIZATION_ENABLED", "True"
+    ).lower() == "true"
 
     # =======================
     # Performance logging
     # =======================
-    PERFORMANCE_LOGGING_ENABLED: bool = os.getenv("PERFORMANCE_LOGGING_ENABLED", "True").lower() == "true"
-    PERFORMANCE_LOG_INTERVAL: int = int(os.getenv("PERFORMANCE_LOG_INTERVAL", "300"))
+    PERFORMANCE_LOGGING_ENABLED: bool = os.getenv(
+        "PERFORMANCE_LOGGING_ENABLED", "True"
+    ).lower() == "true"
 
-    # =======================
-    # Legacy / Compatibility
-    # =======================
-    MARTINGALE_MULTIPLIER: float = float(os.getenv("MARTINGALE_MULTIPLIER", "2.0"))
-    ANTI_MARTINGALE_MULTIPLIER: float = float(os.getenv("ANTI_MARTINGALE_MULTIPLIER", "1.2"))
+    PERFORMANCE_LOG_INTERVAL: int = int(
+        os.getenv("PERFORMANCE_LOG_INTERVAL", "300")
+    )
 
 
 settings = Settings()

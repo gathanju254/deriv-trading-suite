@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from contextlib import asynccontextmanager
 
+from src.config.settings import settings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -95,14 +96,7 @@ app = FastAPI(
 # ==========================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-        "https://delilah-unirrigable-humanely.ngrok-free.dev",  # Add this
-        "https://*.ngrok-free.dev",  # Allow all ngrok subdomains
-    ],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -114,10 +108,10 @@ app.add_middleware(
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=[
-        "localhost",
-        "127.0.0.1",
-        "delilah-unirrigable-humanely.ngrok-free.dev",  # Add this
-        "*.ngrok-free.dev",  # Allow all ngrok subdomains
+        "deriv-trading-backend.onrender.com",
+        "deriv-trading-suite.onrender.com",
+        "http://localhost:5173",
+        "http://localhost:3000",
     ],
 )
 
