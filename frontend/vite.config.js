@@ -54,6 +54,7 @@ export default defineConfig({
     },
   },
 
+  // IMPORTANT: For SPA routing on Render
   build: {
     outDir: 'dist',
     rollupOptions: {
@@ -61,5 +62,8 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
       },
     },
+    // Add this for SPA fallback
+    target: 'esnext',
+    minify: 'terser',
   }
 })

@@ -1,5 +1,4 @@
 // frontend/src/pages/OAuthCallback/OAuthCallback.jsx
-// frontend/src/pages/OAuthCallback/OAuthCallback.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -18,13 +17,8 @@ const OAuthCallback = () => {
   const { addToast } = useToast();
 
   useEffect(() => {
-    // NEW: Handle URL if we're at root with OAuth params
-    if (location.pathname === '/' && location.search.includes('user_id')) {
-      const newPath = `/oauth/callback${location.search}`;
-      navigate(newPath, { replace: true });
-      return;
-    }
-
+    console.log('OAuthCallback: location', location.pathname, location.search);
+    
     // Only run authentication once
     if (hasProcessed) return;
     
@@ -45,6 +39,8 @@ const OAuthCallback = () => {
         const email = params.get('email');
         const code = params.get('code'); // fallback
 
+        console.log('Auth params:', { user_id, hasSessionToken: !!session_token, hasAccessToken: !!access_token, email });
+
         /**
          * ✅ PRIMARY FLOW — backend already authenticated
          */
@@ -56,6 +52,8 @@ const OAuthCallback = () => {
             email,
           };
 
+          console.log('Persisting auth data to localStorage');
+          
           // Persist
           localStorage.setItem('user_id', user_id);
           localStorage.setItem('session_token', session_token);
@@ -106,8 +104,12 @@ const OAuthCallback = () => {
       <div className="oauth-callback-page">
         <div className="oauth-container">
           <Loader size={48} className="spin" />
-          <h2>Connecting to Deriv…</h2>
-          <p>Authenticating your account. Almost there.</p>
+          <h2>Authenticating...</h2>
+          <p>Processing OAuth callback from Deriv</p>
+          <p className="debug-info">
+            Path: {location.pathname}<br/>
+            Has params: {location.search ? 'Yes' : 'No'}
+          </p>
         </div>
       </div>
     );
