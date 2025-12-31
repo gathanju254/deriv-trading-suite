@@ -18,32 +18,24 @@ export default defineConfig({
 
   server: {
     port: 5173,
-    host: true, // allows access via LAN / external devices
-
+    host: true,
     proxy: {
-      // Auth routes (OAuth, login, callback, etc.)
       '/auth': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
-
-      // API routes
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
-
-      // WebSocket for app (not HMR)
       '/ws': {
         target: 'http://localhost:8000',
         ws: true,
         changeOrigin: true,
       },
     },
-
-    // Explicitly allow HMR to work without proxy
     hmr: {
       port: 5173,
     },
@@ -60,4 +52,14 @@ export default defineConfig({
       },
     },
   },
+
+  // IMPORTANT: Add this for SPA routing
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+      },
+    },
+  }
 })

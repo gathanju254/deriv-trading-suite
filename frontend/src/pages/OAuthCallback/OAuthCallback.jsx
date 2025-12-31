@@ -17,7 +17,25 @@ const OAuthCallback = () => {
   const { addToast } = useToast();
 
   useEffect(() => {
-    // NEW: Only run once
+    // NEW: Check if we need to fix the URL path
+    const searchParams = new URLSearchParams(location.search);
+    
+    // If we have auth parameters but not at the /oauth/callback path
+    if (searchParams.has('user_id') && searchParams.has('session_token') && 
+        !location.pathname.includes('/oauth/callback')) {
+      
+      // Construct the proper URL
+      const newPath = '/oauth/callback?' + location.search;
+      
+      // Use replaceState to update URL without reloading
+      window.history.replaceState(null, '', newPath);
+      
+      // Force React Router to recognize the new path by navigating
+      navigate(newPath, { replace: true });
+      return;
+    }
+    
+    // NEW: Only run authentication once
     if (hasProcessed) return;
     
     const runAuth = async () => {
