@@ -13,7 +13,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { TradingProvider } from './context/TradingContext';
 import { ToastProvider } from './context/ToastContext';
 
-import MainLayout from './components/Layout/MainLayout/MainLayout';
+import MainLayout from './components/layout/MainLayout/MainLayout';
 
 import Dashboard from './pages/Dashboard/Dashboard';
 import Trading from './pages/Trading/Trading';
