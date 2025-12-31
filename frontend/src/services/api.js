@@ -3,8 +3,8 @@ import axios from 'axios';
 // Use dynamic base URL - IMPORTANT: Always include /api
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   (import.meta.env.PROD 
-    ? 'https://delilah-unirrigable-humanely.ngrok-free.dev/api'  // Make sure this has /api
-    : 'http://localhost:8000/api');  // And this too
+    ? 'https://deriv-trading-backend.onrender.com/api'  // Render backend
+    : 'http://localhost:8000/api');
 
 const api = axios.create({
   baseURL: API_BASE_URL,

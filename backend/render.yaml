@@ -1,18 +1,29 @@
 # render.yaml
+# render.yaml (in your backend directory)
 services:
   - type: web
-    name: trading-bot-backend
+    name: deriv-trading-backend
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.main:app --host 0.0.0.0 --port 8000
+    buildCommand: |
+      pip install -r requirements.txt
+    startCommand: |
+      uvicorn src.main:app --host 0.0.0.0 --port 8000
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: trading-db
           property: connectionString
       - key: DERIV_APP_ID
-        sync: false
+        value: 113709
       - key: DERIV_API_TOKEN
-        sync: false
+        value: AvmG1pjPLdCuDKx
+      - key: DERIV_OAUTH_REDIRECT_URI
+        value: https://deriv-trading-backend.onrender.com/auth/callback
+      - key: FRONTEND_URL
+        value: https://deriv-trading-suite.onrender.com
+      - key: BACKEND_URL
+        value: https://deriv-trading-backend.onrender.com
       - key: SECRET_KEY
         generateValue: true
+    healthCheckPath: /
+    autoDeploy: true
