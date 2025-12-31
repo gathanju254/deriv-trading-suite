@@ -1,5 +1,4 @@
 // frontend/vite.config.js
-// frontend/vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -17,6 +16,20 @@ export default defineConfig({
     },
   },
 
+  // For production build on Render
+  build: {
+    outDir: 'dist',
+    // IMPORTANT: Add emptyOutDir to clean dist folder
+    emptyOutDir: true,
+    // Add rollup options for SPA
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+      },
+    },
+  },
+
+  // For local development
   server: {
     port: 5173,
     host: true,
@@ -41,29 +54,4 @@ export default defineConfig({
       port: 5173,
     },
   },
-
-  esbuild: {
-    loader: 'jsx',
-  },
-
-  optimizeDeps: {
-    esbuildOptions: {
-      loader: {
-        '.js': 'jsx',
-      },
-    },
-  },
-
-  // IMPORTANT: For SPA routing on Render
-  build: {
-    outDir: 'dist',
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
-      },
-    },
-    // Add this for SPA fallback.
-    target: 'esnext',
-    minify: 'terser',
-  }
 })

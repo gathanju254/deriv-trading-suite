@@ -133,6 +133,7 @@ function App() {
       <ToastProvider>
         <AuthProvider>
           <TradingProvider>
+            {/* Add basename="/" for proper routing on Render */}
             <Router basename="/">
               <AppRoutes />
             </Router>
