@@ -27,7 +27,7 @@ from src.trading.performance import performance
 # ==========================================================
 #              IMPORT ALL MODELS (CRITICAL)
 # ==========================================================
-# If you don’t import them, SQLAlchemy won’t create tables.
+# If you don't import them, SQLAlchemy won't create tables.
 import src.db.models.user
 import src.db.models.trade
 import src.db.models.contract
@@ -92,28 +92,31 @@ app = FastAPI(
 )
 
 # ==========================================================
-#                         CORS
+#                         CORS (DEBUG VERSION)
 # ==========================================================
+# Allow all origins for now to debug - CHANGE TO SPECIFIC ORIGINS IN PRODUCTION
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=["*"],  # Allow all origins for debugging
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # Expose all headers for debugging
 )
 
 # ==========================================================
-#                  TRUSTED HOSTS
+#                  TRUSTED HOSTS (DEBUG VERSION)
 # ==========================================================
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=[
-        "deriv-trading-backend.onrender.com",
-        "deriv-trading-suite.onrender.com",
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
-)
+# Comment out TrustedHostMiddleware for debugging
+# app.add_middleware(
+#     TrustedHostMiddleware,
+#     allowed_hosts=[
+#         "deriv-trading-backend.onrender.com",
+#         "deriv-trading-suite.onrender.com",
+#         "http://localhost:5173",
+#         "http://localhost:3000",
+#     ],
+# )
 
 # ==========================================================
 #                     ROUTERS
@@ -131,4 +134,48 @@ async def root():
         "status": "running",
         "service": "Deriv Trading Backend",
         "version": "1.0.0",
+        "cors": "enabled_for_debugging",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+# ==========================================================
+#                     HEALTH CHECK ENDPOINT
+# ==========================================================
+@app.get("/health")
+async def health():
+    """Health check endpoint for load balancers and debugging"""
+    return {
+        "status": "healthy",
+        "service": "Deriv Trading Backend",
+        "timestamp": datetime.utcnow().isoformat(),
+        "backend_url": settings.BACKEND_URL,
+        "frontend_url": settings.FRONTEND_URL,
+        "cors_enabled": True
+    }
+
+# ==========================================================
+#                     DEBUG ENDPOINTS
+# ==========================================================
+@app.get("/debug/cors-test")
+async def cors_test():
+    """Endpoint to test CORS headers"""
+    return {
+        "message": "CORS test endpoint",
+        "headers_received": {
+            "origin": "Check browser console for Origin header"
+        },
+        "headers_sent": {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*"
+        }
+    }
+
+@app.options("/debug/cors-test")
+async def cors_test_options():
+    """Handle OPTIONS requests for CORS preflight"""
+    return {
+        "message": "CORS preflight successful",
+        "allowed_methods": ["GET", "OPTIONS", "POST", "PUT", "DELETE"],
+        "allowed_headers": ["*"]
     }

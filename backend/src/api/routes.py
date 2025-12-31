@@ -115,6 +115,15 @@ async def get_current_user_custom(authorization: str = Header(None)):
 async def status():
     return {"bot": "running", "symbol": settings.SYMBOL}
 
+@router.get("/health")
+async def health_check():
+    """Health check endpoint for load balancers"""
+    return {
+        "status": "healthy",
+        "service": "Deriv Trading Backend",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
 @router.get("/balance")
 async def balance():
     current_balance = await deriv.get_balance()
