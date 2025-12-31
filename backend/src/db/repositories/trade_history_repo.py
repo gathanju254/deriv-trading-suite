@@ -1,159 +1,216 @@
 # backend/src/db/repositories/trade_history_repo.py
-import json  # Add this import if not present
+import json
 import logging
-from sqlalchemy import desc, func, case
+from typing import List, Dict, Optional
+from datetime import datetime
+
+from sqlalchemy import desc, func
 from sqlalchemy.orm import joinedload
+
 from src.db.session import SessionLocal
 from src.db.models.trade import Trade
 from src.db.models.contract import Contract
 from src.db.models.proposal import Proposal
-from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
+
 class TradeHistoryRepo:
-    
+
+    # ==========================================================
+    #                    CORE QUERIES
+    # ==========================================================
+
     @staticmethod
     def get_all_trades(limit: int = 100, offset: int = 0) -> List[Dict]:
         """Get all trades with related contract and proposal data"""
         db = SessionLocal()
         try:
-            # Use joinedload to eagerly load contract data
-            trades = db.query(Trade)\
-                    .options(joinedload(Trade.contract))\
-                    .order_by(desc(Trade.created_at))\
-                    .offset(offset)\
-                    .limit(limit)\
-                    .all()
-            
+            trades = (
+                db.query(Trade)
+                .options(
+                    joinedload(Trade.contract),
+                    joinedload(Trade.proposal)
+                )
+                .order_by(desc(Trade.created_at))
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
+
             result = []
+
             for trade in trades:
                 trade_data = {
                     "id": trade.id,
                     "symbol": trade.symbol,
-                    "side": trade.side,  # This should be "RISE" or "FALL"
-                    "amount": trade.amount,
+                    "side": trade.side,
                     "duration": trade.duration,
+                    "stake_amount": trade.stake_amount,
                     "status": trade.status,
-                    "created_at": trade.created_at.isoformat() if trade.created_at else None
+                    "created_at": trade.created_at.isoformat() if trade.created_at else None,
+                    "settled_at": trade.settled_at.isoformat() if trade.settled_at else None,
                 }
-                
-                # Add contract data if exists - FIXED
+
+                # ---------------- CONTRACT ----------------
                 if trade.contract:
-                    entry_tick = trade.contract.entry_tick
-                    exit_tick = trade.contract.exit_tick
-                    
-                    # Handle missing values by extracting from audit_details
-                    if (entry_tick in [None, "", "—", "-", "N/A"] or exit_tick in [None, "", "—", "-", "N/A"]) and trade.contract.audit_details:
-                        try:
-                            audit = json.loads(trade.contract.audit_details)
-                            all_ticks = audit.get("all_ticks", [])
-                            if all_ticks:
-                                if entry_tick in [None, "", "—", "-", "N/A"]:
-                                    entry_tick = float(all_ticks[0]["tick"])  # First tick is entry
-                                if exit_tick in [None, "", "—", "-", "N/A"]:
-                                    exit_tick = float(all_ticks[-1]["tick"])  # Last tick is exit
-                        except (json.JSONDecodeError, KeyError, ValueError):
-                            pass
-                    
-                    # Apply the existing condition
-                    if entry_tick in [None, "", "—", "-", "N/A"]:
-                        entry_tick = None
-                    if exit_tick in [None, "", "—", "-", "N/A"]:
-                        exit_tick = None
-                    
                     trade_data["contract"] = {
                         "id": trade.contract.id,
-                        "entry_tick": entry_tick,  # Will be float or None
-                        "exit_tick": exit_tick,    # Will be float or None
-                        "profit": trade.contract.profit or 0.0,
+                        "entry_tick": trade.contract.entry_tick,
+                        "exit_tick": trade.contract.exit_tick,
+                        "gross_profit": trade.contract.gross_profit,
+                        "markup_profit": trade.contract.markup_profit,
+                        "net_profit": trade.contract.net_profit,
                         "is_sold": trade.contract.is_sold,
-                        "sell_time": trade.contract.sell_time.isoformat() if trade.contract.sell_time else None
+                        "sell_time": trade.contract.sell_time.isoformat()
+                        if trade.contract.sell_time else None,
                     }
                 else:
-                    # Add calculated contract structure if no contract exists
-                    profit = 0.0
-                    if trade.status == "WON":
-                        profit = trade.amount * 0.95  # Assuming 95% payout
-                    elif trade.status == "LOST":
-                        profit = -trade.amount
-                    
-                    trade_data["contract"] = {
-                        "entry_tick": "N/A",
-                        "exit_tick": "N/A",
-                        "profit": profit,
-                        "is_sold": "1" if trade.status in ["WON", "LOST"] else "0"
+                    trade_data["contract"] = None
+
+                # ---------------- PROPOSAL ----------------
+                if trade.proposal:
+                    trade_data["proposal"] = {
+                        "id": trade.proposal.id,
+                        "price": trade.proposal.price,
+                        "payout": trade.proposal.payout,
                     }
-                
+                else:
+                    trade_data["proposal"] = None
+
                 result.append(trade_data)
-            
+
             return result
         finally:
             db.close()
-    
+
+    # Backward compatibility
+    @staticmethod
+    def get_trades(limit: int = 100, offset: int = 0):
+        """Alias for get_all_trades"""
+        return TradeHistoryRepo.get_all_trades(limit=limit, offset=offset)
+
+    # ==========================================================
+    #                  SINGLE TRADE
+    # ==========================================================
+
     @staticmethod
     def get_trade_by_id(trade_id: str) -> Optional[Dict]:
-        """Get specific trade by ID"""
         db = SessionLocal()
         try:
-            trade = db.query(Trade).filter(Trade.id == trade_id).first()
+            trade = (
+                db.query(Trade)
+                .options(
+                    joinedload(Trade.contract),
+                    joinedload(Trade.proposal)
+                )
+                .filter(Trade.id == trade_id)
+                .first()
+            )
+
             if not trade:
                 return None
-            
-            trade_data = {
+
+            return {
                 "id": trade.id,
                 "symbol": trade.symbol,
                 "side": trade.side,
-                "amount": trade.amount,
                 "duration": trade.duration,
+                "stake_amount": trade.stake_amount,
                 "status": trade.status,
-                "created_at": trade.created_at.isoformat() if trade.created_at else None
-            }
-            
-            if trade.contract:
-                trade_data["contract"] = {
+                "created_at": trade.created_at.isoformat() if trade.created_at else None,
+                "contract": {
                     "id": trade.contract.id,
                     "entry_tick": trade.contract.entry_tick,
                     "exit_tick": trade.contract.exit_tick,
-                    "profit": trade.contract.profit,
+                    "gross_profit": trade.contract.gross_profit,
+                    "markup_profit": trade.contract.markup_profit,
+                    "net_profit": trade.contract.net_profit,
                     "is_sold": trade.contract.is_sold,
-                    "sell_time": trade.contract.sell_time.isoformat() if trade.contract.sell_time else None
-                }
-            
-            if trade.proposal:
-                trade_data["proposal"] = {
+                    "sell_time": trade.contract.sell_time.isoformat()
+                    if trade.contract.sell_time else None,
+                } if trade.contract else None,
+                "proposal": {
                     "id": trade.proposal.id,
                     "price": trade.proposal.price,
-                    "payout": trade.proposal.payout
-                }
-            
-            return trade_data
+                    "payout": trade.proposal.payout,
+                } if trade.proposal else None,
+            }
         finally:
             db.close()
-    
+
+    # ==========================================================
+    #                 FILTERS & REPORTS
+    # ==========================================================
+
     @staticmethod
     def get_trades_by_status(status: str, limit: int = 100) -> List[Dict]:
-        """Get trades by status (PENDING, ACTIVE, WON, LOST, ERROR)"""
         db = SessionLocal()
         try:
-            trades = db.query(Trade).filter(Trade.status == status).order_by(desc(Trade.created_at)).limit(limit).all()
+            trades = (
+                db.query(Trade)
+                .filter(Trade.status == status)
+                .order_by(desc(Trade.created_at))
+                .limit(limit)
+                .all()
+            )
+
             return [
                 {
-                    "id": trade.id,
-                    "symbol": trade.symbol,
-                    "side": trade.side,
-                    "amount": trade.amount,
-                    "status": trade.status,
-                    "created_at": trade.created_at.isoformat() if trade.created_at else None
+                    "id": t.id,
+                    "symbol": t.symbol,
+                    "side": t.side,
+                    "stake_amount": t.stake_amount,
+                    "status": t.status,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
                 }
-                for trade in trades
+                for t in trades
             ]
         finally:
             db.close()
-    
+
+    @staticmethod
+    def get_recent_trades(limit: int = 10) -> List[Dict]:
+        return TradeHistoryRepo.get_all_trades(limit=limit)
+
+    @staticmethod
+    def get_trades_by_date_range(start_date: str, end_date: str) -> List[Dict]:
+        db = SessionLocal()
+        try:
+            start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+
+            trades = (
+                db.query(Trade)
+                .filter(
+                    Trade.created_at >= start,
+                    Trade.created_at <= end,
+                )
+                .order_by(desc(Trade.created_at))
+                .all()
+            )
+
+            return [
+                {
+                    "id": t.id,
+                    "symbol": t.symbol,
+                    "side": t.side,
+                    "stake_amount": t.stake_amount,
+                    "status": t.status,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                }
+                for t in trades
+            ]
+        finally:
+            db.close()
+
+    # ==========================================================
+    #                  GLOBAL STATISTICS
+    # ==========================================================
+
     @staticmethod
     def get_trading_stats() -> Dict:
-        """Get trading statistics"""
+        """System-wide trading statistics (net-profit based)"""
         db = SessionLocal()
         try:
             total_trades = db.query(Trade).count()
@@ -161,22 +218,30 @@ class TradeHistoryRepo:
             lost_trades = db.query(Trade).filter(Trade.status == "LOST").count()
             active_trades = db.query(Trade).filter(Trade.status == "ACTIVE").count()
             pending_trades = db.query(Trade).filter(Trade.status == "PENDING").count()
-            
-            # Calculate win rate
-            win_rate = (won_trades / (won_trades + lost_trades)) * 100 if (won_trades + lost_trades) > 0 else 0
-            
-            # Simplified and robust profit calculation:
-            # Sum contract.profit (use COALESCE to treat NULL as 0)
-            total_profit_result = db.query(func.sum(func.coalesce(Contract.profit, 0.0))).scalar()
-            total_profit = total_profit_result or 0.0
-            
-            # Calculate total invested amount
-            total_invested_result = db.query(func.sum(Trade.amount)).scalar()
-            total_invested = total_invested_result or 0.0
-            
-            # Calculate ROI
-            roi = ((total_profit / total_invested) * 100) if total_invested > 0 else 0
-            
+
+            win_rate = (
+                (won_trades / (won_trades + lost_trades)) * 100
+                if (won_trades + lost_trades) > 0 else 0
+            )
+
+            # ✅ Net profit only (after markup)
+            total_profit = (
+                db.query(func.sum(func.coalesce(Contract.net_profit, 0.0)))
+                .scalar()
+                or 0.0
+            )
+
+            total_invested = (
+                db.query(func.sum(Trade.stake_amount))
+                .scalar()
+                or 0.0
+            )
+
+            roi = (
+                (total_profit / total_invested) * 100
+                if total_invested > 0 else 0
+            )
+
             return {
                 "total_trades": total_trades,
                 "won_trades": won_trades,
@@ -186,8 +251,9 @@ class TradeHistoryRepo:
                 "win_rate": round(win_rate, 2),
                 "total_profit": round(total_profit, 2),
                 "total_invested": round(total_invested, 2),
-                "roi_percentage": round(roi, 2)
+                "roi_percentage": round(roi, 2),
             }
+
         except Exception as e:
             logger.error(f"Error calculating trading stats: {e}")
             return {
@@ -199,40 +265,7 @@ class TradeHistoryRepo:
                 "win_rate": 0.0,
                 "total_profit": 0.0,
                 "total_invested": 0.0,
-                "roi_percentage": 0.0
+                "roi_percentage": 0.0,
             }
-        finally:
-            db.close()
-    
-    @staticmethod
-    def get_recent_trades(limit: int = 10) -> List[Dict]:
-        """Get most recent trades"""
-        return TradeHistoryRepo.get_all_trades(limit=limit)
-    
-    @staticmethod
-    def get_trades_by_date_range(start_date: str, end_date: str) -> List[Dict]:
-        """Get trades within a date range"""
-        db = SessionLocal()
-        try:
-            from datetime import datetime
-            start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-            end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-            
-            trades = db.query(Trade).filter(
-                Trade.created_at >= start,
-                Trade.created_at <= end
-            ).order_by(desc(Trade.created_at)).all()
-            
-            return [
-                {
-                    "id": trade.id,
-                    "symbol": trade.symbol,
-                    "side": trade.side,
-                    "amount": trade.amount,
-                    "status": trade.status,
-                    "created_at": trade.created_at.isoformat() if trade.created_at else None
-                }
-                for trade in trades
-            ]
         finally:
             db.close()

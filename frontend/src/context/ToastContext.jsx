@@ -15,7 +15,7 @@ export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
   const addToast = (message, type = 'info', duration = 5000) => {
-    const id = Date.now();
+    const id = Date.now() + Math.random();  // Add random to make unique
     const toast = { id, message, type, duration };
     
     setToasts(prev => [...prev, toast]);

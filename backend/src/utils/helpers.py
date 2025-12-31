@@ -202,3 +202,13 @@ class Helpers:
             if std == 0:
                 return [False] * len(data)
             return [abs((x - mean) / std) > 3 for x in data]
+
+    @staticmethod
+    def format_deriv_amount(amount: float) -> float:
+        """Format amount for Deriv API (max 2 decimal places)"""
+        return round(amount, 2)
+
+    @staticmethod
+    def format_deriv_price(amount: float) -> str:
+        """Format price string for Deriv API"""
+        return f"{Helpers.format_deriv_amount(amount):.2f}"

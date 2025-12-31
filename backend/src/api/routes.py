@@ -1,5 +1,12 @@
 # backend/src/api/routes.py
 
+# Add these imports at the TOP of your routes.py file
+from urllib.parse import urlencode
+import secrets
+from fastapi import Request, Query, Header
+from typing import Optional
+
+# Your existing imports...
 from fastapi import APIRouter, HTTPException
 from src.core.deriv_api import deriv
 from src.trading.order_executor import order_executor, position_manager
@@ -13,8 +20,93 @@ from src.db.models.contract import Contract
 from datetime import datetime, timedelta
 import asyncio
 from src.core.risk_manager import RiskState
+from src.trading.multi_user_bot import bot_manager
+from src.api.dependencies import get_current_user
 
 router = APIRouter(prefix="/api", tags=["Trading API"])
+
+# ============================================================
+# AUTH ROUTES (ADD THESE TO YOUR EXISTING FILE)
+# ============================================================
+
+@router.get("/auth/login")
+async def deriv_login():
+    """
+    Returns Deriv OAuth URL.
+    Frontend must redirect browser to this URL.
+    """
+    try:
+        state = secrets.token_urlsafe(32)
+
+        params = {
+            "app_id": settings.DERIV_APP_ID,
+            "redirect_uri": settings.DERIV_OAUTH_REDIRECT_URI,
+            "response_type": "token",  # Deriv prefers token flow
+            "scope": "read write trade",
+            "state": state,
+            "brand": "deriv",
+            "language": "EN",
+        }
+
+        auth_url = f"https://oauth.deriv.com/oauth2/authorize?{urlencode(params)}"
+        logger.info(f"Deriv OAuth URL generated: {auth_url[:100]}...")
+
+        return {"redirect_url": auth_url, "state": state}
+
+    except Exception as e:
+        logger.error(f"OAuth login generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to generate login URL")
+
+@router.get("/auth/callback")
+async def deriv_callback_custom(
+    request: Request,
+    acct1: Optional[str] = Query(None),
+    token1: Optional[str] = Query(None),
+    acct2: Optional[str] = Query(None),
+    token2: Optional[str] = Query(None),
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+):
+    """
+    Forward to the main auth callback endpoint
+    """
+    # Import here to avoid circular imports
+    from src.api.auth_routes import deriv_callback
+    
+    # Get database session
+    db = SessionLocal()
+    try:
+        return await deriv_callback(request, acct1, token1, acct2, token2, code, state, db)
+    finally:
+        db.close()
+
+@router.post("/auth/logout")
+async def logout_custom(authorization: str = Header(None)):
+    """
+    Logout endpoint
+    """
+    # Import here to avoid circular imports
+    from src.api.auth_routes import logout
+    
+    db = SessionLocal()
+    try:
+        return await logout(authorization, db)
+    finally:
+        db.close()
+
+@router.get("/auth/me")
+async def get_current_user_custom(authorization: str = Header(None)):
+    """
+    Get current user info
+    """
+    # Import here to avoid circular imports
+    from src.api.auth_routes import get_current_user
+    
+    db = SessionLocal()
+    try:
+        return await get_current_user(authorization, db)
+    finally:
+        db.close()
 
 # ============================================================
 # BASIC BOT STATUS
@@ -171,140 +263,97 @@ async def get_market_data():
 # ============================================================
 @router.get("/trades")
 async def get_trades(limit: int = 100, offset: int = 0):
-    """Fetch recent trades with contract details, using RISE/FALL terminology"""
+    """
+    Fetch recent trades with contract details,
+    normalized to RISE / FALL terminology.
+    Uses the correct schema with stake_amount instead of amount.
+    """
+    try:
+        trades = TradeHistoryRepo.get_all_trades(limit=limit, offset=offset)
+        
+        formatted_trades = []
+        
+        for trade in trades:
+            # Get contract data if available
+            contract = trade.get("contract") or {}
+            
+            # Get payout from contract or calculate from trade
+            net_payout = None
+            if contract and contract.get("net_profit") is not None:
+                net_payout = trade.get("stake_amount", 0) + contract.get("net_profit", 0)
+            elif trade.get("net_payout") is not None:
+                net_payout = trade.get("net_payout")
+            
+            # Calculate profit/loss
+            stake = float(trade.get("stake_amount", 0) or 0)
+            profit = None
+            if net_payout is not None:
+                profit = net_payout - stake
+            
+            formatted_trades.append({
+                "id": trade.get("id"),
+                "symbol": trade.get("symbol"),
+                "direction": (
+                    "RISE"
+                    if trade.get("side", "").upper() in ["RISE", "CALL", "BUY"]
+                    else "FALL"
+                ),
+                "stake_amount": stake,
+                "status": trade.get("status"),
+                "created_at": trade.get("created_at"),
+                "settled_at": trade.get("settled_at"),
+                "payout": float(net_payout) if net_payout is not None else None,
+                "profit": float(profit) if profit is not None else None,  # This should show the actual profit
+                "entry_tick": contract.get("entry_tick"),
+                "exit_tick": contract.get("exit_tick"),
+                "net_profit": contract.get("net_profit", 0.0),  # This should match the profit
+            })
+        
+        return {"trades": formatted_trades}
+        
+    except Exception as e:
+        logger.exception("Error fetching trades")
+        return {"error": str(e)}
+
+
+@router.get("/trades/status/{status}")
+async def get_trades_by_status(status: str, limit: int = 100):
+    valid_statuses = ["PENDING", "ACTIVE", "WON", "LOST", "ERROR"]
+    if status.upper() not in valid_statuses:
+        raise HTTPException(400, f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+    
     db = SessionLocal()
     try:
-        trades_query = db.query(Trade).join(
-            Contract, Trade.id == Contract.trade_id, isouter=True
-        ).order_by(Trade.created_at.desc())
-
-        total = trades_query.count()
-        trades = trades_query.limit(limit).offset(offset).all()
-
+        trades = db.query(Trade).filter(
+            Trade.status == status.upper()
+        ).order_by(Trade.created_at.desc()).limit(limit).all()
+        
+        # Convert trades to use RISE/FALL terminology and correct field names
         formatted_trades = []
         for trade in trades:
-            # Convert side to RISE/FALL terminology
-            raw_side = trade.side or getattr(trade, "direction", None) or getattr(trade, "consensus_direction", None)
-            direction = "UNKNOWN"
-            if raw_side:
-                s = str(raw_side).upper()
-                if s in ["RISE", "BUY", "CALL"]:
-                    direction = "RISE"
-                elif s in ["FALL", "SELL", "PUT"]:
-                    direction = "FALL"
-            
-            # Determine if it's a Rise/Fall contract
-            is_rise_fall = True  # All your 1-tick contracts are Rise/Fall
-            
-            # Build trade dict
-            trade_dict = {
+            formatted_trade = {
                 "id": trade.id,
                 "symbol": trade.symbol,
-                "original_side": trade.side,  # Keep original for reference
-                "direction": direction,  # Standardized direction (RISE/FALL)
-                "contract_type": "Rise/Fall" if is_rise_fall else "Other",
-                "amount": float(trade.amount) if trade.amount else 0,
-                "duration": trade.duration,
+                "direction": "RISE" if trade.side == "CALL" else "FALL",
+                "stake_amount": float(trade.stake_amount) if trade.stake_amount else 0,
                 "status": trade.status,
                 "created_at": trade.created_at.isoformat() if trade.created_at else None,
-                "updated_at": trade.updated_at.isoformat() if hasattr(trade, "updated_at") and trade.updated_at else None
+                "settled_at": trade.settled_at.isoformat() if trade.settled_at else None,
             }
-
-            # Attach contract info if exists
-            contracts = db.query(Contract).filter(Contract.trade_id == trade.id).all()
-            if contracts:
-                # Get the latest contract
-                contract = contracts[0]
-                trade_dict["contract"] = {
-                    "profit": float(contract.profit) if contract.profit else 0,
-                    "entry_tick": contract.entry_tick if contract.entry_tick else "—",
-                    "exit_tick": contract.exit_tick if contract.exit_tick else "—",
-                    "is_sold": contract.is_sold,
-                    "sell_time": contract.sell_time.isoformat() if contract.sell_time else None
-                }
-            else:
-                # Fabricate a contract object if none exists (to prevent undefined in frontend)
-                profit = 0.0
-                if trade.status == "WON":
-                    profit = trade.amount * 0.95  # Approximate payout
-                elif trade.status == "LOST":
-                    profit = -trade.amount
-                
-                trade_dict["contract"] = {
-                    "entry_tick": "N/A",
-                    "exit_tick": "N/A",
-                    "profit": profit,
-                    "is_sold": "1" if trade.status in ["WON", "LOST"] else "0",
-                    "sell_time": None
-                }
             
-            formatted_trades.append(trade_dict)
-
-        return {
-            "trades": formatted_trades,
-            "pagination": {
-                "limit": limit,
-                "offset": offset,
-                "total": total
-            }
-        }
-
-    except Exception as e:
-        logger.error(f"Error fetching trades: {e}", exc_info=True)
-        return {
-            "trades": [],
-            "pagination": {
-                "limit": limit,
-                "offset": offset,
-                "total": 0
-            }
-        }
-    finally:
-        db.close()
-
-
-@router.get("/trades/{trade_id}")
-async def get_trade(trade_id: str):
-    db = SessionLocal()
-    try:
-        trade = db.query(Trade).filter(Trade.id == trade_id).first()
-        if not trade:
-            raise HTTPException(404, "Trade not found")
+            # Add contract data if available
+            if trade.contract:
+                formatted_trade.update({
+                    "entry_tick": trade.contract.entry_tick,
+                    "exit_tick": trade.contract.exit_tick,
+                    "net_profit": trade.contract.net_profit,
+                    "payout": float(trade.stake_amount + trade.contract.net_profit) if trade.contract.net_profit else None,
+                    "profit": float(trade.contract.net_profit) if trade.contract.net_profit else None,
+                })
+            
+            formatted_trades.append(formatted_trade)
         
-        # Convert side to RISE/FALL
-        raw_side = trade.side or getattr(trade, "direction", None)
-        direction = "UNKNOWN"
-        if raw_side:
-            s = str(raw_side).upper()
-            if s in ["RISE", "BUY", "CALL"]:
-                direction = "RISE"
-            elif s in ["FALL", "SELL", "PUT"]:
-                direction = "FALL"
-        
-        trade_data = {
-            "id": trade.id,
-            "symbol": trade.symbol,
-            "original_side": trade.side,
-            "direction": direction,
-            "amount": float(trade.amount) if trade.amount else 0,
-            "duration": trade.duration,
-            "status": trade.status,
-            "created_at": trade.created_at.isoformat() if trade.created_at else None,
-            "contract_type": "Rise/Fall"
-        }
-        
-        # Add contract details
-        contract = db.query(Contract).filter(Contract.trade_id == trade_id).first()
-        if contract:
-            trade_data["contract"] = {
-                "profit": float(contract.profit) if contract.profit else 0,
-                "entry_tick": contract.entry_tick,
-                "exit_tick": contract.exit_tick,
-                "is_sold": contract.is_sold,
-                "sell_time": contract.sell_time.isoformat() if contract.sell_time else None
-            }
-        
-        return trade_data
+        return {"trades": formatted_trades}
     finally:
         db.close()
 
@@ -312,11 +361,8 @@ async def get_trade(trade_id: str):
 async def get_trades_by_status(status: str, limit: int = 100):
     valid_statuses = ["PENDING", "ACTIVE", "WON", "LOST", "ERROR"]
     if status.upper() not in valid_statuses:
-        raise HTTPException(
-            400, 
-            f"Status must be one of: {valid_statuses}"
-        )
-
+        raise HTTPException(400, f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+    
     trades = TradeHistoryRepo.get_trades_by_status(
         status.upper(), limit=limit
     )
@@ -324,16 +370,17 @@ async def get_trades_by_status(status: str, limit: int = 100):
     # Convert trades to use RISE/FALL terminology
     formatted_trades = []
     for trade in trades:
-        if isinstance(trade, dict):
-            formatted_trade = trade.copy()
-            direction = str(trade.get("side", "")).upper()
-            if direction in ["BUY", "CALL"]:
-                formatted_trade["direction"] = "RISE"
-            elif direction in ["SELL", "PUT"]:
-                formatted_trade["direction"] = "FALL"
-            else:
-                formatted_trade["direction"] = direction
-            formatted_trades.append(formatted_trade)
+        formatted_trades.append({
+            "id": trade.id,
+            "symbol": trade.symbol,
+            "direction": "RISE" if trade.side == "CALL" else "FALL",
+            "amount": float(trade.stake_amount) if trade.stake_amount else 0,  # Changed from trade.amount
+            "status": trade.status,
+            "created_at": trade.created_at.isoformat() if trade.created_at else None,
+            "settled_at": trade.settled_at.isoformat() if trade.settled_at else None,
+            "payout": float(trade.net_payout) if trade.net_payout else None,
+            "profit": float(trade.net_payout - trade.stake_amount) if trade.net_payout and trade.stake_amount else None,
+        })
     
     return {"trades": formatted_trades}
 
@@ -362,29 +409,34 @@ async def get_trading_stats():
 @router.get("/trades/date-range")
 async def get_trades_by_date_range(start_date: str, end_date: str):
     try:
-        trades = TradeHistoryRepo.get_trades_by_date_range(start_date, end_date)
+        start = datetime.fromisoformat(start_date)
+        end = datetime.fromisoformat(end_date)
         
-        # Convert trades to use RISE/FALL terminology
-        formatted_trades = []
-        for trade in trades:
-            if isinstance(trade, dict):
-                formatted_trade = trade.copy()
-                direction = str(trade.get("side", "")).upper()
-                if direction in ["BUY", "CALL"]:
-                    formatted_trade["direction"] = "RISE"
-                elif direction in ["SELL", "PUT"]:
-                    formatted_trade["direction"] = "FALL"
-                else:
-                    formatted_trade["direction"] = direction
-                formatted_trades.append(formatted_trade)
-        
-        return {
-            "trades": formatted_trades,
-            "date_range": {
-                "start_date": start_date,
-                "end_date": end_date
-            }
-        }
+        db = SessionLocal()
+        try:
+            trades = db.query(Trade).filter(
+                Trade.created_at >= start,
+                Trade.created_at <= end
+            ).order_by(Trade.created_at.desc()).all()
+            
+            # Convert trades to use RISE/FALL terminology
+            formatted_trades = []
+            for trade in trades:
+                formatted_trades.append({
+                    "id": trade.id,
+                    "symbol": trade.symbol,
+                    "direction": "RISE" if trade.side == "CALL" else "FALL",
+                    "amount": float(trade.stake_amount) if trade.stake_amount else 0,  # Changed from trade.amount
+                    "status": trade.status,
+                    "created_at": trade.created_at.isoformat() if trade.created_at else None,
+                    "settled_at": trade.settled_at.isoformat() if trade.settled_at else None,
+                    "payout": float(trade.net_payout) if trade.net_payout else None,
+                    "profit": float(trade.net_payout - trade.stake_amount) if trade.net_payout and trade.stake_amount else None,
+                })
+            
+            return {"trades": formatted_trades}
+        finally:
+            db.close()
     except ValueError as e:
         raise HTTPException(400, f"Invalid date format: {e}")
 
@@ -623,51 +675,25 @@ async def manual_settle_trade(trade_id: str, result: str = None, payout: float =
         if not trade:
             raise HTTPException(404, "Trade not found")
         
-        # If result not provided, determine based on payout
-        if result is None:
-            if payout is None:
-                result = "LOST"
-                payout = 0.0
-            else:
-                result = "WON" if payout > 0 else "LOST"
+        if result not in ["WON", "LOST"]:
+            raise HTTPException(400, "Result must be 'WON' or 'LOST'")
         
         # Update trade
         trade.status = result
-        if hasattr(trade, "updated_at"):
-            trade.updated_at = datetime.utcnow()
+        trade.settled_at = datetime.utcnow()
+        if payout is not None:
+            trade.net_payout = payout
         
-        # Update contract if exists
-        contract = db.query(Contract).filter(Contract.trade_id == trade_id).first()
-        if contract:
-            contract.profit = payout
-            contract.is_sold = "1"
-            contract.sell_time = datetime.utcnow()
+        # Update risk manager
+        from src.core.risk_manager import risk_manager
+        risk_manager.update_trade_outcome(result, trade.stake_amount, payout - trade.stake_amount if payout else 0)  # Changed from trade.amount
         
         db.commit()
-        
-        # Update risk manager and performance
-        from src.trading.order_executor import order_executor
-        from src.trading.performance import performance
-        
-        order_executor.risk.update_trade_outcome(result, trade.amount)
-        profit = payout - trade.amount if payout is not None else -trade.amount
-        performance.add_trade({
-            "id": trade_id,
-            "symbol": trade.symbol,
-            "side": trade.side,
-            "amount": trade.amount,
-            "profit": profit,
-            "result": result,
-            "closed_at": datetime.utcnow()
-        })
-        
-        return {
-            "status": "Trade manually settled",
-            "trade_id": trade_id,
-            "result": result,
-            "payout": payout,
-            "contract_type": "Rise/Fall"
-        }
+        return {"status": "Trade manually settled", "trade_id": trade_id}
+    except Exception as e:
+        db.rollback()
+        logger.exception("Error manually settling trade")
+        raise HTTPException(500, str(e))
     finally:
         db.close()
 
@@ -682,45 +708,24 @@ async def auto_settle_expired_trades():
             Trade.created_at < cutoff
         ).all()
         
-        settled = []
+        settled_count = 0
         for trade in expired_trades:
             trade.status = "LOST"
-            contract = db.query(Contract).filter(Contract.trade_id == trade.id).first()
-            if contract:
-                contract.profit = 0.0
-                contract.is_sold = "1"
-                contract.sell_time = datetime.utcnow()
+            trade.settled_at = datetime.utcnow()
+            trade.net_payout = 0.0
             
-            from src.trading.order_executor import order_executor
-            from src.trading.performance import performance
+            # Update risk manager
+            from src.core.risk_manager import risk_manager
+            risk_manager.update_trade_outcome("LOST", trade.stake_amount, -trade.stake_amount)  # Changed from trade.amount
             
-            order_executor.risk.update_trade_outcome("LOST", trade.amount)
-            performance.add_trade({
-                "id": trade.id,
-                "symbol": trade.symbol,
-                "side": trade.side,
-                "amount": trade.amount,
-                "profit": -trade.amount,
-                "result": "LOST",
-                "closed_at": datetime.utcnow()
-            })
-            
-            settled.append(trade.id)
-            logger.info(f"Auto-settled expired Rise/Fall trade {trade.id} as LOST")
+            settled_count += 1
         
         db.commit()
-        
-        from src.trading.position_manager import position_manager
-        for contract_id in list(position_manager.active_positions.keys()):
-            pos = position_manager.active_positions.get(contract_id)
-            if pos and pos.get("trade_id") in settled:
-                position_manager.mark_closed(contract_id, "LOST", 0)
-        
-        return {
-            "settled_count": len(settled),
-            "settled_trades": settled,
-            "contract_type": "Rise/Fall"
-        }
+        return {"status": f"Auto-settled {settled_count} expired trades"}
+    except Exception as e:
+        db.rollback()
+        logger.exception("Error auto-settling expired trades")
+        raise HTTPException(500, str(e))
     finally:
         db.close()
 
@@ -746,39 +751,47 @@ async def get_contract_type():
 async def get_trades_by_direction(direction: str, limit: int = 50):
     """Get trades by direction (RISE or FALL)"""
     if direction.upper() not in ["RISE", "FALL"]:
-        raise HTTPException(400, "Direction must be 'rise' or 'fall'")
+        raise HTTPException(400, "Direction must be 'RISE' or 'FALL'")
     
     db = SessionLocal()
     try:
-        # Map direction to Deriv sides
-        if direction.upper() == "RISE":
-            sides = ["CALL", "BUY"]
-        else:  # FALL
-            sides = ["PUT", "SELL"]
+        deriv_side = "CALL" if direction.upper() == "RISE" else "PUT"
+        trades = db.query(Trade).filter(Trade.side == deriv_side).order_by(Trade.created_at.desc()).limit(limit).all()
         
-        trades = db.query(Trade).filter(
-            Trade.side.in_(sides)
-        ).order_by(Trade.created_at.desc()).limit(limit).all()
-        
+        # Convert trades to use RISE/FALL terminology
         formatted_trades = []
         for trade in trades:
-            formatted_trade = {
+            formatted_trades.append({
                 "id": trade.id,
                 "symbol": trade.symbol,
-                "original_side": trade.side,
                 "direction": direction.upper(),
-                "amount": float(trade.amount) if trade.amount else 0,
-                "duration": trade.duration,
+                "amount": float(trade.stake_amount) if trade.stake_amount else 0,  # Changed from trade.amount
                 "status": trade.status,
                 "created_at": trade.created_at.isoformat() if trade.created_at else None,
-                "contract_type": "Rise/Fall"
-            }
-            formatted_trades.append(formatted_trade)
+                "settled_at": trade.settled_at.isoformat() if trade.settled_at else None,
+                "payout": float(trade.net_payout) if trade.net_payout else None,
+                "profit": float(trade.net_payout - trade.stake_amount) if trade.net_payout and trade.stake_amount else None,
+            })
         
-        return {
-            "direction": direction.upper(),
-            "trades": formatted_trades,
-            "count": len(formatted_trades)
-        }
+        return {"trades": formatted_trades}
     finally:
         db.close()
+
+# New user-specific endpoints
+@router.post("/user/bot/start")
+async def start_user_bot(user_id: str, oauth_token: str):
+    success = await bot_manager.start_bot_for_user(user_id, oauth_token)
+    return {"success": success}
+
+@router.post("/user/bot/stop")
+async def stop_user_bot(user_id: str):
+    success = await bot_manager.stop_bot_for_user(user_id)
+    return {"success": success}
+
+@router.get("/user/bot/status/{user_id}")
+async def get_user_bot_status(user_id: str):
+    return bot_manager.get_user_bot_status(user_id)
+
+@router.get("/admin/commissions")
+async def get_commission_summary():
+    return bot_manager.get_commission_summary()

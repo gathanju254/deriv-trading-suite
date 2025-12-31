@@ -1,90 +1,62 @@
 // frontend/src/services/derivService.js
 import api from './api';
 
+// Local helpers (boring but reliable)
+const getUserId = () => localStorage.getItem('user_id');
+const getAccessToken = () => localStorage.getItem('deriv_access_token');
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 export const derivService = {
-  // Bot Control
+  /* =========================
+     BOT CONTROL
+  ========================== */
   async getBotStatus() {
-    try {
-      const response = await api.get('/status');
-      return response.data;
-    } catch (error) {
-      console.error('Error getting bot status:', error);
-      throw error;
-    }
+    const { data } = await api.get('/status');
+    return data;
   },
 
   async startBot() {
-    try {
-      const response = await api.post('/start');
-      return response.data;
-    } catch (error) {
-      console.error('Error starting bot:', error);
-      throw error;
-    }
+    const { data } = await api.post('/start');
+    return data;
   },
 
   async stopBot() {
-    try {
-      const response = await api.post('/stop');
-      return response.data;
-    } catch (error) {
-      console.error('Error stopping bot:', error);
-      throw error;
-    }
+    const { data } = await api.post('/stop');
+    return data;
   },
 
-  // Trading
+  /* =========================
+     TRADING
+  ========================== */
   async executeManualTrade(side) {
-    try {
-      const response = await api.post(`/manual/${side}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error executing manual trade:', error);
-      throw error;
-    }
+    const { data } = await api.post(`/manual/${side}`);
+    return data;
   },
 
   async getTradeHistory(limit = 50) {
-    try {
-      const response = await api.get(`/trades?limit=${limit}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error getting trade history:', error);
-      throw error;
-    }
+    const { data } = await api.get(`/trades?limit=${limit}`);
+    return data;
   },
 
-  // Signals & Data
+  /* =========================
+     SIGNALS & METRICS
+  ========================== */
   async getSignals() {
     try {
-      const response = await api.get('/trades/signals?limit=10');
-      return { signals: response.data.signals || [] };
-    } catch (error) {
-      console.error('Error getting signals:', error);
-      // Return empty signals instead of throwing error
+      const { data } = await api.get('/trades/signals?limit=10');
+      return { signals: data.signals || [] };
+    } catch {
       return { signals: [] };
     }
   },
 
   async getPerformance() {
     try {
-      const response = await api.get('/performance/metrics');
-      
-      console.log('🔍 RAW PERFORMANCE RESPONSE:', response.data); // DEBUG LOG
-      
-      // Validate response structure
-      if (!response.data) {
-        throw new Error('No data received from performance endpoint');
-      }
-      
-      // Log the exact field names received
-      console.log('🔍 AVAILABLE KEYS:', Object.keys(response.data));
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error getting performance:', error);
-      
-      // Return structured fallback data
+      const { data } = await api.get('/performance/metrics');
+      return data;
+    } catch {
       return {
         win_rate: 0,
         pnl: 0,
@@ -100,55 +72,103 @@ export const derivService = {
   },
 
   async getTradingStats() {
-    try {
-      const response = await api.get('/trades/stats/summary');
-      return response.data;
-    } catch (error) {
-      console.error('Error getting trading stats:', error);
-      return {};
-    }
+    const { data } = await api.get('/trades/stats/summary');
+    return data;
   },
 
-  // Additional endpoints
   async getRiskMetrics() {
-    try {
-      const response = await api.get('/risk/metrics');
-      return response.data;
-    } catch (error) {
-      console.error('Error getting risk metrics:', error);
-      return {};
-    }
-  },
-
-  async getBotMetrics() {
-    try {
-      const response = await api.get('/performance/metrics');
-      return response.data;
-    } catch (error) {
-      console.error('Error getting bot metrics:', error);
-      return {};
-    }
+    const { data } = await api.get('/risk/metrics');
+    return data;
   },
 
   async getMarketData() {
-    try {
-      const response = await api.get('/market/data');
-      return response.data;
-    } catch (error) {
-      console.error('Error getting market data:', error);
-      return {};
-    }
+    const { data } = await api.get('/market/data');
+    return data;
   },
 
   async getBalance() {
+    const { data } = await api.get('/balance');
+    return data;
+  },
+
+  /* =========================
+     OAUTH AUTH FLOW (CLEAN)
+  ========================== */
+
+  // ✅ NEW: Fetch OAuth redirect URL from backend
+  async getOAuthRedirectUrl() {
     try {
-      const response = await api.get('/balance');
-      console.log('🔍 Raw balance response:', response.data);  // New: Debug log
-      return response.data;
+      const response = await api.get('/auth/login');
+      return response.data; // { redirect_url }
     } catch (error) {
-      console.error('Error getting balance:', error);
+      console.error('Error getting OAuth redirect URL:', error);
       throw error;
     }
+  },
+
+  // Called AFTER Deriv redirects back with ?code=
+  async handleOAuthCallback(code) {
+    const { data } = await api.post('/auth/callback', { code });
+
+    const { user_id, session_token, access_token } = data;
+
+    if (user_id) localStorage.setItem('user_id', user_id);
+    if (session_token) localStorage.setItem('session_token', session_token);
+    if (access_token)
+      localStorage.setItem('deriv_access_token', access_token);
+
+    return data;
+  },
+
+  async logout() {
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('session_token');
+      localStorage.removeItem('deriv_access_token');
+    }
+  },
+
+  /* =========================
+     USER BOT CONTROL
+  ========================== */
+  async startUserBot() {
+    const user_id = getUserId();
+    const access_token = getAccessToken();
+
+    if (!user_id || !access_token) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data } = await api.post('/user/bot/start', {
+      user_id,
+      oauth_token: access_token
+    });
+
+    return data;
+  },
+
+  async stopUserBot() {
+    const user_id = getUserId();
+
+    if (!user_id) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data } = await api.post('/user/bot/stop', { user_id });
+    return data;
+  },
+
+  async getUserBotStatus() {
+    const user_id = getUserId();
+
+    if (!user_id) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data } = await api.get(`/user/bot/status/${user_id}`);
+    return data;
   }
 };
 

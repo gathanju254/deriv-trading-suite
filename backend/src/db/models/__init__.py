@@ -2,5 +2,6 @@
 from .trade import Trade
 from .contract import Contract  
 from .proposal import Proposal
+from .user import User, UserSession, Commission  # Add these
 
-__all__ = ["Trade", "Contract", "Proposal"]
+__all__ = ["Trade", "Contract", "Proposal", "User", "UserSession", "Commission"]

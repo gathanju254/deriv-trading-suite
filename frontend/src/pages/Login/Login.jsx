@@ -1,30 +1,31 @@
 // frontend/src/pages/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { derivService } from '../../services/derivService';
 import { useToast } from '../../context/ToastContext';
 import { Bot, LogIn } from 'lucide-react';
 import './Login.css';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleDerivLogin = async () => {
     setLoading(true);
-    
     try {
-      await login({ email, password });
-      addToast('Login successful', 'success');
-      navigate('/dashboard');
-    } catch (error) {
-      addToast(error.message || 'Login failed', 'error');
-    } finally {
+      // Call backend: GET /auth/login
+      const { redirect_url } = await derivService.getOAuthRedirectUrl();
+
+      if (!redirect_url) {
+        throw new Error('Missing redirect URL');
+      }
+
+      // HARD redirect to Deriv OAuth
+      window.location.href = redirect_url;
+    } catch (err) {
+      console.error('OAuth redirect failed:', err);
+      addToast('Failed to redirect to Deriv. Try again.', 'error');
       setLoading(false);
     }
   };
@@ -35,58 +36,34 @@ const Login = () => {
         <div className="login-header">
           <Bot size={48} className="login-logo" />
           <h1>Deriv Trading Suite</h1>
-          <p className="login-subtitle">Automated Trading Platform</p>
+          <p className="login-subtitle">
+            Trade smarter. Let the bot cook.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <button type="submit" className="login-button" disabled={loading}>
+        <div className="login-form">
+          <button
+            className="login-button"
+            onClick={handleDerivLogin}
+            disabled={loading}
+          >
             {loading ? (
-              'Logging in...'
+              'Redirecting to Deriv...'
             ) : (
               <>
                 <LogIn size={18} />
-                Sign In
+                Login with Deriv
               </>
             )}
           </button>
 
-          <div className="login-info">
-            <p className="demo-credentials">
-              <strong>Demo Credentials:</strong><br />
-              Email: demo@deriv.com<br />
-              Password: demo123
-            </p>
-            <p className="disclaimer">
-              This is a demo application. Trading involves risk.
-            </p>
-          </div>
-        </form>
+          <p className="login-footer">
+            New here?{' '}
+            <span className="login-link" onClick={handleDerivLogin}>
+              Create an account on Deriv
+            </span>
+          </p>
+        </div>
       </div>
     </div>
   );

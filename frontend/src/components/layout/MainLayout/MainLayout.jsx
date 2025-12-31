@@ -1,27 +1,29 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
+// frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useEffect, useState } from 'react';
+import { Outlet } from 'react-router-dom'; // Add this import
 import Header from '../../../components/Common/Header/Header';
 import Sidebar from '../../../components/Common/Sidebar/Sidebar';
 import Footer from '../Footer/Footer';
 import { useApp } from '../../../context/AppContext';
 import './MainLayout.css';
 
-const MainLayout = ({ children }) => {
+const MainLayout = () => { // Remove children prop
   const { sidebarCollapsed, mobileMenuOpen, toggleMobileMenu } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [contentLoaded, setContentLoaded] = useState(false); // New: For staggered animations
+  const [contentLoaded, setContentLoaded] = useState(false);
 
   // Trigger fade-in on mount with staggered effect
   useEffect(() => {
     setIsLoaded(true);
-    const timer = setTimeout(() => setContentLoaded(true), 300); // Stagger content load
+    const timer = setTimeout(() => setContentLoaded(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
   return (
     <div 
       className={`main-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileMenuOpen ? 'mobile-menu-open' : ''} ${isLoaded ? 'loaded' : ''}`}
-      role="application" // New: Better semantic role
+      role="application"
       aria-label="Main application layout"
     >
       {/* Enhanced skip link for accessibility */}
@@ -40,8 +42,8 @@ const MainLayout = ({ children }) => {
         <div 
           className="mobile-overlay"
           onClick={toggleMobileMenu}
-          onKeyDown={(e) => e.key === 'Escape' && toggleMobileMenu()} // New: Keyboard support
-          tabIndex={-1} // New: Focus management
+          onKeyDown={(e) => e.key === 'Escape' && toggleMobileMenu()}
+          tabIndex={-1}
           aria-hidden="true"
           role="presentation"
         />
@@ -55,7 +57,8 @@ const MainLayout = ({ children }) => {
           role="main" 
           aria-label="Main content area"
         >
-          {children}
+          {/* Use Outlet to render child routes */}
+          <Outlet />
         </main>
         <Footer />
       </div>

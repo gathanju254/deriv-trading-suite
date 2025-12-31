@@ -35,6 +35,8 @@ from src.api.websocket import (
 import numpy as np
 from src.config.settings import settings
 
+# Add import for the new helper (for consistency, though not directly used here)
+from src.utils.helpers import Helpers
 
 class TradingBot:
     def __init__(self):
@@ -307,7 +309,7 @@ class TradingBot:
                 
                 trade_id = await order_executor.place_trade(
                     side=order_side,  # Using CALL/PUT for API
-                    amount=trade_amount,
+                    amount=trade_amount,  # This is the stake amount
                     symbol=settings.SYMBOL
                 )
 

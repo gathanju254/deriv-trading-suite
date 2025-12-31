@@ -42,17 +42,17 @@ class PerformanceTracker:
                 # Get contract profit
                 contract = db.query(Contract).filter(Contract.trade_id == trade.id).first()
                 profit = 0.0
-                if contract and contract.profit is not None:
-                    profit = contract.profit
+                if contract and contract.net_profit is not None:  # Changed from contract.profit
+                    profit = contract.net_profit
                 else:
                     # Estimate profit based on status
-                    profit = trade.amount * 0.95 if trade.status == "WON" else -trade.amount
+                    profit = trade.stake_amount * 0.95 if trade.status == "WON" else -trade.stake_amount
                 
                 self.trades.append({
                     "id": trade.id,
                     "symbol": trade.symbol,
                     "side": trade.side,
-                    "amount": trade.amount,
+                    "amount": trade.stake_amount,
                     "profit": profit,
                     "result": trade.status,
                     "closed_at": trade.created_at  # Use created_at for now
@@ -105,27 +105,24 @@ class PerformanceTracker:
             trade_record = db.query(Trade).filter(Trade.id == trade["id"]).first()
             if trade_record:
                 trade_record.status = trade["result"]
-                # Add an updated_at field if you have one, or use created_at
+                # Also update net_payout if we have profit
+                if "profit" in trade:
+                    trade_record.net_payout = trade_record.stake_amount + trade["profit"]
             
             # Update or create contract record
             contract = db.query(Contract).filter(Contract.trade_id == trade["id"]).first()
             if contract:
                 # Update existing contract
-                contract.profit = trade.get("profit", 0.0)
+                contract.net_profit = trade.get("profit", 0.0)
                 contract.is_sold = True if trade["result"] in ["WON", "LOST"] else False
                 contract.sell_time = datetime.utcnow()
-                if not contract.exit_tick:
-                    # Try to get exit tick from market data if available
-                    from src.core.deriv_api import deriv
-                    # You might need to track this differently
-                    pass
             else:
                 # Create new contract record
                 contract = Contract(
                     id=trade.get("contract_id", f"contract_{trade['id']}"),
                     trade_id=trade["id"],
-                    profit=trade.get("profit", 0.0),
-                    is_sold="1" if trade["result"] in ["WON", "LOST"] else "0",
+                    net_profit=trade.get("profit", 0.0),
+                    is_sold=True if trade["result"] in ["WON", "LOST"] else False,
                     sell_time=datetime.utcnow()
                 )
                 db.add(contract)

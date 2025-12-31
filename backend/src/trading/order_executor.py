@@ -32,6 +32,9 @@ from src.api.websocket import (
     broadcast_balance_update
 )
 
+# Add import for the new helper
+from src.utils.helpers import Helpers
+
 
 class OrderExecutor:
     def __init__(self):
@@ -116,7 +119,7 @@ class OrderExecutor:
                 ProposalRepo.save(Proposal(
                     id=str(proposal_id),
                     trade_id=trade_id,
-                    price=meta["amount"],
+                    price=meta["total_amount"],  # Updated to use total_amount (stake + markup)
                     payout=buy_data.get("payout"),
                 ))
 
@@ -131,7 +134,7 @@ class OrderExecutor:
                     trade_id=trade_id,
                     contract_id=str(contract_id),
                     side=meta["side"],  # RISE / FALL
-                    entry_price=float(meta["amount"]),
+                    entry_price=float(meta["total_amount"]),  # Updated to use total_amount
                 )
 
                 meta["contract_id"] = str(contract_id)
@@ -143,7 +146,7 @@ class OrderExecutor:
                     trade_id=trade_id,
                     entry_tick=None,  # Will be updated later
                     exit_tick=None,   # Will be updated later
-                    profit=0.0,
+                    net_profit=0.0,   # Changed from 'profit=0.0' to 'net_profit=0.0' to match the Contract model
                     is_sold=False
                 )
                 ContractRepo.save(contract)
@@ -156,7 +159,9 @@ class OrderExecutor:
                     "contract_id": str(contract_id),
                     "direction": meta["side"],
                     "status": "ACTIVE",
-                    "amount": meta["amount"],
+                    "stake_amount": meta["stake_amount"],  # Updated key
+                    "markup_amount": meta["markup_amount"],  # Updated key
+                    "total_amount": meta["total_amount"],  # Updated key
                     "timestamp": time.time(),
                     "type": "trade_active"
                 })
@@ -330,9 +335,9 @@ class OrderExecutor:
                     contract.entry_tick = entry_price
                 if exit_price is not None:
                     contract.exit_tick = exit_price
-                contract.profit = profit
-                contract.is_sold = True if result in ["WON", "LOST"] else False  # This is always True when contract is sold
-                contract.sell_time = sell_time  # Now defined!
+                contract.net_profit = profit  # FIXED: Set INSTANCE attribute
+                contract.is_sold = True if result in ["WON", "LOST"] else False
+                contract.sell_time = sell_time
                 
                 # New: Save audit_details for tick history
                 if data.get("audit_details"):
@@ -345,13 +350,13 @@ class OrderExecutor:
         if trade:
             # Pass ACTUAL profit to risk manager, not the stake amount
             actual_profit = profit  # This is already calculated as payout - stake
-            self.risk.update_trade_outcome(result, trade.amount, actual_profit)
+            self.risk.update_trade_outcome(result, trade.stake_amount, actual_profit)  # Updated to use stake_amount
 
             await performance.add_trade({
                 "id": trade_id,
                 "symbol": trade.symbol,
                 "side": direction,
-                "amount": trade.amount,
+                "amount": trade.stake_amount,  # Updated to use stake_amount
                 "profit": profit,
                 "result": result,
                 "closed_at": sell_time,  # Use the same sell_time
@@ -462,10 +467,11 @@ class OrderExecutor:
     async def place_trade(
         self,
         side: str,
-        amount: float,
+        amount: float,  # This is the stake amount (user's intended trade amount)
         symbol: str,
         duration: int = settings.CONTRACT_DURATION,
         duration_unit: str = "t",
+        user_id: str = None,  # Add user_id for multi-user support
     ):
         trade_id = str(uuid.uuid4())
 
@@ -473,13 +479,31 @@ class OrderExecutor:
         deriv_type = self._map_to_deriv_contract_type(side)
         user_side = self._map_from_deriv_contract_type(deriv_type)
 
-        # Create trade in database
+        # Calculate markup based on user or default
+        if user_id and hasattr(deriv, 'get_markup_for_user'):
+            markup_percentage = deriv.get_markup_for_user(user_id)
+        else:
+            markup_percentage = settings.APP_MARKUP_PERCENTAGE
+    
+        markup_amount = amount * (markup_percentage / 100)
+        gross_amount = amount  # The amount user wants to trade
+        net_amount = amount + markup_amount  # Amount actually sent to Deriv
+    
+        # NEW: Round net_amount to 2 decimal places to comply with Deriv API
+        net_amount = round(net_amount, 2)
+        markup_amount = net_amount - amount  # Recalculate markup_amount after rounding
+
+        # Create trade in database with the new schema
         TradeRepo.create(Trade(
             id=trade_id,
+            user_id=user_id,  # Store user_id
             symbol=symbol,
             side=user_side,
-            amount=amount,
             duration=duration,
+            stake_amount=gross_amount,  # Updated to stake_amount
+            markup_percentage=markup_percentage,
+            markup_amount=markup_amount,
+            # gross_payout and net_payout will be populated later when trade settles
             status="PENDING",
         ))
 
@@ -487,19 +511,21 @@ class OrderExecutor:
         await self._broadcast_trade_update({
             "trade_id": trade_id,
             "direction": user_side,
-            "amount": amount,
+            "stake_amount": gross_amount,  # Use original gross_amount for display
+            "markup_amount": round(markup_amount, 2),  # Round for consistency
+            "total_amount": net_amount,  # Now rounded
             "symbol": symbol,
             "status": "PENDING",
             "timestamp": time.time(),
             "type": "trade_placed"
         })
-
-        # Send buy request to Deriv
+    
+        # Send buy request to Deriv with the NET amount (stake + markup)
         await deriv.send({
             "buy": 1,
-            "price": f"{amount:.2f}",
+            "price": Helpers.format_deriv_price(net_amount),  # Already rounds to 2 decimals
             "parameters": {
-                "amount": amount,
+                "amount": net_amount,  # Now rounded to 2 decimals
                 "basis": "stake",
                 "contract_type": deriv_type,
                 "currency": settings.BASE_CURRENCY,
@@ -508,16 +534,19 @@ class OrderExecutor:
                 "symbol": symbol,
             },
         })
-
+    
         self.trades[trade_id] = {
             "side": user_side,
             "deriv_side": deriv_type,
-            "amount": amount,
+            "stake_amount": gross_amount,
+            "markup_amount": round(markup_amount, 2),
+            "total_amount": net_amount,  # Now rounded
+            "user_id": user_id,
             "awaiting_contract": True,
             "consensus_data": {},
         }
-
-        logger.info(f"🚀 Placed {user_side} trade {trade_id} ({deriv_type}) ${amount}")
+    
+        logger.info(f"🚀 Placed {user_side} trade {trade_id} ({deriv_type}) Stake: ${gross_amount:.2f}, Markup: ${round(markup_amount, 2):.2f}, Total: ${net_amount:.2f}")
         return trade_id
 
     # =====================================================

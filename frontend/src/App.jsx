@@ -1,43 +1,125 @@
 // frontend/src/App.jsx
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { TradingProvider } from './context/TradingContext';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from 'react-router-dom';
+
 import { AppProvider } from './context/AppContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { TradingProvider } from './context/TradingContext';
 import { ToastProvider } from './context/ToastContext';
+
 import MainLayout from './components/Layout/MainLayout/MainLayout';
+
 import Dashboard from './pages/Dashboard/Dashboard';
 import Trading from './pages/Trading/Trading';
 import Analytics from './pages/Analytics/Analytics';
 import Settings from './pages/Settings/Settings';
+
 import Login from './pages/Login/Login';
+import OAuthCallback from './pages/OAuthCallback/OAuthCallback';
+
 import './App.css';
 
+/* -------------------------------------------
+   Protected Route (bouncer at the door)
+-------------------------------------------- */
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="app-loading">Loading…</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+};
+
+/* -------------------------------------------
+   Public Route (no reruns for logged-in users)
+-------------------------------------------- */
+const PublicRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="app-loading">Loading…</div>;
+  }
+
+  return user ? <Navigate to="/dashboard" replace /> : children;
+};
+
+/* -------------------------------------------
+   Main Layout Wrapper
+-------------------------------------------- */
+const MainLayoutWrapper = () => {
+  return (
+    <MainLayout>
+      <Outlet /> {/* This renders the child routes */}
+    </MainLayout>
+  );
+};
+
+/* -------------------------------------------
+   App Routes
+-------------------------------------------- */
+const AppRoutes = () => {
+  return (
+    <Routes>
+      {/* Public */}
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        }
+      />
+
+      <Route path="/oauth/callback" element={<OAuthCallback />} />
+
+      {/* Protected routes with MainLayout */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <MainLayoutWrapper />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="trading" element={<Trading />} />
+        <Route path="analytics" element={<Analytics />} />
+        <Route path="settings" element={<Settings />} />
+        {/* Catch-all for any other protected routes */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Route>
+    </Routes>
+  );
+};
+
+/* -------------------------------------------
+   Root App (clean provider stack)
+-------------------------------------------- */
 function App() {
   return (
     <AppProvider>
-      <AuthProvider>
-        <TradingProvider>
-          <ToastProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <TradingProvider>
             <Router>
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/*" element={
-                  <MainLayout>
-                    <Routes>
-                      <Route path="/" element={<Navigate to="/dashboard" />} />
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/trading" element={<Trading />} />
-                      <Route path="/analytics" element={<Analytics />} />
-                      <Route path="/settings" element={<Settings />} />
-                    </Routes>
-                  </MainLayout>
-                } />
-              </Routes>
+              <AppRoutes />
             </Router>
-          </ToastProvider>
-        </TradingProvider>
-      </AuthProvider>
+          </TradingProvider>
+        </AuthProvider>
+      </ToastProvider>
     </AppProvider>
   );
 }

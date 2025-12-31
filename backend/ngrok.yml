@@ -1,0 +1,12 @@
+# ngrok.yml
+version: "2"
+authtoken: 37UxyEuYX99IvhgbWuIql5VXVBY_e6Wyaq8QMMvqKYFRqv3r  # Get from https://dashboard.ngrok.com/get-started/your-authtoken
+tunnels:
+  backend:
+    addr: 8000
+    proto: http
+    host_header: "localhost:8000"
+  frontend:
+    addr: 5173
+    proto: http
+    host_header: "localhost:5173"

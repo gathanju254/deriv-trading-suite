@@ -11,6 +11,8 @@ ta-lib==0.6.8
 ta>=0.11.0
 git+https://github.com/binary-com/python-deriv-api.git
 requests>=2.32.0
+PyJWT[crypto]>=2.10.1
+aiohttp>=3.9.0
 python-dotenv>=1.0.1
 schedule>=1.2.1
 fastapi>=0.100.0

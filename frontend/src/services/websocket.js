@@ -8,24 +8,39 @@ class WebSocketService {
     this.subscribers = new Map();
     this.url = null;
     this.isManualClose = false;
+    this.reconnectTimer = null;
   }
 
   connect(url) {
+    // If no URL provided, use default
+    if (!url) {
+      url = import.meta.env.PROD
+        ? `wss://${window.location.host}/ws`
+        : 'ws://localhost:8000/ws';
+    }
+
     return new Promise((resolve, reject) => {
       try {
         this.url = url;
         this.isManualClose = false;
         
+        // Clear any existing reconnect timer
+        if (this.reconnectTimer) {
+          clearTimeout(this.reconnectTimer);
+          this.reconnectTimer = null;
+        }
+        
+        console.log('🌐 Connecting to WebSocket:', url);
         this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {
-          console.log('WebSocket connected to:', url);
+          console.log('✅ WebSocket connected to:', url);
           this.reconnectAttempts = 0;
           resolve();
         };
 
         this.ws.onclose = (event) => {
-          console.log('WebSocket disconnected:', event.code, event.reason);
+          console.log('❌ WebSocket disconnected:', event.code, event.reason);
           
           // Don't attempt reconnect if manually closed
           if (!this.isManualClose && event.code !== 1000) {
@@ -34,7 +49,7 @@ class WebSocketService {
         };
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
+          console.error('❌ WebSocket error:', error);
           reject(new Error('WebSocket connection failed'));
         };
 
@@ -42,7 +57,7 @@ class WebSocketService {
           this.handleMessage(event.data);
         };
       } catch (error) {
-        console.error('WebSocket connection error:', error);
+        console.error('❌ WebSocket connection error:', error);
         reject(error);
       }
     });
@@ -51,24 +66,28 @@ class WebSocketService {
   handleReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts && this.url) {
       this.reconnectAttempts++;
-      console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      const delay = this.reconnectInterval * Math.pow(1.5, this.reconnectAttempts - 1);
       
-      setTimeout(() => {
+      console.log(`🔄 Attempting to reconnect in ${Math.round(delay/1000)}s... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      
+      this.reconnectTimer = setTimeout(() => {
         if (this.url) {
           this.connect(this.url).catch(error => {
-            console.error('Reconnection failed:', error);
+            console.error('❌ Reconnection failed:', error);
           });
         }
-      }, this.reconnectInterval * Math.pow(1.5, this.reconnectAttempts - 1)); // Exponential backoff
+      }, delay);
     } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.log('Max reconnection attempts reached');
+      console.log('🚫 Max reconnection attempts reached');
     }
   }
 
   handleMessage(data) {
     try {
       const message = JSON.parse(data);
-      console.log('📡 WebSocket message received:', message); // Debug log
+      
+      // Debug logging (optional - comment out in production)
+      // console.log('📡 WebSocket message received:', message);
       
       // Handle both formats: {type, data} or direct payload
       let messageType = message.type;
@@ -78,14 +97,14 @@ class WebSocketService {
       if (!messageType) {
         if (message.symbol && message.quote) messageType = 'tick';
         else if (message.balance !== undefined) messageType = 'balance';
-        else if (message.side) messageType = 'trade';
+        else if (message.side || message.direction) messageType = 'trade';
         else if (message.pnl !== undefined || message.win_rate !== undefined) messageType = 'performance';
-        else if (message.direction) messageType = 'signal';
+        else if (message.direction && !message.side) messageType = 'signal';
         else messageType = 'unknown';
       }
       
-      // Log the inferred type for debugging
-      console.log(`📡 Inferred message type: ${messageType}`);
+      // Debug: Log the inferred type (optional)
+      // console.log(`📡 Inferred message type: ${messageType}`);
       
       // Notify specific type subscribers
       const subscribers = this.subscribers.get(messageType) || [];
@@ -120,7 +139,7 @@ class WebSocketService {
     
     console.log(`📡 Subscribed to ${messageType}, total subscribers: ${this.subscribers.get(messageType).length}`);
     
-    return () => this.unsubscribe(messageType, callback); // Return unsubscribe function
+    return () => this.unsubscribe(messageType, callback);
   }
 
   unsubscribe(messageType, callback) {
@@ -148,11 +167,22 @@ class WebSocketService {
 
   disconnect() {
     this.isManualClose = true;
+    
+    // Clear reconnect timer
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
     if (this.ws) {
       this.ws.close(1000, 'Client disconnected');
       this.ws = null;
     }
+    
+    // Clear all subscribers
     this.subscribers.clear();
+    
+    console.log('👋 WebSocket disconnected');
   }
 
   getConnectionStatus() {
@@ -174,6 +204,19 @@ class WebSocketService {
   // Helper method to get all subscribed types (for debugging)
   getSubscribedTypes() {
     return Array.from(this.subscribers.keys());
+  }
+
+  // New method: check if WebSocket is healthy
+  isHealthy() {
+    return this.ws && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  // New method: force reconnection
+  async forceReconnect() {
+    console.log('🔁 Force reconnecting WebSocket...');
+    this.disconnect();
+    this.isManualClose = false;
+    return this.connect(this.url);
   }
 }
 
