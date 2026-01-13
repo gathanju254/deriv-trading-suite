@@ -79,12 +79,7 @@ const MainLayout = () => {
 
       <Sidebar />
 
-      <div
-        className={`flex-1 flex flex-col transition-all duration-500 ease-out
-        pt-16 md:pt-18
-        ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}
-      >
-
+      <div className={`flex-1 flex flex-col transition-all duration-500 ease-out ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
         {/* Fixed Header Container */}
         <div className="sticky top-0 z-40 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
           <Header />
