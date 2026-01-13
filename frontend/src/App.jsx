@@ -25,8 +25,6 @@ import Settings from './pages/Settings/Settings';
 import Login from './pages/Login/Login';
 import OAuthCallback from './pages/OAuthCallback/OAuthCallback';
 
-//import './App.css';
-
 /* -------------------------------------------
    Protected Route (bouncer at the door)
 -------------------------------------------- */

@@ -2,14 +2,15 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx}"
   ],
   theme: {
     extend: {
       colors: {
         primary: { 50: '#f0f9ff', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' },
         secondary: { 50: '#fef2f2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c' },
-        accent: { 50: '#fefce8', 500: '#f59e0b', 600: '#d97706', 700: '#b45309' }
+        accent: { 50: '#fefce8', 500: '#f59e0b', 600: '#d97706', 700: '#b45309' },
+        bgApp: '#0f172a',
       },
       spacing: { '128': '32rem', '144': '36rem' },
       fontFamily: {
@@ -37,6 +38,6 @@ export default {
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'),
     require('@tailwindcss/aspect-ratio'),
-    //require('@tailwindcss/line-clamp'),
+    //require('@tailwindcss/line-clamp'), // enable if needed
   ],
 };
