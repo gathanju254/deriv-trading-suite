@@ -1,13 +1,13 @@
 /* frontend/src/components/layout/MainLayout/MainLayout.css */
 /* =====================================
-   Main Layout
+   Main Layout Container
 ===================================== */
 .main-layout {
   display: flex;
   min-height: 100vh;
   background-color: #0f172a;
-  transition: all 0.3s ease;
   position: relative;
+  transition: all 0.3s ease;
   opacity: 0;
 }
 
@@ -15,38 +15,45 @@
   opacity: 1;
 }
 
-.sidebar-collapsed .main-content {
-  margin-left: 80px; /* collapsed sidebar width */
-}
-
+/* =====================================
+   Sidebar / Content Interaction
+===================================== */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  transition: all 0.3s ease;
+  transition: margin 0.3s ease;
   margin-left: 250px; /* default sidebar width */
   position: relative;
   min-height: 100vh;
 }
 
+.sidebar-collapsed .main-content {
+  margin-left: 80px; /* collapsed sidebar width */
+}
+
+/* =====================================
+   Inner Content Area
+===================================== */
 .content-area {
   flex: 1;
   padding: 1.5rem;
   transition: all 0.3s ease;
 }
 
-/* Mobile menu overlay */
+/* =====================================
+   Mobile Overlay
+===================================== */
 .mobile-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(15, 23, 42, 0.8);
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.85);
   z-index: 20;
 }
 
-/* Skip link for accessibility */
+/* =====================================
+   Accessibility Skip Link
+===================================== */
 .skip-link {
   position: absolute;
   top: -40px;
@@ -65,7 +72,9 @@
   opacity: 1;
 }
 
-/* Fade-in for content */
+/* =====================================
+   Animations (Local)
+===================================== */
 .fade-in {
   animation: fadeIn 0.5s ease-in-out forwards;
 }
@@ -85,7 +94,9 @@
   to { transform: translateX(0); opacity: 1; }
 }
 
-/* Responsive adjustments */
+/* =====================================
+   Responsive Adjustments
+===================================== */
 @media (max-width: 1024px) {
   .main-content {
     margin-left: 200px;

@@ -1,39 +1,33 @@
 /* frontend/src/components/Common/Sidebar/Sidebar.css */
 /* =====================================
-   Sidebar (Animated & Unified)
+   Sidebar Container
 ===================================== */
-
 .sidebar {
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
-
   width: 250px;
-  background-color: #0f172a; /* SAME as header */
+  background-color: #0f172a;
   border-right: 1px solid #1e293b;
-
   display: flex;
   flex-direction: column;
-
   transform: translateX(0);
   transition:
     width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
     transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-
   z-index: 20;
   will-change: width, transform;
 }
 
 /* ===============================
-   Collapsed (Desktop)
+   Collapsed State (Desktop)
 ================================ */
-
 .sidebar.collapsed {
   width: 80px;
 }
 
-/* Hide labels smoothly (JSX already removed them, this is for polish) */
+/* Hide labels and text smoothly */
 .sidebar.collapsed .nav-label,
 .sidebar.collapsed .logo-text,
 .sidebar.collapsed .balance-text {
@@ -42,7 +36,7 @@
   pointer-events: none;
 }
 
-/* Center icons perfectly when collapsed */
+/* Center icons when collapsed */
 .sidebar.collapsed .nav-link {
   justify-content: center;
   gap: 0;
@@ -53,15 +47,13 @@
   transform: scale(1.05);
 }
 
-/* Center logo icon */
 .sidebar.collapsed .logo {
   justify-content: center;
 }
 
 /* ===============================
-   Mobile behavior
+   Mobile Behavior
 ================================ */
-
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
@@ -72,16 +64,15 @@
     transform: translateX(0);
   }
 
-  /* Collapse disabled on mobile */
+  /* Disable collapse on mobile */
   .sidebar.collapsed {
     width: 250px;
   }
 }
 
 /* ===============================
-   Header
+   Sidebar Header / Logo
 ================================ */
-
 .sidebar-header {
   height: 60px;
   display: flex;
@@ -107,7 +98,6 @@
 /* ===============================
    Navigation
 ================================ */
-
 .sidebar-nav {
   flex: 1;
   margin-top: 1rem;
@@ -124,13 +114,10 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-
   padding: 0.75rem 1rem;
   border-radius: 10px;
-
   color: #94a3b8;
   font-size: 0.875rem;
-
   transition:
     background 0.2s ease,
     color 0.2s ease,
@@ -154,16 +141,14 @@
 }
 
 /* ===============================
-   Footer (Balance)
+   Footer / Balance
 ================================ */
-
 .sidebar-footer {
   padding: 0.75rem 1.25rem;
   border-top: 1px solid #1e293b;
   background-color: #0f172a;
 }
 
-/* Keep balance always visible on mobile */
 @media (max-width: 768px) {
   .sidebar-footer {
     position: sticky;
@@ -187,7 +172,6 @@
 /* ===============================
    Overlay (Mobile)
 ================================ */
-
 .sidebar-overlay {
   position: fixed;
   inset: 0;
@@ -202,9 +186,8 @@
 }
 
 /* ===============================
-   Reduced Motion
+   Accessibility & Reduced Motion
 ================================ */
-
 @media (prefers-reduced-motion: reduce) {
   .sidebar,
   .nav-link,

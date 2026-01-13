@@ -1,16 +1,19 @@
 /* frontend/src/components/Common/Header/Header.css */
-/* Header */
+/* =====================================
+   Header Container
+===================================== */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   height: 60px;
-  background: #0f172a;
+  background-color: #0f172a;
   padding: 0 1rem;
   border-bottom: 1px solid #1e293b;
   position: sticky;
   top: 0;
   z-index: 20;
+  transition: background 0.3s ease;
 }
 
 /* Left & Right */
@@ -21,7 +24,7 @@
   gap: 0.75rem;
 }
 
-/* Menu Button */
+/* Menu Toggle Button */
 .menu-button {
   background: none;
   border: none;
@@ -29,13 +32,15 @@
   cursor: pointer;
   padding: 0.5rem;
   border-radius: 6px;
+  transition: background 0.2s ease, transform 0.15s ease;
 }
 
 .menu-button:hover {
   background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
 }
 
-/* Icon Buttons */
+/* Icon Buttons (Notifications) */
 .icon-button {
   background: none;
   border: none;
@@ -44,13 +49,15 @@
   border-radius: 6px;
   cursor: pointer;
   position: relative;
+  transition: background 0.2s ease, transform 0.15s ease;
 }
 
 .icon-button:hover {
   background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
 }
 
-/* Notification badge */
+/* Notification Badge */
 .notification-badge {
   position: absolute;
   top: 4px;
@@ -63,9 +70,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: white;
+  font-weight: 600;
 }
 
-/* Status dots */
+/* Status Dots */
 .header-status {
   display: flex;
   gap: 8px;
@@ -75,9 +84,12 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  transition: background 0.3s ease;
 }
 
-/* Profile */
+/* =====================================
+   Profile Menu
+===================================== */
 .profile-container {
   position: relative;
 }
@@ -90,8 +102,17 @@
   border: none;
   color: #f8fafc;
   cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.2s ease, transform 0.15s ease;
 }
 
+.profile-button:hover {
+  background: rgba(59, 130, 246, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Avatar */
 .avatar,
 .dropdown-avatar {
   background: #3b82f6;
@@ -106,14 +127,16 @@
 .avatar {
   width: 32px;
   height: 32px;
+  font-size: 0.875rem;
 }
 
 .dropdown-avatar {
   width: 40px;
   height: 40px;
+  font-size: 1rem;
 }
 
-/* Dropdown */
+/* Dropdown Menu */
 .profile-dropdown {
   position: absolute;
   right: 0;
@@ -124,6 +147,7 @@
   width: 220px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
   z-index: 30;
+  animation: fadeIn 0.25s ease forwards;
 }
 
 .dropdown-header {
@@ -136,9 +160,12 @@
 .dropdown-item {
   padding: 10px 12px;
   display: flex;
+  align-items: center;
   gap: 8px;
   cursor: pointer;
   color: #f8fafc;
+  border-radius: 6px;
+  transition: background 0.2s ease;
 }
 
 .dropdown-item:hover {
@@ -153,9 +180,17 @@
   text-align: left;
 }
 
-/* =========================
-   Mobile (FINAL, CLEAN)
-========================= */
+/* =====================================
+   Keyframes
+===================================== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =====================================
+   Mobile Responsive
+===================================== */
 @media (max-width: 768px) {
   .header {
     padding: 0 0.75rem;
@@ -166,8 +201,6 @@
   }
 
   .header-right {
-    display: flex;
-    align-items: center;
     gap: 0.5rem;
     justify-content: flex-end;
   }
@@ -177,5 +210,19 @@
     left: auto;
     width: 90vw;
     max-width: 280px;
+  }
+}
+
+/* =====================================
+   Reduced Motion Accessibility
+===================================== */
+@media (prefers-reduced-motion: reduce) {
+  .menu-button,
+  .icon-button,
+  .profile-button,
+  .profile-dropdown,
+  .status-dot {
+    transition: none !important;
+    animation: none !important;
   }
 }
