@@ -1,14 +1,7 @@
 // frontend/src/components/Common/Sidebar/Sidebar.jsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Home, 
-  TrendingUp, 
-  BarChart3, 
-  Settings,
-  Bot,
-  Wallet
-} from 'lucide-react';
+import { Home, TrendingUp, BarChart3, Settings, Bot, Wallet } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
 import './Sidebar.css';
@@ -25,44 +18,37 @@ const Sidebar = () => {
   ];
 
   const handleNavClick = () => {
-    if (window.innerWidth <= 768) {
-      toggleMobileMenu();
-    }
+    if (window.innerWidth <= 768) toggleMobileMenu();
   };
 
-  // New: Handle keyboard events for accessibility (close on Escape)
   const handleKeyDown = (e) => {
-    if (e.key === 'Escape' && mobileMenuOpen) {
-      toggleMobileMenu();
-    }
+    if (e.key === 'Escape' && mobileMenuOpen) toggleMobileMenu();
   };
 
   return (
     <>
-      {/* Mobile overlay - enhanced for better interaction */}
+      {/* Mobile overlay */}
       {mobileMenuOpen && (
-        <div 
+        <div
           className="sidebar-overlay"
           onClick={toggleMobileMenu}
-          onKeyDown={handleKeyDown} // New: Keyboard support
-          tabIndex={-1} // New: Focus management
+          onKeyDown={handleKeyDown}
+          tabIndex={-1}
           aria-hidden="true"
           role="presentation"
         />
       )}
 
-      <aside 
+      <aside
         className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}
-        role="navigation" // New: Semantic role for accessibility
+        role="navigation"
         aria-label="Main navigation"
-        onKeyDown={handleKeyDown} // New: Keyboard support on sidebar
+        onKeyDown={handleKeyDown}
       >
         <div className="sidebar-header">
           <div className="logo">
             <Bot size={32} />
-            {!sidebarCollapsed && (
-              <span className="logo-text">Deriv Suite</span>
-            )}
+            {!sidebarCollapsed && <span className="logo-text">Deriv Suite</span>}
           </div>
         </div>
 
@@ -74,16 +60,12 @@ const Sidebar = () => {
                 <li key={item.path}>
                   <NavLink
                     to={item.path}
-                    className={({ isActive }) => 
-                      `nav-link ${isActive ? 'active' : ''}`
-                    }
+                    className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                     onClick={handleNavClick}
-                    aria-label={`Navigate to ${item.label}`} // New: ARIA label for links
+                    aria-label={`Navigate to ${item.label}`}
                   >
                     <Icon size={20} />
-                    {!sidebarCollapsed && (
-                      <span className="nav-label">{item.label}</span>
-                    )}
+                    {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
                   </NavLink>
                 </li>
               );
@@ -94,9 +76,7 @@ const Sidebar = () => {
         <div className="sidebar-footer">
           <div className="balance-widget">
             <Wallet size={16} />
-            {!sidebarCollapsed && (
-              <span className="balance-text">{`$${balance.toFixed(2)}`}</span>
-            )}
+            {!sidebarCollapsed && <span className="balance-text">{`$${balance.toFixed(2)}`}</span>}
           </div>
         </div>
       </aside>

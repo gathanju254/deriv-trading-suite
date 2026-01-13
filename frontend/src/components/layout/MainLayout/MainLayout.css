@@ -8,6 +8,7 @@
   background-color: #0f172a;
   transition: all 0.3s ease;
   position: relative;
+  opacity: 0;
 }
 
 .main-layout.loaded {
@@ -15,7 +16,7 @@
 }
 
 .sidebar-collapsed .main-content {
-  margin-left: 80px;
+  margin-left: 80px; /* collapsed sidebar width */
 }
 
 .main-content {
@@ -25,11 +26,13 @@
   transition: all 0.3s ease;
   margin-left: 250px; /* default sidebar width */
   position: relative;
+  min-height: 100vh;
 }
 
 .content-area {
   flex: 1;
   padding: 1.5rem;
+  transition: all 0.3s ease;
 }
 
 /* Mobile menu overlay */
@@ -53,11 +56,13 @@
   padding: 8px 16px;
   border-radius: 4px;
   z-index: 50;
-  transition: top 0.3s ease;
+  transition: top 0.3s ease, opacity 0.3s ease;
+  opacity: 0.9;
 }
 
 .skip-link:focus {
   top: 8px;
+  opacity: 1;
 }
 
 /* Fade-in for content */
@@ -69,6 +74,7 @@
   animation: slideInLeft 0.5s ease forwards;
 }
 
+/* Keyframes */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -80,6 +86,12 @@
 }
 
 /* Responsive adjustments */
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 200px;
+  }
+}
+
 @media (max-width: 768px) {
   .main-content {
     margin-left: 0;
