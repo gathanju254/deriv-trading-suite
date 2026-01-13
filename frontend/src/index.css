@@ -4,12 +4,13 @@
 @tailwind utilities;
 
 /* =====================================
-   Base Styles
+   Base Reset & Typography
 ===================================== */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  color-scheme: dark;
 }
 
 * {
@@ -18,12 +19,16 @@
   box-sizing: border-box;
 }
 
+/* =====================================
+   Body & Root
+===================================== */
 body {
-  margin: 0;
   min-width: 320px;
   min-height: 100vh;
   background-color: #0f172a;
   color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -32,7 +37,7 @@ body {
 }
 
 /* =====================================
-   Scrollbar
+   Scrollbar (Global – Single Source)
 ===================================== */
 ::-webkit-scrollbar {
   width: 6px;
@@ -52,35 +57,26 @@ body {
 }
 
 /* =====================================
-   Toast Animations
+   Animations (Shared System-wide)
 ===================================== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes slideInRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes slideOutRight {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
 }
 
 /* =====================================
    Toast System
 ===================================== */
-
-/* Toast container */
 .toast-container {
   position: fixed;
   bottom: 24px;
@@ -92,7 +88,6 @@ body {
   max-width: 400px;
 }
 
-/* Toast base */
 .toast {
   background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   border: 1px solid #374151;
@@ -101,13 +96,13 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   animation: slideInRight 0.3s ease-out;
 }
 
 .toast span {
-  color: #f8fafc;
   font-size: 0.875rem;
+  color: #f8fafc;
   flex: 1;
 }
 
@@ -115,39 +110,40 @@ body {
   background: none;
   border: none;
   color: #94a3b8;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   cursor: pointer;
-  padding: 0 8px;
-  transition: color 0.2s;
+  transition: color 0.2s ease;
 }
 
 .toast button:hover {
   color: #f8fafc;
 }
 
-/* Toast types */
-.toast.toast-success {
-  border-left: 4px solid #10b981;
-}
+.toast-success { border-left: 4px solid #10b981; }
+.toast-error   { border-left: 4px solid #ef4444; }
+.toast-info    { border-left: 4px solid #3b82f6; }
+.toast-warning { border-left: 4px solid #f59e0b; }
 
-.toast.toast-error {
-  border-left: 4px solid #ef4444;
-}
-
-.toast.toast-info {
-  border-left: 4px solid #3b82f6;
-}
-
-.toast.toast-warning {
-  border-left: 4px solid #f59e0b;
-}
-
-/* Exit animation */
 .toast-exit {
   animation: slideOutRight 0.3s ease-in forwards;
 }
 
-/* Extra utility */
-.z-9999 {
-  z-index: 1050;
+/* =====================================
+   Accessibility
+===================================== */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* =====================================
+   Reduced Motion
+===================================== */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
