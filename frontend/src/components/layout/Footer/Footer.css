@@ -1,1 +1,13 @@
-/* frontend/src/components/Layout/Footer/Footer.css */
+/* frontend/src/components/layout/Footer/Footer.css */
+@keyframes gradient-border {
+  0%, 100% {
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    border-color: rgba(139, 92, 246, 0.5);
+  }
+}
+
+.animate-gradient-border {
+  animation: gradient-border 3s ease-in-out infinite;
+}
