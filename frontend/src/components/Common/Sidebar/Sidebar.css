@@ -33,13 +33,29 @@
   width: 80px;
 }
 
-/* Fade + slide labels when collapsing */
+/* Hide labels smoothly (JSX already removed them, this is for polish) */
 .sidebar.collapsed .nav-label,
 .sidebar.collapsed .logo-text,
 .sidebar.collapsed .balance-text {
   opacity: 0;
   transform: translateX(-8px);
   pointer-events: none;
+}
+
+/* Center icons perfectly when collapsed */
+.sidebar.collapsed .nav-link {
+  justify-content: center;
+  gap: 0;
+  padding: 0.75rem 0;
+}
+
+.sidebar.collapsed .nav-link:hover {
+  transform: scale(1.05);
+}
+
+/* Center logo icon */
+.sidebar.collapsed .logo {
+  justify-content: center;
 }
 
 /* ===============================
@@ -56,6 +72,7 @@
     transform: translateX(0);
   }
 
+  /* Collapse disabled on mobile */
   .sidebar.collapsed {
     width: 250px;
   }
@@ -94,6 +111,7 @@
 .sidebar-nav {
   flex: 1;
   margin-top: 1rem;
+  overflow-y: auto;
 }
 
 .sidebar-nav ul {
@@ -136,12 +154,22 @@
 }
 
 /* ===============================
-   Footer
+   Footer (Balance)
 ================================ */
 
 .sidebar-footer {
-  padding: 1rem 1.25rem;
+  padding: 0.75rem 1.25rem;
   border-top: 1px solid #1e293b;
+  background-color: #0f172a;
+}
+
+/* Keep balance always visible on mobile */
+@media (max-width: 768px) {
+  .sidebar-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+  }
 }
 
 .balance-widget {

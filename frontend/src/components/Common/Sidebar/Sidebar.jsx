@@ -40,7 +40,7 @@ const Sidebar = () => {
         <div className="sidebar-header">
           <div className="logo">
             <Bot size={30} />
-            <span className="logo-text">Deriv Suite</span>
+            {!sidebarCollapsed && <span className="logo-text">Deriv Suite</span>}
           </div>
         </div>
 
@@ -54,7 +54,9 @@ const Sidebar = () => {
                   onClick={handleNavClick}
                 >
                   <Icon size={20} />
-                  <span className="nav-label">{label}</span>
+                  {!sidebarCollapsed && (
+                    <span className="nav-label">{label}</span>
+                  )}
                 </NavLink>
               </li>
             ))}
@@ -64,7 +66,9 @@ const Sidebar = () => {
         <div className="sidebar-footer">
           <div className="balance-widget">
             <Wallet size={16} />
-            <span className="balance-text">${balance.toFixed(2)}</span>
+            {!sidebarCollapsed && (
+              <span className="balance-text">${balance.toFixed(2)}</span>
+            )}
           </div>
         </div>
       </aside>
@@ -73,4 +77,3 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
-
