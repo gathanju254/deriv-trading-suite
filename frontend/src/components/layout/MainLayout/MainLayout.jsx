@@ -1,8 +1,9 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
+// frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import Header from '../../Common/Header/Header';
-import Sidebar from '../../Common/Sidebar/Sidebar';
+import Header from '../../common/Header/Header';
+import Sidebar from '../../common/Sidebar/Sidebar';
 import Footer from '../../layout/Footer/Footer';
 import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
@@ -14,29 +15,25 @@ const MainLayout = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
   const location = useLocation();
-  
-  // Get page title from route
-  const getPageTitle = () => {
-    const path = location.pathname;
-    if (path === '/dashboard') return 'Dashboard';
-    if (path === '/trading') return 'Live Trading';
-    if (path === '/analytics') return 'Analytics';
-    if (path === '/settings') return 'Settings';
-    return 'Deriv Trading Suite';
-  };
 
+  // Map routes to page titles
+  const PAGE_TITLES = {
+    '/dashboard': 'Dashboard',
+    '/trading': 'Live Trading',
+    '/analytics': 'Analytics',
+    '/settings': 'Settings',
+  };
+  const pageTitle = PAGE_TITLES[location.pathname] || 'Deriv Trading Suite';
+
+  // Handle initial load animation & refresh data on route change
   useEffect(() => {
-    // Initial load animation
     const timer = setTimeout(() => setIsLoaded(true), 100);
-    
-    // Refresh data on route change
     refreshAllData();
-    
     return () => clearTimeout(timer);
   }, [location.pathname, refreshAllData]);
 
+  // Show/hide loading overlay
   useEffect(() => {
-    // Show loading indicator when data is loading
     if (loading) {
       setShowLoading(true);
     } else {
@@ -47,14 +44,15 @@ const MainLayout = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-gray-100 overflow-hidden">
-      {/* Loading overlay */}
+
+      {/* Loading Overlay */}
       {showLoading && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="relative">
             <div className="w-16 h-16 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-sm font-medium text-gray-300">Loading...</span>
-            </div>
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-gray-300">
+              Loading...
+            </span>
           </div>
         </div>
       )}
@@ -68,27 +66,27 @@ const MainLayout = () => {
         ${isLoaded ? 'opacity-100' : 'opacity-0'}
         ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}
       `}>
+
         {/* Header */}
         <Header />
 
-        {/* Breadcrumb */}
+        {/* Breadcrumb & Page Title */}
         <div className="px-6 py-3 border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
           <div className="max-w-7xl mx-auto">
-            <nav className="flex items-center gap-2 text-sm">
-              <span className="text-gray-400">Home</span>
+            <nav className="flex items-center gap-2 text-sm text-gray-400">
+              <span>Home</span>
               <span className="text-gray-600">/</span>
-              <span className="font-medium text-gray-300">{getPageTitle()}</span>
+              <span className="font-medium text-gray-300">{pageTitle}</span>
             </nav>
             <h1 className="text-2xl font-bold mt-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              {getPageTitle()}
+              {pageTitle}
             </h1>
           </div>
         </div>
 
-        {/* Main content area */}
+        {/* Main Content Area */}
         <main className="flex-1 p-4 md:p-6 overflow-auto custom-scrollbar">
           <div className="max-w-7xl mx-auto">
-            {/* Content wrapper with glass effect */}
             <div className={`
               bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm
               border border-gray-800 rounded-2xl shadow-2xl overflow-hidden
@@ -104,10 +102,10 @@ const MainLayout = () => {
         <Footer />
       </div>
 
-      {/* Mobile menu backdrop */}
+      {/* Mobile Menu Backdrop */}
       {mobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm z-30 md:hidden transition-opacity duration-300"
+          className="fixed inset-0 z-30 md:hidden bg-black/70 backdrop-blur-sm transition-opacity duration-300"
           onClick={toggleMobileMenu}
         />
       )}

@@ -1,4 +1,5 @@
 // frontend/src/components/Common/Sidebar/Sidebar.jsx
+// frontend/src/components/common/Sidebar/Sidebar.jsx
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -12,8 +13,7 @@ import {
   ChevronRight,
   Users,
   Shield,
-  Zap,
-  Clock
+  Clock,
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
@@ -28,7 +28,7 @@ const Sidebar = () => {
   const [activeTooltip, setActiveTooltip] = useState(null);
   const [balanceAnimation, setBalanceAnimation] = useState(false);
 
-  // Trigger balance animation when balance changes
+  // Animate balance when it changes
   useEffect(() => {
     if (balance > 0) {
       setBalanceAnimation(true);
@@ -37,6 +37,7 @@ const Sidebar = () => {
     }
   }, [balance]);
 
+  // Define menu categories & items
   const menuItems = [
     {
       category: 'Trading',
@@ -44,7 +45,7 @@ const Sidebar = () => {
         { path: '/dashboard', icon: Home, label: 'Dashboard', badge: null },
         { path: '/trading', icon: TrendingUp, label: 'Live Trading', badge: botStatus === 'running' ? 'Live' : null },
         { path: '/analytics', icon: BarChart3, label: 'Analytics', badge: null },
-      ]
+      ],
     },
     {
       category: 'Management',
@@ -53,8 +54,8 @@ const Sidebar = () => {
         { path: '/users', icon: Users, label: 'Users', badge: null },
         { path: '/security', icon: Shield, label: 'Security', badge: null },
         { path: '/settings', icon: Settings, label: 'Settings', badge: null },
-      ]
-    }
+      ],
+    },
   ];
 
   const getStatusColor = (status) => {
@@ -63,7 +64,7 @@ const Sidebar = () => {
       case 'connected': return 'bg-gradient-to-r from-blue-500 to-cyan-600';
       case 'disconnected': return 'bg-gradient-to-r from-red-500 to-pink-600';
       case 'connecting': return 'bg-gradient-to-r from-yellow-500 to-orange-600';
-      default: return 'bg-gradient-to-r from-gray-500 to-gray-600';
+      default: return 'bg-gray-500';
     }
   };
 
@@ -76,17 +77,18 @@ const Sidebar = () => {
       {/* Mobile overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm z-40 transition-opacity duration-300"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 transition-opacity duration-300"
           onClick={toggleMobileMenu}
         />
       )}
 
-      {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full bg-gradient-to-b from-gray-900 to-gray-950 text-gray-200 shadow-2xl z-50 transition-all duration-300 ease-in-out
+        className={`
+          fixed top-0 left-0 h-full z-50 bg-gradient-to-b from-gray-900 to-gray-950
+          shadow-2xl transition-all duration-300 ease-in-out border-r border-gray-800
           ${sidebarCollapsed ? 'w-20' : 'w-64'}
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-          border-r border-gray-800`}
+        `}
       >
         {/* Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-800">
@@ -109,7 +111,6 @@ const Sidebar = () => {
             )}
           </div>
           
-          {/* Collapse button */}
           {!sidebarCollapsed && (
             <button
               onClick={toggleSidebar}
@@ -132,7 +133,6 @@ const Sidebar = () => {
                   </span>
                 </div>
               )}
-              
               <ul className="space-y-1">
                 {category.items.map(({ path, icon: Icon, label, badge }) => {
                   const isActive = location.pathname === path;
@@ -141,27 +141,24 @@ const Sidebar = () => {
                       <NavLink
                         to={path}
                         onClick={handleNavClick}
+                        onMouseEnter={() => setActiveTooltip(label)}
+                        onMouseLeave={() => setActiveTooltip(null)}
                         className={({ isActive }) => `
                           group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
                           ${isActive 
-                            ? 'bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-l-2 border-blue-500 text-white' 
-                            : 'hover:bg-gray-800/50 text-gray-300'
-                          }
+                            ? 'bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-l-2 border-blue-500 text-white'
+                            : 'hover:bg-gray-800/50 text-gray-300'}
                           ${sidebarCollapsed ? 'justify-center' : ''}
                         `}
-                        onMouseEnter={() => setActiveTooltip(label)}
-                        onMouseLeave={() => setActiveTooltip(null)}
                       >
                         <div className={`
                           p-2 rounded-lg transition-all duration-200
                           ${isActive 
-                            ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg' 
-                            : 'bg-gray-800 group-hover:bg-gray-700'
-                          }
+                            ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg'
+                            : 'bg-gray-800 group-hover:bg-gray-700'}
                         `}>
                           <Icon size={20} />
                         </div>
-                        
                         {!sidebarCollapsed && (
                           <>
                             <span className="flex-1 font-medium">{label}</span>
@@ -172,8 +169,7 @@ const Sidebar = () => {
                             )}
                           </>
                         )}
-                        
-                        {/* Tooltip for collapsed state */}
+
                         {sidebarCollapsed && activeTooltip === label && (
                           <div className="absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-xl border border-gray-700 whitespace-nowrap z-50">
                             {label}
@@ -189,9 +185,9 @@ const Sidebar = () => {
           ))}
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-gray-800 p-4">
-          {/* Connection Status */}
+        {/* Footer: Balance & WebSocket */}
+        <div className="border-t border-gray-800 p-4 relative">
+          {/* WebSocket status */}
           <div className={`flex items-center gap-3 mb-4 p-3 rounded-xl bg-gray-900/50 ${sidebarCollapsed ? 'justify-center' : ''}`}>
             <div className="relative">
               <div className={`w-3 h-3 rounded-full ${getStatusColor(wsConnectionStatus)} animate-pulse`} />
@@ -208,8 +204,7 @@ const Sidebar = () => {
           {/* Balance */}
           <div className={`
             flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-gray-900 to-gray-800
-            ${sidebarCollapsed ? 'justify-center' : ''}
-            ${balanceAnimation ? 'animate-pulse-once' : ''}
+            ${sidebarCollapsed ? 'justify-center' : ''} ${balanceAnimation ? 'animate-pulse-once' : ''}
           `}>
             <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-700 shadow-lg">
               <Wallet size={18} className="text-white" />
@@ -224,7 +219,7 @@ const Sidebar = () => {
             )}
           </div>
 
-          {/* Expand button for collapsed state */}
+          {/* Expand button */}
           {sidebarCollapsed && (
             <button
               onClick={toggleSidebar}
