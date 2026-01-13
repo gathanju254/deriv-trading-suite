@@ -1,7 +1,7 @@
 // frontend/src/components/layout/Footer/Footer.jsx
 import React, { useState, useEffect } from 'react';
 import { useTrading } from '../../../hooks/useTrading';
-import { Activity, TrendingUp, TrendingDown } from 'lucide-react';
+import { Activity, TrendingUp, TrendingDown, Clock } from 'lucide-react';
 
 const Footer = () => {
   const { botStatus, wsConnectionStatus, marketData, performance } = useTrading();
@@ -35,22 +35,22 @@ const Footer = () => {
     `${type === 'bot' ? 'Bot' : 'WebSocket'}: ${status.charAt(0).toUpperCase() + status.slice(1)}`;
 
   return (
-    <footer className="bg-gray-900 border-t border-gray-800 px-6 py-3 md:px-12 shadow-lg animate-fade-in">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+    <footer className="bg-gradient-to-r from-gray-900 to-gray-800 border-t border-gray-700/50 px-6 py-4 md:px-12 shadow-xl animate-fade-in">
+      <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
         {/* Left: Copyright and Status */}
-        <div className="flex flex-col md:flex-row items-center gap-4">
-          <p className="text-gray-400 text-sm">&copy; 2024 Deriv Trading Suite. All rights reserved.</p>
+        <div className="flex flex-col md:flex-row items-center gap-6">
+          <p className="text-gray-400 text-sm font-medium">&copy; 2024 Deriv Trading Suite. All rights reserved.</p>
 
-          {/* Status indicators */}
-          <div className="flex items-center gap-4">
+          {/* Enhanced Status indicators */}
+          <div className="flex items-center gap-6">
             {/* Bot status */}
             <div
-              className="flex items-center gap-2 cursor-help"
+              className="flex items-center gap-3 cursor-help"
               title={getStatusTitle('bot', botStatus)}
             >
-              <span className="text-gray-400 text-xs font-semibold uppercase">Bot:</span>
+              <span className="text-gray-400 text-xs font-semibold uppercase tracking-wide">Bot:</span>
               <span
-                className={`w-3 h-3 rounded-full ${getStatusColor('bot', botStatus)} ${
+                className={`w-4 h-4 rounded-full ${getStatusColor('bot', botStatus)} shadow-lg ${
                   botStatus === 'running' ? 'animate-pulse-slow' : ''
                 }`}
               />
@@ -58,45 +58,46 @@ const Footer = () => {
 
             {/* WebSocket status */}
             <div
-              className="flex items-center gap-2 cursor-help"
+              className="flex items-center gap-3 cursor-help"
               title={getStatusTitle('ws', wsConnectionStatus)}
             >
-              <span className="text-gray-400 text-xs font-semibold uppercase">WS:</span>
+              <span className="text-gray-400 text-xs font-semibold uppercase tracking-wide">WS:</span>
               <span
-                className={`w-3 h-3 rounded-full ${getStatusColor('ws', wsConnectionStatus)} ${
+                className={`w-4 h-4 rounded-full ${getStatusColor('ws', wsConnectionStatus)} shadow-lg ${
                   wsConnectionStatus === 'connected' ? 'animate-pulse-slow' : ''
                 }`}
               />
             </div>
 
             {/* Uptime */}
-            <div className="text-gray-400 text-xs font-mono" title="Application uptime">
-              Uptime: {formatUptime(uptime)}
+            <div className="flex items-center gap-3" title="Application uptime">
+              <Clock className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-400 text-sm font-mono">{formatUptime(uptime)}</span>
             </div>
           </div>
         </div>
 
-        {/* Center: Quick Stats */}
-        <div className="hidden md:flex items-center gap-6 text-sm">
-          <div className="flex items-center gap-1" title="Total Profit">
+        {/* Center: Enhanced Quick Stats */}
+        <div className="hidden md:flex items-center gap-8 text-sm">
+          <div className="flex items-center gap-2" title="Total Profit">
             <TrendingUp size={16} className="text-green-400" />
-            <span className="text-gray-300">${performance?.total_profit?.toFixed(2) || '0.00'}</span>
+            <span className="text-gray-300 font-semibold">${performance?.total_profit?.toFixed(2) || '0.00'}</span>
           </div>
-          <div className="flex items-center gap-1" title="Win Rate">
+          <div className="flex items-center gap-2" title="Win Rate">
             <Activity size={16} className="text-primary" />
-            <span className="text-gray-300">{performance?.win_rate?.toFixed(1) || '0.0'}%</span>
+            <span className="text-gray-300 font-semibold">{performance?.win_rate?.toFixed(1) || '0.0'}%</span>
           </div>
-          <div className="flex items-center gap-1" title="Active Trades">
+          <div className="flex items-center gap-2" title="Active Trades">
             <TrendingDown size={16} className="text-accent" />
-            <span className="text-gray-300">{performance?.active_trades || 0}</span>
+            <span className="text-gray-300 font-semibold">{performance?.active_trades || 0}</span>
           </div>
         </div>
 
         {/* Right: Version and Symbol */}
-        <div className="flex items-center gap-4">
-          <span className="text-gray-500 text-sm font-mono" title="App Version">v1.0.0</span>
+        <div className="flex items-center gap-6">
+          <span className="text-gray-500 text-sm font-mono tracking-wide" title="App Version">v1.0.0</span>
           {marketData?.symbol && (
-            <span className="text-gray-400 text-sm font-mono" title="Trading Symbol">• Trading: {marketData.symbol}</span>
+            <span className="text-gray-400 text-sm font-mono tracking-wide" title="Trading Symbol">• Trading: {marketData.symbol}</span>
           )}
         </div>
       </div>

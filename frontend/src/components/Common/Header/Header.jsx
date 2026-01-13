@@ -1,18 +1,6 @@
 // frontend/src/components/Common/Header/Header.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  Bell,
-  Menu,
-  ChevronDown,
-  Sun,
-  Moon,
-  LogOut,
-  User,
-  Settings,
-  Shield,
-  Zap, // Quick action icon
-} from 'lucide-react';
-
+import { Bell, Menu, ChevronDown, Sun, Moon, LogOut, User, Settings, Shield, Zap } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useTrading } from '../../../hooks/useTrading';
@@ -26,7 +14,6 @@ const Header = () => {
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-
   const profileRef = useRef(null);
   const notifRef = useRef(null);
 
@@ -49,137 +36,96 @@ const Header = () => {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      addToast('Logged out', 'success');
-    } catch {
-      addToast('Logout failed', 'error');
+    try { 
+      await logout(); 
+      addToast('Logged out successfully', 'success'); 
+    } catch { 
+      addToast('Logout failed', 'error'); 
     }
   };
 
-  const statusDot = (status) => {
-    if (status === 'running' || status === 'connected') return 'bg-green-500 animate-pulse-slow';
-    if (status === 'connecting') return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
+  const statusDot = (status) => status === 'running' || status === 'connected'
+    ? 'bg-green-500 animate-pulse-slow shadow-green-500/50'
+    : status === 'connecting'
+      ? 'bg-yellow-500 shadow-yellow-500/50'
+      : 'bg-red-500 shadow-red-500/50';
 
   const handleQuickBotToggle = async () => {
-    if (botStatus === 'running') {
-      await stopBot();
-    } else {
-      await startBot();
-    }
+    if (botStatus === 'running') await stopBot();
+    else await startBot();
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-gray-900/95 backdrop-blur border-b border-gray-800 shadow-lg animate-fade-in">
-      <div className="h-full px-4 md:px-6 flex items-center justify-between">
-        {/* Left: Menu */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => (window.innerWidth < 768 ? toggleMobileMenu() : toggleSidebar())}
-            className="p-2 rounded-lg hover:bg-gray-800 transition-colors duration-200"
-            aria-label="Toggle menu"
-          >
-            <Menu size={22} />
-          </button>
-        </div>
+    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-gray-900/95 backdrop-blur-md border-b border-gray-700/50 shadow-2xl animate-fade-in">
+      <div className="h-full px-6 flex items-center justify-between">
+        {/* Menu Toggle */}
+        <button onClick={() => (window.innerWidth < 768 ? toggleMobileMenu() : toggleSidebar())} className="p-2 rounded-lg hover:bg-gray-700 transition-all duration-200 hover:scale-110" aria-label="Toggle menu">
+          <Menu size={22} />
+        </button>
 
-        {/* Center: Quick Actions */}
+        {/* Quick Bot Control */}
         <div className="hidden md:flex items-center gap-4">
           <button
             onClick={handleQuickBotToggle}
-            className={`px-4 py-2 rounded-lg font-semibold transition-all duration-200 ${
-              botStatus === 'running'
-                ? 'bg-secondary text-white hover:bg-secondary-dark'
-                : 'bg-primary text-white hover:bg-primary-dark'
+            className={`px-6 py-2 rounded-lg font-semibold transition-all duration-300 hover:scale-105 shadow-lg ${
+              botStatus === 'running' 
+                ? 'bg-gradient-to-r from-red-600 to-red-500 text-white hover:from-red-700 hover:to-red-600' 
+                : 'bg-gradient-to-r from-primary to-primary-dark text-white hover:from-primary-dark hover:to-primary'
             }`}
             aria-label={`Bot is ${botStatus}. Click to ${botStatus === 'running' ? 'stop' : 'start'}`}
           >
-            <Zap size={16} className="inline mr-2" />
-            {botStatus === 'running' ? 'Stop Bot' : 'Start Bot'}
+            <Zap size={16} className="inline mr-2" /> {botStatus === 'running' ? 'Stop Bot' : 'Start Bot'}
           </button>
         </div>
 
-        {/* Right: Controls */}
+        {/* Right Controls */}
         <div className="flex items-center gap-4">
-          {/* Dark Mode */}
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 rounded-lg hover:bg-gray-800 transition-colors duration-200"
-            aria-label="Toggle dark mode"
-          >
+          {/* Dark Mode Toggle */}
+          <button onClick={toggleDarkMode} className="p-2 rounded-lg hover:bg-gray-700 transition-all duration-200 hover:scale-110" aria-label="Toggle dark mode">
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          {/* Bot & Connection Status */}
-          <div className="flex gap-2" title={`Bot: ${botStatus}, WebSocket: ${wsConnectionStatus}`}>
-            <span className={`w-2.5 h-2.5 rounded-full ${statusDot(botStatus)}`} />
-            <span className={`w-2.5 h-2.5 rounded-full ${statusDot(wsConnectionStatus)}`} />
+          {/* Status Indicators */}
+          <div className="flex gap-3" title={`Bot: ${botStatus}, WS: ${wsConnectionStatus}`}>
+            <span className={`w-3 h-3 rounded-full ${statusDot(botStatus)}`} />
+            <span className={`w-3 h-3 rounded-full ${statusDot(wsConnectionStatus)}`} />
           </div>
 
           {/* Notifications */}
           <div className="relative" ref={notifRef}>
-            <button
-              onClick={() => setNotificationsOpen(prev => !prev)}
-              className="p-2 rounded-lg hover:bg-gray-800 transition-colors duration-200 relative"
-              aria-label={`Notifications (${unreadCount} unread)`}
-            >
+            <button onClick={() => setNotificationsOpen(prev => !prev)} className="p-2 rounded-lg hover:bg-gray-700 transition-all duration-200 hover:scale-110 relative" aria-label={`Notifications (${unreadCount} unread)`}>
               <Bell size={18} />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 text-xs bg-accent rounded-full flex items-center justify-center animate-pulse">
-                  {unreadCount}
-                </span>
-              )}
+              {unreadCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 text-xs bg-accent rounded-full flex items-center justify-center animate-pulse shadow-lg">{unreadCount}</span>}
             </button>
-
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden animate-fade-in">
-                <div className="p-3 font-semibold border-b border-gray-700 text-primary">Notifications</div>
+              <div className="absolute right-0 mt-3 w-80 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                <div className="p-4 font-semibold border-b border-gray-700 text-primary">Notifications</div>
                 {notifications.map(n => (
-                  <div
-                    key={n.id}
-                    className={`px-3 py-2 text-sm hover:bg-gray-700 transition-colors duration-200 ${
-                      n.unread ? 'bg-gray-900/50' : ''
-                    }`}
-                  >
-                    {n.text}
-                  </div>
+                  <div key={n.id} className={`px-4 py-3 text-sm hover:bg-gray-700 transition-colors duration-200 ${n.unread ? 'bg-gray-900/50' : ''}`}>{n.text}</div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Profile */}
+          {/* Profile Menu */}
           <div className="relative" ref={profileRef}>
-            <button
-              onClick={() => setProfileOpen(prev => !prev)}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-800 transition-colors duration-200"
-              aria-label="Profile menu"
-            >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center font-bold text-white shadow-md">
-                {initials}
-              </div>
+            <button onClick={() => setProfileOpen(prev => !prev)} className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-700 transition-all duration-200 hover:scale-105" aria-label="Profile menu">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center font-bold text-white shadow-lg">{initials}</div>
               <ChevronDown size={14} />
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden animate-fade-in">
-                <div className="p-3 border-b border-gray-700">
-                  <p className="text-sm text-gray-300">{user?.email}</p>
-                  <p className="text-xs text-gray-400">
-                    Balance: ${balance?.toFixed(2)}
-                  </p>
+              <div className="absolute right-0 mt-3 w-64 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+                <div className="p-4 border-b border-gray-700">
+                  <p className="text-sm text-gray-300 font-medium">{user?.email}</p>
+                  <p className="text-xs text-gray-400">Balance: ${balance?.toFixed(2)}</p>
                 </div>
 
                 <MenuItem icon={User} label="Profile" to="/settings/profile" />
                 <MenuItem icon={Shield} label="Security" to="/settings/security" />
                 <MenuItem icon={Settings} label="Settings" to="/settings" />
 
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-4 py-2 text-left text-secondary hover:bg-secondary/20 flex items-center gap-2 transition-colors duration-200"
-                >
+                <button onClick={handleLogout} className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors duration-200">
                   <LogOut size={16} /> Logout
                 </button>
               </div>
@@ -192,12 +138,8 @@ const Header = () => {
 };
 
 const MenuItem = ({ icon: Icon, label, to }) => (
-  <button
-    onClick={() => (window.location.href = to)}
-    className="w-full px-4 py-2 hover:bg-gray-700 flex items-center gap-2 transition-colors duration-200"
-  >
-    <Icon size={16} />
-    {label}
+  <button onClick={() => (window.location.href = to)} className="w-full px-4 py-3 hover:bg-gray-700 flex items-center gap-2 transition-colors duration-200">
+    <Icon size={16} /> {label}
   </button>
 );
 
