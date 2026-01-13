@@ -1,8 +1,10 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
+// frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Header, Sidebar } from '../../Common';
-import Footer from '../../layout/Footer/Footer';
+import Footer from '../Footer/Footer'; // ✅ fixed import path
+import LoadingSpinner from '../../Common/LoadingSpinner/LoadingSpinner';
 import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
 import './MainLayout.css';
@@ -13,7 +15,6 @@ const MainLayout = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const location = useLocation();
 
-  // Map routes to page titles
   const PAGE_TITLES = {
     '/dashboard': 'Dashboard',
     '/trading': 'Live Trading',
@@ -22,40 +23,40 @@ const MainLayout = () => {
   };
   const pageTitle = PAGE_TITLES[location.pathname] || 'Deriv Trading Suite';
 
-  // Initial load
+  // Initial data load
   useEffect(() => {
     setIsLoaded(false);
-    const load = async () => {
+    const loadData = async () => {
       try {
-        await refreshAllData(); // wait until data finishes
+        await refreshAllData();
       } catch (err) {
-        console.error('Failed to refresh data', err);
+        console.error('Data refresh failed', err);
       } finally {
         setIsLoaded(true);
       }
     };
-    load();
-  }, []); // 🔹 only once on mount
+    loadData();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-gray-100 overflow-hidden">
 
-      {/* Loading Overlay */}
+      {/* 🔹 Fullscreen Loading Overlay */}
       {!isLoaded && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin" />
-            <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-gray-300">
-              Loading...
-            </span>
-          </div>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-md">
+          <LoadingSpinner 
+            size="xl" 
+            text="Loading dashboard..." 
+            type="premium" 
+            fullScreen
+          />
         </div>
       )}
 
       {/* Sidebar */}
       <Sidebar />
 
-      {/* Main content */}
+      {/* Main content wrapper */}
       <div className={`flex flex-col min-h-screen transition-all duration-300 ease-in-out ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Header */}

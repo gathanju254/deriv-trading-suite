@@ -6,13 +6,12 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner/LoadingSpinne
 import {
   RefreshCw,
   Activity,
-  TrendingUp,
   BarChart3,
   Clock,
   Settings,
   Bell,
   Play,
-  StopCircle
+  StopCircle,
 } from 'lucide-react';
 
 import StatCards from '../../components/Dashboard/StatCards/StatCards';
@@ -21,8 +20,6 @@ import MarketOverview from '../../components/Dashboard/MarketOverview/MarketOver
 import RecentTrades from '../../components/Dashboard/RecentTrades/RecentTrades';
 import StrategyPerformance from '../../components/Dashboard/StrategyPerformance/StrategyPerformance';
 import SignalIndicator from '../../components/Dashboard/SignalIndicator/SignalIndicator';
-
-import './Dashboard.css';
 
 const Dashboard = () => {
   const {
@@ -38,17 +35,15 @@ const Dashboard = () => {
     signals,
     tradeHistory,
     startBot,
-    stopBot
+    stopBot,
   } = useTrading();
 
   const { addToast } = useToast();
-
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
 
   useEffect(() => {
     if (!autoRefresh) return;
-
     const interval = setInterval(() => {
       setRefreshProgress(prev => {
         if (prev >= 100) {
@@ -58,11 +53,7 @@ const Dashboard = () => {
         return prev + 1;
       });
     }, 300);
-
-    return () => {
-      clearInterval(interval);
-      setRefreshProgress(0);
-    };
+    return () => clearInterval(interval);
   }, [autoRefresh, refreshAllData]);
 
   const handleManualRefresh = async (type = 'all') => {
@@ -96,7 +87,7 @@ const Dashboard = () => {
     }
   };
 
-  const formatTimeSince = (timestamp) => {
+  const formatTimeSince = timestamp => {
     if (!timestamp) return '—';
     const seconds = Math.floor((Date.now() - timestamp) / 1000);
     if (seconds < 60) return `${seconds}s ago`;
@@ -106,141 +97,130 @@ const Dashboard = () => {
 
   if (loading && !performance?.total_trades) {
     return (
-      <div className="dashboard-loading">
-        <LoadingSpinner size="large" text="Loading trading dashboard..." />
+      <div className="w-full h-screen flex items-center justify-center bg-gray-900">
+        <LoadingSpinner size="xl" text="Loading trading dashboard..." fullScreen />
       </div>
     );
   }
 
   return (
-    <div className="dashboard">
+    <div className="w-full min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+
       {/* ================= HEADER ================= */}
-      <div className="dashboard-header">
-        <div className="header-left">
-          <div className="header-title">
-            <h1>Trading Dashboard</h1>
-            <div className="header-subtitle">
-              <span className={`connection-status ${wsConnectionStatus}`}>
-                <div className="status-dot" />
-                {wsConnectionStatus === 'connected' ? 'Live' : wsConnectionStatus}
-              </span>
-              <span className="last-update">
-                <Clock size={14} />
-                Updated {formatTimeSince(lastUpdateTime)}
-              </span>
-            </div>
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-6 py-4 bg-gray-900/50 backdrop-blur-sm border-b border-gray-800">
+        {/* Title & Status */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+            Trading Dashboard
+          </h1>
+          <div className="flex items-center gap-2 text-gray-400 text-sm">
+            <span className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${wsConnectionStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
+              {wsConnectionStatus === 'connected' ? 'Live' : wsConnectionStatus}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock size={14} />
+              Updated {formatTimeSince(lastUpdateTime)}
+            </span>
           </div>
         </div>
 
-        <div className="header-right">
+        {/* Controls */}
+        <div className="flex items-center gap-2 mt-3 md:mt-0">
           <button
-            className={`quick-bot-toggle ${botStatus}`}
+            className={`flex items-center gap-1 px-3 py-1 rounded-lg font-semibold transition-colors ${botStatus === 'running' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
             onClick={handleQuickBotToggle}
             disabled={loading}
           >
-            {botStatus === 'running' ? (
-              <>
-                <StopCircle size={16} /> Stop Bot
-              </>
-            ) : (
-              <>
-                <Play size={16} /> Start Bot
-              </>
+            {botStatus === 'running' ? <StopCircle size={16} /> : <Play size={16} />}
+            {botStatus === 'running' ? 'Stop Bot' : 'Start Bot'}
+          </button>
+
+          <button
+            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors relative"
+            onClick={() => handleManualRefresh('all')}
+            disabled={loading}
+          >
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            {autoRefresh && (
+              <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-300" style={{ width: `${refreshProgress}%` }} />
             )}
           </button>
 
-          <div className="refresh-control">
-            <button
-              className="refresh-btn"
-              onClick={() => handleManualRefresh('all')}
-              disabled={loading}
-            >
-              <RefreshCw size={18} className={loading ? 'spinning' : ''} />
-            </button>
-            {autoRefresh && (
-              <div className="refresh-progress">
-                <div className="progress-bar" style={{ width: `${refreshProgress}%` }} />
-              </div>
-            )}
-          </div>
-
-          <div className="quick-actions">
-            <button className="action-btn"><Bell size={18} /></button>
-            <button className="action-btn"><Settings size={18} /></button>
-          </div>
+          <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors">
+            <Bell size={18} />
+          </button>
+          <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors">
+            <Settings size={18} />
+          </button>
         </div>
       </div>
 
       {/* ================= CONTENT ================= */}
-      <div className="dashboard-content">
+      <div className="flex-1 p-4 md:p-6 flex flex-col gap-6 md:gap-8">
 
-        {/* STATS */}
-        <div className="stats-section">
+        {/* STAT CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCards />
         </div>
 
         {/* CONTROLS + MARKET */}
-        <div className="controls-market-section">
-          <div className="controls-card">
-            <div className="section-header">
-              <h2><Activity size={20} /> Trading Controls</h2>
-              <div className={`bot-status ${botStatus}`}>
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Bot Controls */}
+          <div className="flex-1 bg-gray-900/80 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4 shadow-lg">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <Activity size={20} /> Trading Controls
+              </h2>
+              <span className={`font-semibold ${botStatus === 'running' ? 'text-green-400' : 'text-red-400'}`}>
                 {botStatus === 'running' ? '🟢 ACTIVE' : '🔴 STOPPED'}
-              </div>
+              </span>
             </div>
             <BotControls />
           </div>
 
-          <div className="market-card">
-            {/* Moved market-header from MarketOverview.jsx to here for consistency */}
-            <div className="market-header">
-              <div className="market-title">
-                <BarChart3 size={18} />
-                <h3>Market Overview</h3>
-                <span className="market-symbol">{marketData.symbol || 'R_100'}</span>
-              </div>
-              <div className="connection-status">
-                <div className={`status-dot ${wsConnectionStatus}`} />
-                <span className={`status-text status-${wsConnectionStatus}`}>
-                  {wsConnectionStatus === 'connected' ? 'Live' : wsConnectionStatus}
-                </span>
-              </div>
+          {/* Market Overview */}
+          <div className="flex-1 bg-gray-900/80 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4 shadow-lg">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <BarChart3 size={20} /> Market Overview
+              </h2>
+              <span className={`flex items-center gap-1 text-sm ${wsConnectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${wsConnectionStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
+                {wsConnectionStatus === 'connected' ? 'Live' : wsConnectionStatus}
+              </span>
             </div>
             <MarketOverview />
           </div>
         </div>
 
-        {/* PERFORMANCE */}
-        <div className="performance-card">
-          <div className="section-header">
-            <h2><BarChart3 size={20} /> Strategy Performance</h2>
+        {/* Strategy Performance */}
+        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4 shadow-lg">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              <BarChart3 size={20} /> Strategy Performance
+            </h2>
             {performance.win_rate !== undefined && (
-              <div className="win-rate-badge">
-                {performance.win_rate.toFixed(1)}% Win Rate
-              </div>
+              <span className="text-green-400 font-bold">{performance.win_rate.toFixed(1)}% Win Rate</span>
             )}
           </div>
           <StrategyPerformance />
         </div>
 
-        {/* 🔥 ACTIVITY COLUMN (STACKED) */}
-        <div className="activity-column">
-          <div className="signals-card">
-            <div className="section-header">
-              <h2>Market Signals</h2>
-              <div className="signal-count">
-                {signals?.length || 0} active
-              </div>
+        {/* Signals + Trades */}
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1 bg-gray-900/80 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4 shadow-lg">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-lg font-semibold">Market Signals</h2>
+              <span className="text-sm text-gray-400">{signals?.length || 0} active</span>
             </div>
             <SignalIndicator />
           </div>
 
-          <div className="trades-card">
-            <div className="section-header">
-              <h2>Recent Trades</h2>
-              <div className="trade-count">
-                {tradeHistory?.length || 0} total
-              </div>
+          <div className="flex-1 bg-gray-900/80 border border-gray-800 rounded-2xl p-4 flex flex-col gap-4 shadow-lg">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-lg font-semibold">Recent Trades</h2>
+              <span className="text-sm text-gray-400">{tradeHistory?.length || 0} total</span>
             </div>
             <RecentTrades />
           </div>
