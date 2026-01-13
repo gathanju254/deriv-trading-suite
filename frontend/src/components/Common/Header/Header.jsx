@@ -27,6 +27,20 @@ const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Close profile menu on Escape key
+  useEffect(() => {
+    if (!showProfileMenu) return;
+
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showProfileMenu]);
+
   const handleLogout = async () => {
     try {
       await logout();
