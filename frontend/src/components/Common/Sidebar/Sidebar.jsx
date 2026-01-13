@@ -1,4 +1,5 @@
 // frontend/src/components/Common/Sidebar/Sidebar.jsx
+// frontend/src/components/Common/Sidebar/Sidebar.jsx
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, TrendingUp, BarChart3, Settings, Bot, Wallet } from 'lucide-react';
@@ -21,21 +22,13 @@ const Sidebar = () => {
     if (window.innerWidth <= 768) toggleMobileMenu();
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Escape' && mobileMenuOpen) toggleMobileMenu();
-  };
-
   return (
     <>
-      {/* Mobile overlay */}
       {mobileMenuOpen && (
         <div
           className="sidebar-overlay"
           onClick={toggleMobileMenu}
-          onKeyDown={handleKeyDown}
-          tabIndex={-1}
           aria-hidden="true"
-          role="presentation"
         />
       )}
 
@@ -43,40 +36,35 @@ const Sidebar = () => {
         className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}
         role="navigation"
         aria-label="Main navigation"
-        onKeyDown={handleKeyDown}
       >
         <div className="sidebar-header">
           <div className="logo">
-            <Bot size={32} />
-            {!sidebarCollapsed && <span className="logo-text">Deriv Suite</span>}
+            <Bot size={30} />
+            <span className="logo-text">Deriv Suite</span>
           </div>
         </div>
 
         <nav className="sidebar-nav">
           <ul>
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <li key={item.path}>
-                  <NavLink
-                    to={item.path}
-                    className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-                    onClick={handleNavClick}
-                    aria-label={`Navigate to ${item.label}`}
-                  >
-                    <Icon size={20} />
-                    {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
-                  </NavLink>
-                </li>
-              );
-            })}
+            {menuItems.map(({ path, icon: Icon, label }) => (
+              <li key={path}>
+                <NavLink
+                  to={path}
+                  className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                  onClick={handleNavClick}
+                >
+                  <Icon size={20} />
+                  <span className="nav-label">{label}</span>
+                </NavLink>
+              </li>
+            ))}
           </ul>
         </nav>
 
         <div className="sidebar-footer">
           <div className="balance-widget">
             <Wallet size={16} />
-            {!sidebarCollapsed && <span className="balance-text">{`$${balance.toFixed(2)}`}</span>}
+            <span className="balance-text">${balance.toFixed(2)}</span>
           </div>
         </div>
       </aside>
@@ -85,3 +73,4 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
+
