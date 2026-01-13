@@ -47,38 +47,7 @@
   gap: 20px;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #94a3b8;
-}
-
-.form-group input {
-  padding: 12px 16px;
-  background-color: #1e293b;
-  border: 1px solid #475569;
-  border-radius: 8px;
-  color: #f8fafc;
-  font-size: 0.875rem;
-  transition: all 0.2s;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.form-group input:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* ---------------- Buttons ---------------- */
 
 .login-button {
   padding: 12px 24px;
@@ -105,23 +74,56 @@
   cursor: not-allowed;
 }
 
-.login-info {
-  margin-top: 20px;
+/* ---------------- Footer (New to Deriv?) ---------------- */
+
+.login-footer {
   text-align: center;
-}
-
-.demo-credentials {
-  background-color: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: #94a3b8;
-  margin-bottom: 12px;
 }
 
-.disclaimer {
+.login-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  color: #3b82f6;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.login-link:hover {
+  text-decoration: underline;
+}
+
+/* ---------------- Powered by Deriv ---------------- */
+
+.login-meta {
+  margin-top: 28px;
+  text-align: center;
   font-size: 0.75rem;
   color: #64748b;
-  font-style: italic;
+  opacity: 0.85;
+}
+
+.login-meta strong {
+  margin-left: 4px;
+  color: #e5e7eb;
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .login-container {
+    padding: 28px 24px;
+    border-radius: 12px;
+  }
+
+  .login-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .login-button {
+    font-size: 0.9rem;
+  }
 }

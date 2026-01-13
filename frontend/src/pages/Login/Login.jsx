@@ -1,6 +1,5 @@
 // frontend/src/pages/Login.jsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { derivService } from '../../services/derivService';
 import { useToast } from '../../context/ToastContext';
 import { Bot, LogIn } from 'lucide-react';
@@ -9,12 +8,10 @@ import './Login.css';
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
-  const navigate = useNavigate();
 
   const handleDerivLogin = async () => {
     setLoading(true);
     try {
-      // Call backend: GET /auth/login
       const { redirect_url } = await derivService.getOAuthRedirectUrl();
 
       if (!redirect_url) {
@@ -33,6 +30,7 @@ const Login = () => {
   return (
     <div className="login-page">
       <div className="login-container">
+        {/* Header */}
         <div className="login-header">
           <Bot size={48} className="login-logo" />
           <h1>Deriv Trading Suite</h1>
@@ -41,6 +39,7 @@ const Login = () => {
           </p>
         </div>
 
+        {/* Action */}
         <div className="login-form">
           <button
             className="login-button"
@@ -52,17 +51,27 @@ const Login = () => {
             ) : (
               <>
                 <LogIn size={18} />
-                Login with Deriv
+                Continue with Deriv
               </>
             )}
           </button>
 
           <p className="login-footer">
-            New here?{' '}
-            <span className="login-link" onClick={handleDerivLogin}>
-              Create an account on Deriv
-            </span>
+            New to Deriv?{' '}
+            <button
+              type="button"
+              className="login-link"
+              onClick={handleDerivLogin}
+            >
+              You’ll create an account in the next step.
+            </button>
           </p>
+        </div>
+
+        {/* Trust / Meta */}
+        <div className="login-meta">
+          <span>Powered by</span>
+          <strong>Deriv</strong>
         </div>
       </div>
     </div>

@@ -2,13 +2,64 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <!-- Core -->
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+
+    <!-- Primary Meta -->
     <title>Deriv Trading Suite</title>
+    <meta
+      name="description"
+      content="Deriv Trading Suite — a professional trading dashboard and automation platform powered by Deriv APIs."
+    />
+    <meta name="author" content="Deriv Trading Suite" />
+    <meta name="theme-color" content="#0f172a" />
+
+    <!-- SEO & Social (quietly powerful) -->
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="Deriv Trading Suite" />
+    <meta
+      property="og:description"
+      content="Professional trading dashboard and automation suite powered by Deriv APIs."
+    />
+    <meta property="og:type" content="website" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Icons -->
     <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Optional fonts (only if used) -->
+    <!--
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    -->
   </head>
+
   <body>
+    <noscript>
+      <strong>
+        Deriv Trading Suite requires JavaScript to run. Please enable it to
+        continue.
+      </strong>
+    </noscript>
+
+    <!-- React Mount -->
     <div id="root"></div>
+
+    <!-- Vite Entry -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
