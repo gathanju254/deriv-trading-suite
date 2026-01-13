@@ -25,7 +25,7 @@ const MainLayout = () => {
 
   const pageTitle = PAGE_TITLES[location.pathname] || 'Deriv Trading Suite';
 
-  // Initial load
+  // Initial load with fade-in animation
   useEffect(() => {
     setIsLoaded(false);
     const load = async () => {
@@ -35,7 +35,7 @@ const MainLayout = () => {
       } catch {
         addToast('Failed to load data', 'error');
       } finally {
-        setTimeout(() => setIsLoaded(true), 500);
+        setTimeout(() => setIsLoaded(true), 500); // Allow time for fade-in
       }
     };
     load();
@@ -50,9 +50,8 @@ const MainLayout = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex overflow-hidden">
-
-      {/* Loading overlay */}
+    <div className="min-h-screen bg-bgApp text-gray-100 flex overflow-hidden animate-fade-in">
+      {/* Loading overlay with professional spinner */}
       {!isLoaded && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
           <LoadingSpinner size="xl" text="Loading..." fullScreen />
@@ -62,51 +61,50 @@ const MainLayout = () => {
       {/* Sidebar */}
       <Sidebar />
 
-      {/* Main content */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-
-        {/* Header */}
+      {/* Main content area */}
+      <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+        {/* Header with enhanced controls */}
         <Header>
-          <div className="flex justify-between items-center px-4 py-3 bg-gray-800/50 backdrop-blur-sm border-b border-gray-700">
-            <h1 className="text-xl font-bold">{pageTitle}</h1>
+          <div className="flex justify-between items-center px-4 py-3 bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 shadow-lg">
+            <h1 className="text-xl font-bold text-primary">{pageTitle}</h1>
             <div className="flex items-center gap-4 text-sm text-gray-300">
-
-              {/* Connection */}
-              <div className="flex items-center gap-1">
-                {wsConnectionStatus === 'connected' ? <Wifi className="w-4 h-4 text-green-400" /> : <WifiOff className="w-4 h-4 text-red-400" />}
-                <span>{wsConnectionStatus}</span>
+              {/* Connection status with tooltip */}
+              <div className="flex items-center gap-1" title={`WebSocket: ${wsConnectionStatus}`}>
+                {wsConnectionStatus === 'connected' ? <Wifi className="w-4 h-4 text-green-400 animate-pulse-slow" /> : <WifiOff className="w-4 h-4 text-red-400" />}
+                <span className="capitalize">{wsConnectionStatus}</span>
               </div>
 
               {/* Last update */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1" title="Last data update">
                 <Clock className="w-4 h-4" />
                 <span>Updated {formatTimeSince(lastUpdateTime)}</span>
               </div>
 
-              {/* Refresh */}
+              {/* Refresh button */}
               <button
                 onClick={refreshAllData}
-                className="p-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors duration-200"
+                aria-label="Refresh data"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
 
-              {/* Reconnect */}
+              {/* Reconnect button (only if disconnected) */}
               {wsConnectionStatus !== 'connected' && (
                 <button
                   onClick={manualReconnect}
-                  className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-xs"
+                  className="px-3 py-1 rounded-lg bg-primary hover:bg-primary-dark text-white text-xs transition-colors duration-200"
+                  aria-label="Reconnect WebSocket"
                 >
                   Reconnect
                 </button>
               )}
-
             </div>
           </div>
         </Header>
 
-        {/* Page content */}
-        <main className="flex-1 p-4 overflow-auto">
+        {/* Page content with scroll */}
+        <main className="flex-1 p-4 overflow-auto bg-gradient-to-br from-gray-900 to-gray-950">
           <Outlet />
         </main>
 
@@ -117,8 +115,9 @@ const MainLayout = () => {
       {/* Mobile backdrop */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 md:hidden bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-40 md:hidden bg-black/50 backdrop-blur-sm animate-fade-in"
           onClick={toggleMobileMenu}
+          aria-hidden="true"
         />
       )}
     </div>
