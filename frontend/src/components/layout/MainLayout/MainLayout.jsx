@@ -1,9 +1,9 @@
-// frontend/src/components/Layout/MainLayout/MainLayout.jsx
+// frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from '../../Common/Header/Header';
 import Sidebar from '../../Common/Sidebar/Sidebar';
-import Footer from '../../Layout/Footer/Footer';
+import Footer from '../../layout/Footer/Footer';
 import { useApp } from '../../../context/AppContext';
 
 const MainLayout = () => {

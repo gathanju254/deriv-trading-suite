@@ -1,5 +1,4 @@
-// frontend/src/components/Layout/Footer/Footer.jsx
-// frontend/src/components/Layout/Footer/Footer.jsx
+// frontend/src/components/layout/Footer/Footer.jsx
 import React from 'react';
 import { useTrading } from '../../../hooks/useTrading';
 
