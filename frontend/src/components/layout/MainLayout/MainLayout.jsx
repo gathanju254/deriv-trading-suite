@@ -1,5 +1,4 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
-// frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom'; // Add this import
 import Header from '../../../components/Common/Header/Header';
