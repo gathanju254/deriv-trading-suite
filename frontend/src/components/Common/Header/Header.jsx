@@ -81,8 +81,18 @@ const Header = () => {
     }
   };
 
+  const getStatusDot = (status) => (
+    <span className={`w-3 h-3 rounded-full ml-2 ${
+      status === 'running' || status === 'connected'
+        ? 'bg-success-500 animate-pulse-slow'
+        : status === 'connecting'
+          ? 'bg-accent-500 animate-pulse'
+          : 'bg-secondary-500'
+    }`} />
+  );
+
   return (
-    <header className="sticky top-0 z-40 h-18 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
+    <header className="h-18 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
       <div className="h-full px-6 flex items-center justify-between">
         {/* Menu Toggle */}
         <button 
@@ -93,28 +103,19 @@ const Header = () => {
           <Menu size={22} className="text-gray-300" />
         </button>
 
-        {/* Quick Bot Control */}
+        {/* Quick Bot Control - Simplified with dot */}
         <div className="hidden md:flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end">
-              <span className="text-xs text-gray-400">Bot Status</span>
-              <span className={`text-sm font-semibold capitalize ${getStatusColor(botStatus).split(' ')[0]}`}>
-                {botStatus}
-              </span>
-            </div>
-            <button
-              onClick={handleQuickBotToggle}
-              className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:scale-105 shadow-lg flex items-center gap-2 ${
-                botStatus === 'running' 
-                  ? 'bg-gradient-to-r from-secondary-600 to-secondary-700 hover:from-secondary-700 hover:to-secondary-800 text-white' 
-                  : 'bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white'
-              }`}
-              aria-label={`Bot is ${botStatus}. Click to ${botStatus === 'running' ? 'stop' : 'start'}`}
-            >
-              <Zap size={18} className={botStatus === 'running' ? 'animate-pulse' : ''} />
-              {botStatus === 'running' ? 'Stop Bot' : 'Start Bot'}
-            </button>
-          </div>
+          <button
+            onClick={handleQuickBotToggle}
+            className={`px-6 py-2.5 rounded-xl font-semibold transition-all duration-300 hover:scale-105 shadow-lg flex items-center gap-2 ${
+              botStatus === 'running' 
+                ? 'bg-gradient-to-r from-secondary-600 to-secondary-700 hover:from-secondary-500 hover:to-secondary-600 text-white'
+                : 'bg-gradient-to-r from-success-600 to-success-700 hover:from-success-500 hover:to-success-600 text-white'
+            }`}
+          >
+            {botStatus === 'running' ? 'Stop Bot' : 'Start Bot'}
+            {getStatusDot(botStatus)}
+          </button>
         </div>
 
         {/* Right Controls */}

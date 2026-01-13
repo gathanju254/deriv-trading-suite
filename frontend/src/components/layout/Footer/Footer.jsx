@@ -66,6 +66,16 @@ const Footer = () => {
     );
   };
 
+  const StatusDot = ({ status }) => (
+    <span className={`w-3 h-3 rounded-full ${
+      status === 'running' || status === 'connected'
+        ? 'bg-success-500 animate-pulse-slow'
+        : status === 'connecting'
+          ? 'bg-accent-500 animate-pulse'
+          : 'bg-secondary-500'
+    }`} />
+  );
+
   const StatCard = ({ icon: Icon, label, value, color = 'text-white', subtext = null }) => (
     <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gray-800/30 border border-gray-700/50 backdrop-blur-sm">
       <div className="p-2 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900">
@@ -98,9 +108,9 @@ const Footer = () => {
               </div>
             </div>
             
-            <div className="space-y-2">
-              <StatusPill type="bot" status={botStatus} />
-              <StatusPill type="ws" status={wsConnectionStatus} />
+            <div className="flex items-center gap-2">
+              <StatusDot status={botStatus} />
+              <StatusDot status={wsConnectionStatus} />
             </div>
             
             <div className="flex items-center gap-4 text-sm text-gray-400">
@@ -151,7 +161,7 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Right: Market Info & Copyright */}
+          {/* Right: Market Info */}
           <div className="space-y-4">
             <div className="p-4 rounded-xl bg-gradient-to-br from-gray-900 to-gray-950 border border-gray-800/50">
               <h4 className="font-semibold text-white mb-2">Market Info</h4>

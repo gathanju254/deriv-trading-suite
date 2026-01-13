@@ -97,7 +97,7 @@ const Sidebar = () => {
 
         {/* Footer Section */}
         <div className="p-4 border-t border-gray-800/50 space-y-4 relative">
-          {/* Connection Status */}
+          {/* Connection Status - Already dot-only, keep as is */}
           <div className={`flex items-center gap-3 ${sidebarCollapsed && 'justify-center'}`}>
             <div className="relative">
               <span className={`w-3 h-3 rounded-full ${
@@ -109,6 +109,7 @@ const Sidebar = () => {
                 <span className="absolute -inset-1.5 rounded-full bg-success-500/20 animate-ping" />
               )}
             </div>
+            {/* Remove text when collapsed for consistency */}
             {!sidebarCollapsed && (
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-300 capitalize">{wsConnectionStatus}</span>
@@ -117,7 +118,7 @@ const Sidebar = () => {
             )}
           </div>
 
-          {/* Balance Card */}
+          {/* Balance Card - Already dot-only for bot status, keep as is */}
           <div className={`flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-br from-gray-900 to-gray-950 border border-gray-800/50 shadow-xl transition-all duration-300 ${pulse && 'animate-pulse-soft'} ${sidebarCollapsed && 'justify-center'}`}>
             <div className="relative">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-600 to-accent-800 flex items-center justify-center shadow-lg">
