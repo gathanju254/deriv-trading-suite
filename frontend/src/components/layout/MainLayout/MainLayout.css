@@ -1,75 +1,135 @@
 /* frontend/src/components/layout/MainLayout/MainLayout.css */
+/* ===================================== */
+/* =========== MAIN LAYOUT ============= */
+/* ===================================== */
 
-/* =====================================
-   Main Layout Container
-===================================== */
 .main-layout {
   display: flex;
   min-height: 100vh;
+  background-color: #0f172a;
   position: relative;
-  background: linear-gradient(135deg, 
-    #0f172a 0%, 
-    #1a2539 25%, 
-    #1e293b 50%, 
-    #1a2539 75%, 
-    #0f172a 100%);
-  background-attachment: fixed;
-  opacity: 0;
-  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: hidden; /* Prevent horizontal scroll during animations */
 }
 
 .main-layout.loaded {
-  opacity: 1;
+  animation: layoutFadeIn 0.5s ease-out;
 }
 
-/* =====================================
-   Accessibility: Skip Link
-===================================== */
+/* Layout state transitions */
+.main-layout.sidebar-collapsed .main-content {
+  margin-left: 80px;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-layout:not(.sidebar-collapsed) .main-content {
+  margin-left: 250px;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===================================== */
+/* ======== SKIP LINK (A11Y) =========== */
+/* ===================================== */
+
 .skip-link {
   position: absolute;
-  top: -40px;
-  left: 20px;
+  top: -100px;
+  left: 0;
   background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: white;
   padding: 12px 20px;
-  border-radius: 8px;
   text-decoration: none;
   font-weight: 600;
   font-size: 0.875rem;
+  border-radius: 0 0 8px 0;
   z-index: 9999;
-  transition: top 0.3s ease, transform 0.2s ease;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
 }
 
 .skip-link:focus {
-  top: 20px;
-  transform: scale(1.05);
-  outline: 2px solid rgba(255, 255, 255, 0.8);
+  transform: translateY(100px);
+  opacity: 1;
+  outline: 3px solid #f59e0b;
   outline-offset: 2px;
 }
 
-.skip-link:hover {
-  background: linear-gradient(135deg, #2563eb, #1e40af);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+/* ===================================== */
+/* ========== MOBILE OVERLAY =========== */
+/* ===================================== */
+
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 45;
+  animation: overlayFadeIn 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
 }
 
-/* =====================================
-   Main Content Area
-===================================== */
+.mobile-overlay {
+  opacity: 1;
+}
+
+.mobile-overlay::before {
+  content: 'Tap anywhere to close';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.mobile-overlay:hover::before {
+  opacity: 1;
+}
+
+/* Improved click target with ripple effect */
+.mobile-overlay::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  animation: ripplePulse 2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+/* ===================================== */
+/* ============ MAIN CONTENT =========== */
+/* ===================================== */
+
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  margin-left: 250px;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+  position: relative;
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
               opacity 0.5s ease,
               transform 0.5s ease;
   opacity: 0;
   transform: translateY(10px);
-  position: relative;
-  overflow-x: hidden;
 }
 
 .main-content.fade-in {
@@ -78,103 +138,63 @@
 }
 
 .main-content.content-loaded {
-  opacity: 1;
-  transform: translateY(0);
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s,
-              transform 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s;
+  animation: contentSlideUp 0.5s ease-out;
 }
 
-/* Collapsed sidebar state */
-.main-layout.sidebar-collapsed .main-content {
-  margin-left: 80px;
-}
+/* ===================================== */
+/* ============ CONTENT AREA =========== */
+/* ===================================== */
 
-/* =====================================
-   Content Area (Main scrollable area)
-===================================== */
 .content-area {
   flex: 1;
   padding: 24px;
-  position: relative;
-  z-index: 1;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   overflow-y: auto;
-  background: transparent;
+  scroll-behavior: smooth;
+  min-height: calc(100vh - 128px); /* Account for header and footer */
+  position: relative;
 }
 
-/* Content background with subtle gradient */
 .content-area::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  background: 
-    radial-gradient(circle at 20% 80%, rgba(30, 64, 175, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.03) 0%, transparent 50%),
-    linear-gradient(to bottom right, transparent, rgba(15, 23, 42, 0.95));
-  z-index: -1;
-  pointer-events: none;
+  height: 1px;
+  background: linear-gradient(90deg, 
+              transparent, 
+              rgba(59, 130, 246, 0.3), 
+              transparent);
 }
 
-/* Scrollbar styling for content area */
-.content-area::-webkit-scrollbar {
-  width: 8px;
+/* ===================================== */
+/* ============ ANIMATIONS ============= */
+/* ===================================== */
+
+@keyframes layoutFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.content-area::-webkit-scrollbar-track {
-  background: rgba(30, 41, 59, 0.3);
-  border-radius: 4px;
+@keyframes contentSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.content-area::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #475569, #64748b);
-  border-radius: 4px;
-  border: 2px solid rgba(15, 23, 42, 0.8);
-}
-
-.content-area::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #64748b, #94a3b8);
-}
-
-/* =====================================
-   Mobile Overlay
-===================================== */
-.mobile-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  z-index: 48;
-  animation: fadeIn 0.3s ease-out;
-  cursor: pointer;
-}
-
-.mobile-overlay::after {
-  content: 'Tap to close';
-  position: absolute;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.875rem;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 8px 16px;
-  border-radius: 20px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.mobile-overlay:hover::after {
-  opacity: 1;
-}
-
-@keyframes fadeIn {
+@keyframes overlayFadeIn {
   from {
     opacity: 0;
     backdrop-filter: blur(0);
@@ -185,212 +205,216 @@
   }
 }
 
-/* =====================================
-   Responsive Design
-===================================== */
+@keyframes ripplePulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.4);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* ===================================== */
+/* ======== RESPONSIVE DESIGN ========== */
+/* ===================================== */
 
 /* Tablet (768px and below) */
 @media (max-width: 768px) {
-  .main-content {
+  .main-layout {
+    flex-direction: column;
+  }
+  
+  .main-layout.sidebar-collapsed .main-content,
+  .main-layout:not(.sidebar-collapsed) .main-content {
     margin-left: 0;
-    min-height: calc(100vh - 60px); /* Adjust for header height */
+    transition: none;
   }
-
-  .main-layout.sidebar-collapsed .main-content {
-    margin-left: 0;
-  }
-
-  .content-area {
-    padding: 20px 16px;
-    min-height: calc(100vh - 120px); /* Account for header and footer */
-  }
-
-  .mobile-overlay {
-    display: block;
-  }
-
-  /* Mobile menu open state */
+  
   .main-layout.mobile-menu-open .main-content {
     transform: translateX(280px);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  
+  .content-area {
+    padding: 16px;
+    min-height: calc(100vh - 116px); /* Adjusted for smaller header */
+  }
+  
+  /* Enhanced mobile overlay for landscape */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .mobile-overlay::before {
+      content: 'Click to close';
+      font-size: 0.75rem;
+      padding: 8px 16px;
+    }
+    
+    .content-area {
+      min-height: calc(100vh - 100px);
+    }
+  }
 }
 
-/* Small mobile (480px and below) */
+/* Mobile (480px and below) */
 @media (max-width: 480px) {
   .content-area {
-    padding: 16px 12px;
+    padding: 12px;
+    min-height: calc(100vh - 112px); /* Further adjustment */
   }
-
-  .main-content.fade-in {
-    animation: slideUpFade 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  @keyframes slideUpFade {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .mobile-overlay::after {
-    bottom: 30px;
+  
+  .skip-link {
+    padding: 10px 16px;
     font-size: 0.75rem;
-    padding: 6px 12px;
   }
 }
 
-/* Landscape orientation */
-@media (max-height: 500px) and (orientation: landscape) {
+/* Small mobile (360px and below) */
+@media (max-width: 360px) {
   .content-area {
-    padding: 16px 12px;
-    min-height: auto;
-  }
-
-  .main-content {
-    min-height: auto;
+    padding: 8px;
   }
 }
 
-/* =====================================
-   Performance Optimizations
-===================================== */
+/* ===================================== */
+/* ============ ACCESSIBILITY ========== */
+/* ===================================== */
+
+/* Focus indicators for keyboard navigation */
+.main-content:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+/* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   .main-layout,
   .main-content,
   .mobile-overlay,
   .skip-link,
-  .content-area {
-    transition: none !important;
+  .content-area,
+  .mobile-overlay::before,
+  .mobile-overlay::after {
     animation: none !important;
+    transition: none !important;
   }
-
-  .main-content.fade-in,
-  .main-content.content-loaded {
+  
+  .main-content {
     opacity: 1;
     transform: none;
   }
-
-  .mobile-overlay {
-    animation: none;
-    backdrop-filter: none;
+  
+  .main-layout.mobile-menu-open .main-content {
+    transform: none;
   }
 }
 
-/* =====================================
-   High Contrast Mode Support
-===================================== */
+/* High contrast mode */
 @media (prefers-contrast: high) {
-  .main-layout {
-    background: #0f172a;
-    border: 1px solid #f8fafc;
-  }
-
-  .content-area::before {
-    display: none;
-  }
-
-  .content-area {
-    border: 1px solid #475569;
-    border-radius: 4px;
-    margin: 8px;
-  }
-
-  .skip-link {
-    border: 2px solid white;
-    background: black;
-    color: white;
-  }
-
   .mobile-overlay {
     background: rgba(0, 0, 0, 0.9);
-    border: 2px solid white;
+    backdrop-filter: none;
   }
-}
-
-/* =====================================
-   Print Styles
-===================================== */
-@media print {
-  .main-layout {
-    background: white !important;
-    color: black !important;
-  }
-
-  .main-content {
-    margin-left: 0 !important;
-    opacity: 1 !important;
-    transform: none !important;
-  }
-
-  .mobile-overlay,
-  .skip-link {
-    display: none !important;
-  }
-
-  .content-area {
-    overflow: visible !important;
-    height: auto !important;
-    padding: 0 !important;
-  }
-
+  
   .content-area::before {
-    display: none !important;
+    background: linear-gradient(90deg, 
+                transparent, 
+                #3b82f6, 
+                transparent);
+  }
+  
+  .skip-link {
+    border: 3px solid white;
   }
 }
 
-/* =====================================
-   Loading State Enhancement
-===================================== */
-.main-content:not(.content-loaded) .content-area::after {
-  content: '';
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(59, 130, 246, 0.2);
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  z-index: 1000;
-}
-
-@keyframes spin {
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
+/* Dark mode optimization (already dark, but ensure consistency) */
+@media (prefers-color-scheme: dark) {
+  .main-layout {
+    background-color: #0a0f1a; /* Slightly darker base */
+  }
+  
+  .content-area {
+    background: linear-gradient(135deg, #0a0f1a 0%, #1a2235 100%);
   }
 }
 
-/* =====================================
-   Grid Background Effect (Optional)
-===================================== */
-.content-area::before {
-  background-image: 
-    linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-  mask-image: radial-gradient(ellipse at 50% 50%, black 30%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 30%, transparent 70%);
+/* Light mode support (optional) */
+@media (prefers-color-scheme: light) {
+  .main-layout {
+    background-color: #f8fafc;
+  }
+  
+  .content-area {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  }
+  
+  .content-area::before {
+    background: linear-gradient(90deg, 
+                transparent, 
+                rgba(59, 130, 246, 0.2), 
+                transparent);
+  }
+  
+  .mobile-overlay {
+    background: rgba(255, 255, 255, 0.9);
+  }
+  
+  .mobile-overlay::before {
+    color: rgba(0, 0, 0, 0.7);
+    background: rgba(255, 255, 255, 0.9);
+  }
+  
+  .skip-link {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  }
 }
 
-/* =====================================
-   Smooth Scrolling
-===================================== */
+/* ===================================== */
+/* ========== PERFORMANCE ============== */
+/* ===================================== */
+
+/* Hardware acceleration for smoother animations */
+.main-content,
+.mobile-overlay {
+  will-change: transform, opacity;
+}
+
+/* Optimize scrolling performance */
 .content-area {
-  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
-/* =====================================
-   Focus Visible Polyfill Fallback
-===================================== */
-.content-area:focus-within {
-  outline: 2px solid rgba(59, 130, 246, 0.5);
-  outline-offset: 4px;
-  border-radius: 4px;
+/* ===================================== */
+/* ============ DEBUGGING ============== */
+/* ===================================== */
+
+/* Uncomment for layout debugging */
+/*
+.main-layout {
+  border: 1px solid red;
 }
+
+.main-content {
+  border: 1px solid blue;
+}
+
+.content-area {
+  border: 1px solid green;
+}
+*/
