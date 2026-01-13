@@ -1,6 +1,15 @@
 // frontend/src/components/Common/Header/Header.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Settings, User, Menu, LogOut, ChevronDown, Shield } from 'lucide-react';
+import {
+  Bell,
+  Settings,
+  User,
+  Menu,
+  LogOut,
+  ChevronDown,
+  Shield
+} from 'lucide-react';
+
 import { useApp } from '../../../context/AppContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useTrading } from '../../../hooks/useTrading';
@@ -14,10 +23,18 @@ const Header = () => {
   const { addToast } = useToast();
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
   const profileMenuRef = useRef(null);
 
-  const isMobile = window.innerWidth <= 768;
+  /* Detect viewport changes */
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
+  /* Close profile menu on outside click */
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
@@ -28,6 +45,7 @@ const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  /* Close on ESC */
   useEffect(() => {
     const handleEsc = (e) => e.key === 'Escape' && setShowProfileMenu(false);
     document.addEventListener('keydown', handleEsc);
@@ -44,14 +62,13 @@ const Header = () => {
     }
   };
 
-  const getInitials = (email) => email ? email[0].toUpperCase() : 'U';
+  const getInitials = (email) => (email ? email[0].toUpperCase() : 'U');
 
   const statusColor = (status, map) => map[status] || '#6b7280';
 
   return (
     <header className="header">
       <div className="header-left">
-        {/* Single responsive menu button */}
         <button
           className="menu-button"
           onClick={isMobile ? toggleMobileMenu : toggleSidebar}
@@ -62,24 +79,28 @@ const Header = () => {
       </div>
 
       <div className="header-right">
-        {/* Status Dots */}
+        {/* Status indicators */}
         <div className="header-status">
           <div
-            className="status-dot bot-header-status"
-            style={{ backgroundColor: statusColor(botStatus, {
-              running: '#10b981',
-              stopped: '#ef4444',
-              connecting: '#f59e0b'
-            }) }}
+            className="status-dot"
+            style={{
+              backgroundColor: statusColor(botStatus, {
+                running: '#10b981',
+                stopped: '#ef4444',
+                connecting: '#f59e0b'
+              })
+            }}
             title={`Bot: ${botStatus}`}
           />
           <div
-            className="status-dot ws-header-status"
-            style={{ backgroundColor: statusColor(wsConnectionStatus, {
-              connected: '#10b981',
-              disconnected: '#ef4444',
-              connecting: '#f59e0b'
-            }) }}
+            className="status-dot"
+            style={{
+              backgroundColor: statusColor(wsConnectionStatus, {
+                connected: '#10b981',
+                disconnected: '#ef4444',
+                connecting: '#f59e0b'
+              })
+            }}
             title={`WS: ${wsConnectionStatus}`}
           />
         </div>
@@ -97,42 +118,35 @@ const Header = () => {
         <div className="profile-container" ref={profileMenuRef}>
           <button
             className="profile-button"
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            onClick={() => setShowProfileMenu((v) => !v)}
           >
             <div className="avatar">{getInitials(user?.email)}</div>
-            <ChevronDown
-              size={16}
-              className={`chevron ${showProfileMenu ? 'rotate-180' : ''}`}
-            />
+            <ChevronDown size={16} />
           </button>
 
           {showProfileMenu && (
             <div className="profile-dropdown">
               <div className="dropdown-header">
-                <div className="dropdown-avatar">{getInitials(user?.email)}</div>
-                <div className="dropdown-user-info">
+                <div className="dropdown-avatar">
+                  {getInitials(user?.email)}
+                </div>
+                <div>
                   <div>{user?.email}</div>
-                  <div className="dropdown-balance">
-                    Balance: ${balance?.toFixed(2)}
-                  </div>
+                  <div>Balance: ${balance?.toFixed(2)}</div>
                 </div>
               </div>
 
-              <div className="dropdown-divider" />
-
-              <div className="dropdown-item" onClick={() => window.location.href = '/settings/profile'}>
+              <div className="dropdown-item" onClick={() => (window.location.href = '/settings/profile')}>
                 <User size={16} /> Profile
               </div>
 
-              <div className="dropdown-item" onClick={() => window.location.href = '/settings/security'}>
+              <div className="dropdown-item" onClick={() => (window.location.href = '/settings/security')}>
                 <Shield size={16} /> Security
               </div>
 
-              <div className="dropdown-item" onClick={() => window.location.href = '/settings'}>
+              <div className="dropdown-item" onClick={() => (window.location.href = '/settings')}>
                 <Settings size={16} /> Settings
               </div>
-
-              <div className="dropdown-divider" />
 
               <button className="dropdown-item logout-button" onClick={handleLogout}>
                 <LogOut size={16} /> Logout

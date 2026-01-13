@@ -11,9 +11,9 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  flex-wrap: wrap; /* Add this to allow wrapping */
 }
 
+/* Left & Right */
 .header-left,
 .header-right {
   display: flex;
@@ -32,10 +32,10 @@
 }
 
 .menu-button:hover {
-  background: rgba(59,130,246,0.2);
+  background: rgba(59, 130, 246, 0.2);
 }
 
-/* Icons */
+/* Icon Buttons */
 .icon-button {
   background: none;
   border: none;
@@ -46,6 +46,11 @@
   position: relative;
 }
 
+.icon-button:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+/* Notification badge */
 .notification-badge {
   position: absolute;
   top: 4px;
@@ -58,6 +63,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Status dots */
+.header-status {
+  display: flex;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
 /* Profile */
@@ -105,13 +122,13 @@
   border: 1px solid #334155;
   border-radius: 8px;
   width: 220px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
   z-index: 30;
 }
 
 .dropdown-header {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   padding: 12px;
   border-bottom: 1px solid #334155;
 }
@@ -133,35 +150,32 @@
   border: none;
   color: #ef4444;
   width: 100%;
+  text-align: left;
 }
 
-/* Status dots */
-.header-status {
-  display: flex;
-  gap: 8px;
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-/* Mobile */
+/* =========================
+   Mobile (FINAL, CLEAN)
+========================= */
 @media (max-width: 768px) {
-  .header-right {
-    gap: 0.4rem; /* Reduce gap further if needed */
+  .header {
+    padding: 0 0.75rem;
   }
-  
-  /* Ensure header-left and header-right stay in order on wrap */
+
   .header-left {
-    order: 1;
+    flex-shrink: 0;
   }
-  
+
   .header-right {
-    order: 2;
-    flex: 1; /* Allow it to shrink if needed */
-    justify-content: flex-end; /* Push icons to the right */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+
+  .profile-dropdown {
+    right: 0;
+    left: auto;
+    width: 90vw;
+    max-width: 280px;
   }
 }
-
