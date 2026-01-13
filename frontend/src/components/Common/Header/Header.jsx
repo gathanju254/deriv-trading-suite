@@ -10,7 +10,7 @@ import './Header.css';
 const Header = () => {
   const { toggleSidebar, toggleMobileMenu } = useApp();
   const { user, logout } = useAuth();
-  const { balance } = useTrading();
+  const { botStatus, wsConnectionStatus, balance } = useTrading();
   const { addToast } = useToast();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
@@ -47,6 +47,24 @@ const Header = () => {
 
   const getInitials = (email) => email ? email.charAt(0).toUpperCase() : 'U';
 
+  const getBotStatusColor = (status) => {
+    switch (status) {
+      case 'running': return '#10b981';
+      case 'stopped': return '#ef4444';
+      case 'connecting': return '#f59e0b';
+      default: return '#6b7280';
+    }
+  };
+
+  const getWsStatusColor = (status) => {
+    switch (status) {
+      case 'connected': return '#10b981';
+      case 'disconnected': return '#ef4444';
+      case 'connecting': return '#f59e0b';
+      default: return '#6b7280';
+    }
+  };
+
   return (
     <header className="header">
       <div className="header-left">
@@ -70,6 +88,20 @@ const Header = () => {
       </div>
 
       <div className="header-right">
+        {/* Real-time Status Dots */}
+        <div className="header-status">
+          <div 
+            className="status-dot bot-header-status"
+            style={{ backgroundColor: getBotStatusColor(botStatus) }}
+            title={`Bot: ${botStatus.charAt(0).toUpperCase() + botStatus.slice(1)}`}
+          />
+          <div 
+            className="status-dot ws-header-status"
+            style={{ backgroundColor: getWsStatusColor(wsConnectionStatus) }}
+            title={`WS: ${wsConnectionStatus.charAt(0).toUpperCase() + wsConnectionStatus.slice(1)}`}
+          />
+        </div>
+
         {/* Notifications */}
         <button 
           className="icon-button notification-button" 
