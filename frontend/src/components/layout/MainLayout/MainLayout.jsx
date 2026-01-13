@@ -1,8 +1,7 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import Header from '../../common/Header/Header';
-import Sidebar from '../../common/Sidebar/Sidebar';
+import { Header, Sidebar } from '../../Common';
 import Footer from '../../layout/Footer/Footer';
 import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
