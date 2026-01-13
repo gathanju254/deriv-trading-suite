@@ -11,6 +11,7 @@
   position: sticky;
   top: 0;
   z-index: 20;
+  flex-wrap: wrap; /* Add this to allow wrapping */
 }
 
 .header-left,
@@ -149,7 +150,18 @@
 /* Mobile */
 @media (max-width: 768px) {
   .header-right {
-    gap: 0.4rem;
+    gap: 0.4rem; /* Reduce gap further if needed */
+  }
+  
+  /* Ensure header-left and header-right stay in order on wrap */
+  .header-left {
+    order: 1;
+  }
+  
+  .header-right {
+    order: 2;
+    flex: 1; /* Allow it to shrink if needed */
+    justify-content: flex-end; /* Push icons to the right */
   }
 }
 
