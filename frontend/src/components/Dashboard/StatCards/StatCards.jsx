@@ -1,5 +1,5 @@
 // frontend/src/components/Dashboard/StatCards/StatCards.jsx
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useTrading } from '../../../hooks/useTrading';
 import {
   DollarSign,
@@ -8,15 +8,15 @@ import {
   Target,
   ArrowUpRight,
   ArrowDownRight,
-  Zap,
+  Zap
 } from 'lucide-react';
 
 const StatCards = () => {
   const { performance, wsConnectionStatus } = useTrading();
-  const prevRef = useRef({});
   const [updatedCard, setUpdatedCard] = useState(null);
+  const prevRef = useRef({});
 
-  const stats = {
+  const normalized = {
     totalProfit: performance?.total_profit ?? performance?.pnl ?? 0,
     winRate: performance?.win_rate ?? 0,
     totalTrades: performance?.total_trades ?? 0,
@@ -25,98 +25,99 @@ const StatCards = () => {
   };
 
   useEffect(() => {
-    const prev = prevRef.current;
-    const changed = Object.keys(stats).find(
-      key => prev[key] !== undefined && prev[key] !== stats[key]
-    );
-
-    if (changed) {
-      setUpdatedCard(changed);
-      setTimeout(() => setUpdatedCard(null), 700);
+    for (const key in normalized) {
+      if (prevRef.current[key] !== normalized[key]) {
+        setUpdatedCard(key);
+        setTimeout(() => setUpdatedCard(null), 600);
+        break;
+      }
     }
-
-    prevRef.current = stats;
-  }, [stats]);
+    prevRef.current = normalized;
+  }, [normalized]);
 
   const cards = [
     {
       id: 'totalProfit',
       title: 'Total P&L',
-      value: `$${stats.totalProfit.toFixed(2)}`,
-      sub: `Daily: $${stats.dailyPnl.toFixed(2)}`,
+      value: `$${normalized.totalProfit.toFixed(2)}`,
       icon: DollarSign,
-      accent: stats.totalProfit >= 0 ? 'emerald' : 'red',
+      accent: normalized.totalProfit >= 0 ? 'emerald' : 'red',
+      sub: `Daily: $${normalized.dailyPnl.toFixed(2)}`
     },
     {
       id: 'winRate',
       title: 'Win Rate',
-      value: `${stats.winRate.toFixed(1)}%`,
-      sub: `${performance?.winning_trades ?? 0} wins`,
+      value: `${normalized.winRate.toFixed(1)}%`,
       icon: Percent,
       accent: 'blue',
+      sub: `${performance?.winning_trades ?? 0}/${performance?.completed_trades ?? 0}`
     },
     {
       id: 'totalTrades',
-      title: 'Trades',
-      value: stats.totalTrades.toString(),
-      sub: `Active: ${performance?.active_trades ?? 0}`,
+      title: 'Total Trades',
+      value: normalized.totalTrades,
       icon: BarChart3,
       accent: 'violet',
+      sub: `Active: ${performance?.active_trades ?? 0}`
     },
     {
       id: 'sharpeRatio',
-      title: 'Sharpe',
-      value: stats.sharpeRatio.toFixed(2),
-      sub: `Drawdown: ${performance?.max_drawdown?.toFixed(1) ?? '0.0'}%`,
+      title: 'Sharpe Ratio',
+      value: normalized.sharpeRatio.toFixed(2),
       icon: Target,
       accent: 'amber',
-    },
+      sub: `Drawdown: ${performance?.max_drawdown?.toFixed(1) ?? '0.0'}%`
+    }
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-      {cards.map(card => {
-        const Icon = card.icon;
-        const isUpdated = updatedCard === card.id;
+    <div className="w-full">
+      <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map(card => {
+          const Icon = card.icon;
+          const pulse = updatedCard === card.id;
 
-        return (
-          <div
-            key={card.id}
-            className={`
-              relative rounded-2xl border border-slate-800
-              bg-gradient-to-br from-slate-900 to-slate-950
-              p-6 transition-all duration-300
-              ${isUpdated ? 'ring-2 ring-emerald-500/40' : ''}
-            `}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">{card.title}</span>
-              <Icon className={`h-5 w-5 text-${card.accent}-400`} />
+          return (
+            <div
+              key={card.id}
+              className={`relative flex h-full flex-col justify-between rounded-xl border border-slate-800
+                bg-gradient-to-br from-slate-900 to-slate-800 p-5 transition-all
+                ${pulse ? 'ring-2 ring-emerald-500/40 scale-[1.02]' : 'hover:scale-[1.02]'}
+              `}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`rounded-lg bg-${card.accent}-500/15 p-2 text-${card.accent}-400`}
+                  >
+                    <Icon size={18} />
+                  </div>
+                  <span className="text-sm font-medium text-slate-300">
+                    {card.title}
+                  </span>
+                </div>
+
+                {wsConnectionStatus === 'connected' && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400">
+                    <Zap size={12} /> LIVE
+                  </span>
+                )}
+              </div>
+
+              {/* Value */}
+              <div className="mt-4 text-3xl font-bold text-slate-100">
+                {card.value}
+              </div>
+
+              {/* Sub */}
+              <div className="mt-2 text-xs text-slate-400">
+                {card.sub}
+              </div>
             </div>
-
-            {/* Value */}
-            <div className="mt-4 text-3xl font-semibold tracking-tight text-slate-100">
-              {card.value}
-            </div>
-
-            {/* Sub + live */}
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-              <span>{card.sub}</span>
-              {wsConnectionStatus === 'connected' && (
-                <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                  <Zap size={12} /> LIVE
-                </span>
-              )}
-            </div>
-
-            {/* Update glow */}
-            {isUpdated && (
-              <span className="absolute inset-0 rounded-2xl bg-emerald-500/5 pointer-events-none" />
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };
