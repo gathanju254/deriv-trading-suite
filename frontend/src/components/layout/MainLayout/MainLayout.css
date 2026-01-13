@@ -1,584 +1,87 @@
 /* frontend/src/components/layout/MainLayout/MainLayout.css */
-/* ===================================== */
-/* =========== MAIN LAYOUT ============= */
-/* ===================================== */
-
+/* =====================================
+   Main Layout
+===================================== */
 .main-layout {
   display: flex;
   min-height: 100vh;
   background-color: #0f172a;
+  transition: all 0.3s ease;
   position: relative;
-  overflow-x: hidden;
-  transition: background-color 0.3s ease;
 }
 
 .main-layout.loaded {
-  animation: layoutFadeIn 0.5s ease-out;
-}
-
-/* ===================================== */
-/* ======== SKIP LINK (A11Y) =========== */
-/* ===================================== */
-
-.skip-link {
-  position: absolute;
-  top: -100px;
-  left: 0;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  color: white;
-  padding: 12px 20px;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 0.875rem;
-  border-radius: 0 0 8px 0;
-  z-index: 10000;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-  opacity: 0;
-}
-
-.skip-link:focus {
-  transform: translateY(100px);
   opacity: 1;
-  outline: 3px solid #f59e0b;
-  outline-offset: 2px;
 }
 
-/* ===================================== */
-/* ========== MOBILE OVERLAY =========== */
-/* ===================================== */
+.sidebar-collapsed .main-content {
+  margin-left: 80px;
+}
 
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  margin-left: 250px; /* default sidebar width */
+  position: relative;
+}
+
+.content-area {
+  flex: 1;
+  padding: 1.5rem;
+}
+
+/* Mobile menu overlay */
 .mobile-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  z-index: 49;
-  animation: overlayFadeIn 0.3s ease-out;
-  display: none;
-  cursor: pointer;
-  opacity: 0;
+  background-color: rgba(15, 23, 42, 0.8);
+  z-index: 20;
 }
 
-.main-layout.mobile-menu-open .mobile-overlay {
-  display: block;
-  opacity: 1;
-}
-
-.mobile-overlay:hover::before {
-  content: 'Click anywhere to close';
+/* Skip link for accessibility */
+.skip-link {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 10px 20px;
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 20px;
-  backdrop-filter: blur(10px);
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 50;
-}
-
-/* Ripple effect only on hover for better UX */
-.mobile-overlay:hover::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 80px;
-  height: 80px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  animation: ripplePulse 2s infinite ease-in-out;
-  pointer-events: none;
-  z-index: 51;
-}
-
-/* ===================================== */
-/* ============ MAIN CONTENT =========== */
-/* ===================================== */
-
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  position: relative;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.5s ease,
-              transform 0.5s ease;
-  opacity: 0;
-  transform: translateY(10px);
-  width: 100%;
-  margin-left: 250px; /* Default sidebar width */
-}
-
-.main-content.fade-in {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.main-content.content-loaded {
-  animation: contentSlideUp 0.5s ease-out;
-}
-
-/* Collapsed sidebar state */
-.main-layout.sidebar-collapsed .main-content {
-  margin-left: 80px;
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ===================================== */
-/* ============ CONTENT AREA =========== */
-/* ===================================== */
-
-.content-area {
-  flex: 1;
-  padding: 24px;
-  background: linear-gradient(135deg, 
-              rgba(15, 23, 42, 0.95) 0%, 
-              rgba(30, 41, 59, 0.95) 100%);
-  overflow-y: auto;
-  scroll-behavior: smooth;
-  min-height: calc(100vh - 128px);
-  position: relative;
-  backdrop-filter: blur(10px);
-  border-left: 1px solid rgba(148, 163, 184, 0.1);
-}
-
-.content-area::before {
-  content: '';
-  position: absolute;
-  top: 0;
+  top: -40px;
   left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, 
-              transparent, 
-              rgba(59, 130, 246, 0.4), 
-              transparent);
-  z-index: 1;
-}
-
-/* Subtle grid background */
-.content-area::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: 
-    linear-gradient(rgba(59, 130, 246, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, 0.05) 1px, transparent 1px);
-  background-size: 40px 40px;
-  background-position: center center;
-  z-index: -1;
-  opacity: 0.3;
-  pointer-events: none;
-}
-
-/* ===================================== */
-/* ============ ANIMATIONS ============= */
-/* ===================================== */
-
-@keyframes layoutFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes contentSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes overlayFadeIn {
-  from {
-    opacity: 0;
-    backdrop-filter: blur(0);
-  }
-  to {
-    opacity: 1;
-    backdrop-filter: blur(12px);
-  }
-}
-
-@keyframes ripplePulse {
-  0% {
-    transform: translate(-50%, -50%) scale(0.8);
-    opacity: 0.6;
-    border-width: 1px;
-  }
-  50% {
-    transform: translate(-50%, -50%) scale(1.2);
-    opacity: 0.3;
-    border-width: 3px;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1.6);
-    opacity: 0;
-    border-width: 1px;
-  }
-}
-
-/* ===================================== */
-/* ======== RESPONSIVE DESIGN ========== */
-/* ===================================== */
-
-/* Tablet (768px and below) */
-@media (max-width: 768px) {
-  .main-layout {
-    flex-direction: column;
-  }
-  
-  .main-content {
-    margin-left: 0 !important;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .main-layout.mobile-menu-open .main-content {
-    transform: translateX(280px);
-    filter: blur(2px);
-    pointer-events: none;
-    user-select: none;
-  }
-  
-  .content-area {
-    padding: 16px;
-    min-height: calc(100vh - 116px);
-    background: linear-gradient(135deg, 
-                rgba(15, 23, 42, 0.98) 0%, 
-                rgba(30, 41, 59, 0.98) 100%);
-  }
-  
-  /* Adjust sidebar width for mobile */
-  .sidebar {
-    width: 280px !important;
-  }
-  
-  /* Enhanced mobile overlay for landscape */
-  @media (orientation: landscape) and (max-height: 500px) {
-    .mobile-overlay:hover::before {
-      content: 'Tap to close';
-      font-size: 0.75rem;
-      padding: 8px 16px;
-      background: rgba(0, 0, 0, 0.7);
-    }
-    
-    .content-area {
-      padding: 12px;
-      min-height: calc(100vh - 100px);
-    }
-    
-    .mobile-overlay:hover::after {
-      width: 60px;
-      height: 60px;
-    }
-  }
-}
-
-/* Mobile (480px and below) */
-@media (max-width: 480px) {
-  .content-area {
-    padding: 12px;
-    min-height: calc(100vh - 112px);
-  }
-  
-  .skip-link {
-    padding: 10px 16px;
-    font-size: 0.75rem;
-  }
-  
-  .mobile-overlay:hover::before {
-    font-size: 0.75rem;
-    padding: 8px 16px;
-  }
-  
-  .mobile-overlay:hover::after {
-    width: 60px;
-    height: 60px;
-  }
-}
-
-/* Small mobile (360px and below) */
-@media (max-width: 360px) {
-  .content-area {
-    padding: 8px;
-    min-height: calc(100vh - 108px);
-  }
-  
-  .main-layout.mobile-menu-open .main-content {
-    transform: translateX(260px);
-  }
-  
-  .sidebar {
-    width: 260px !important;
-  }
-}
-
-/* Large desktop (1440px and above) */
-@media (min-width: 1440px) {
-  .content-area {
-    max-width: 1400px;
-    margin: 0 auto;
-    width: 100%;
-    border-left: 1px solid rgba(148, 163, 184, 0.15);
-    border-right: 1px solid rgba(148, 163, 184, 0.15);
-  }
-}
-
-/* ===================================== */
-/* ============ ACCESSIBILITY ========== */
-/* ===================================== */
-
-/* Focus indicators for keyboard navigation */
-.main-content:focus-within {
-  outline: 2px solid rgba(59, 130, 246, 0.6);
-  outline-offset: -2px;
+  background: #3b82f6;
+  color: white;
+  padding: 8px 16px;
   border-radius: 4px;
+  z-index: 50;
+  transition: top 0.3s ease;
 }
 
-/* Ensure focus states are visible in high contrast mode */
-@media (prefers-contrast: high) {
-  .main-content:focus-within {
-    outline: 3px solid #3b82f6;
-    outline-offset: -3px;
-  }
-  
-  .skip-link:focus {
-    outline: 4px solid #f59e0b;
-  }
+.skip-link:focus {
+  top: 8px;
 }
 
-/* Reduced motion preferences */
-@media (prefers-reduced-motion: reduce) {
-  .main-layout,
-  .main-content,
-  .mobile-overlay,
-  .skip-link,
-  .content-area {
-    animation: none !important;
-    transition: none !important;
-  }
-  
-  .main-content {
-    opacity: 1;
-    transform: none;
-  }
-  
-  .main-layout.mobile-menu-open .main-content {
-    transform: none;
-    filter: none;
-  }
-  
-  .mobile-overlay {
-    animation: none;
-    backdrop-filter: none;
-  }
-  
-  .mobile-overlay:hover::after {
-    animation: none;
-    display: none;
-  }
+/* Fade-in for content */
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out forwards;
 }
 
-/* High contrast mode */
-@media (prefers-contrast: high) {
-  .mobile-overlay {
-    background: rgba(0, 0, 0, 0.95);
-    backdrop-filter: none;
-  }
-  
-  .content-area::before {
-    background: linear-gradient(90deg, 
-                transparent, 
-                #3b82f6, 
-                transparent);
-    height: 2px;
-  }
-  
-  .content-area::after {
-    background-image: 
-      linear-gradient(#3b82f6 1px, transparent 1px),
-      linear-gradient(90deg, #3b82f6 1px, transparent 1px);
-  }
-  
-  .skip-link {
-    border: 3px solid white;
-    background: #1d4ed8;
-  }
+.content-loaded {
+  animation: slideInLeft 0.5s ease forwards;
 }
 
-/* Dark mode optimization */
-@media (prefers-color-scheme: dark) {
-  .main-layout {
-    background-color: #0a0f1a;
-  }
-  
-  .content-area {
-    background: linear-gradient(135deg, 
-                rgba(10, 15, 26, 0.95) 0%, 
-                rgba(26, 34, 53, 0.95) 100%);
-    border-left-color: rgba(148, 163, 184, 0.15);
-  }
-  
-  .content-area::after {
-    background-image: 
-      linear-gradient(rgba(59, 130, 246, 0.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(59, 130, 246, 0.08) 1px, transparent 1px);
-  }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* Light mode support */
-@media (prefers-color-scheme: light) {
-  .main-layout {
-    background-color: #f1f5f9;
-  }
-  
-  .content-area {
-    background: linear-gradient(135deg, 
-                rgba(241, 245, 249, 0.95) 0%, 
-                rgba(226, 232, 240, 0.95) 100%);
-    border-left: 1px solid rgba(148, 163, 184, 0.2);
-  }
-  
-  .content-area::before {
-    background: linear-gradient(90deg, 
-                transparent, 
-                rgba(59, 130, 246, 0.3), 
-                transparent);
-  }
-  
-  .content-area::after {
-    background-image: 
-      linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
-  }
-  
-  .mobile-overlay {
-    background: rgba(255, 255, 255, 0.92);
-  }
-  
-  .mobile-overlay:hover::before {
-    color: rgba(0, 0, 0, 0.8);
-    background: rgba(255, 255, 255, 0.9);
-  }
-  
-  .mobile-overlay:hover::after {
-    border-color: rgba(0, 0, 0, 0.2);
-  }
-  
-  .skip-link {
-    background: linear-gradient(135deg, #1d4ed8, #1e40af);
-    border: 2px solid #3b82f6;
-  }
+@keyframes slideInLeft {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
-/* ===================================== */
-/* ========== PERFORMANCE ============== */
-/* ===================================== */
-
-/* Hardware acceleration for smoother animations */
-.main-content,
-.mobile-overlay,
-.content-area {
-  will-change: transform, opacity;
-  transform: translateZ(0);
-}
-
-/* Optimize scrolling performance */
-.content-area {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: #475569 #1e293b;
-}
-
-/* Optimize transitions for mobile */
+/* Responsive adjustments */
 @media (max-width: 768px) {
-  .main-content,
-  .mobile-overlay {
-    transition-duration: 0.25s;
-  }
-}
-
-/* ===================================== */
-/* =========== PRINT STYLES ============ */
-/* ===================================== */
-
-@media print {
-  .main-layout {
-    background: white !important;
-  }
-  
   .main-content {
-    margin-left: 0 !important;
-    opacity: 1 !important;
-    transform: none !important;
+    margin-left: 0;
   }
-  
-  .content-area {
-    background: white !important;
-    border: none !important;
-    min-height: auto !important;
-  }
-  
-  .content-area::before,
-  .content-area::after {
-    display: none !important;
-  }
-  
-  .mobile-overlay {
-    display: none !important;
-  }
-  
-  .skip-link {
-    display: none !important;
-  }
-}
-
-/* ===================================== */
-/* ========== ERROR STATES ============= */
-/* ===================================== */
-
-/* Error state styling for debugging */
-.main-layout.error {
-  border: 2px solid #ef4444;
-}
-
-.main-content.error {
-  background: rgba(239, 68, 68, 0.05);
-}
-
-/* Debug outline for development */
-.debug .main-layout {
-  outline: 1px dashed rgba(59, 130, 246, 0.3);
-}
-
-.debug .main-content {
-  outline: 1px dashed rgba(16, 185, 129, 0.3);
-}
-
-.debug .content-area {
-  outline: 1px dashed rgba(245, 158, 11, 0.3);
 }
