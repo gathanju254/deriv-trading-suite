@@ -1,5 +1,4 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
-// frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Header from '../../common/Header/Header';
@@ -13,7 +12,6 @@ const MainLayout = () => {
   const { sidebarCollapsed, mobileMenuOpen, toggleMobileMenu } = useApp();
   const { loading, refreshAllData } = useTrading();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [showLoading, setShowLoading] = useState(false);
   const location = useLocation();
 
   // Map routes to page titles
@@ -25,28 +23,26 @@ const MainLayout = () => {
   };
   const pageTitle = PAGE_TITLES[location.pathname] || 'Deriv Trading Suite';
 
-  // Handle initial load animation & refresh data on route change
+  // Initial load
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoaded(true), 100);
-    refreshAllData();
-    return () => clearTimeout(timer);
-  }, [location.pathname, refreshAllData]);
-
-  // Show/hide loading overlay
-  useEffect(() => {
-    if (loading) {
-      setShowLoading(true);
-    } else {
-      const timer = setTimeout(() => setShowLoading(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [loading]);
+    setIsLoaded(false);
+    const load = async () => {
+      try {
+        await refreshAllData(); // wait until data finishes
+      } catch (err) {
+        console.error('Failed to refresh data', err);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    load();
+  }, []); // 🔹 only once on mount
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-gray-100 overflow-hidden">
 
       {/* Loading Overlay */}
-      {showLoading && (
+      {!isLoaded && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="relative">
             <div className="w-16 h-16 border-4 border-gray-700 border-t-blue-500 rounded-full animate-spin" />
@@ -61,11 +57,7 @@ const MainLayout = () => {
       <Sidebar />
 
       {/* Main content */}
-      <div className={`
-        flex flex-col min-h-screen transition-all duration-300 ease-in-out
-        ${isLoaded ? 'opacity-100' : 'opacity-0'}
-        ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}
-      `}>
+      <div className={`flex flex-col min-h-screen transition-all duration-300 ease-in-out ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
 
         {/* Header */}
         <Header />
@@ -87,12 +79,7 @@ const MainLayout = () => {
         {/* Main Content Area */}
         <main className="flex-1 p-4 md:p-6 overflow-auto custom-scrollbar">
           <div className="max-w-7xl mx-auto">
-            <div className={`
-              bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm
-              border border-gray-800 rounded-2xl shadow-2xl overflow-hidden
-              transition-all duration-300
-              ${mobileMenuOpen ? 'blur-sm md:blur-0' : ''}
-            `}>
+            <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm border border-gray-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
               <Outlet />
             </div>
           </div>
