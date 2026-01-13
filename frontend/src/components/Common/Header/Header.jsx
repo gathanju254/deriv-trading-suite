@@ -9,56 +9,48 @@ import './Header.css';
 
 const Header = () => {
   const { toggleSidebar, toggleMobileMenu } = useApp();
-  const { user, logout, isAuthenticated } = useAuth();
-  const { botStatus, wsConnectionStatus, balance } = useTrading();
+  const { user, logout } = useAuth();
+  const { balance } = useTrading();
   const { addToast } = useToast();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
 
-  // Handle click outside to close profile menu
+  // Close profile menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
         setShowProfileMenu(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Close profile menu on Escape key
   useEffect(() => {
-    if (!showProfileMenu) return;
-
     const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        setShowProfileMenu(false);
-      }
+      if (e.key === 'Escape') setShowProfileMenu(false);
     };
-
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
-  }, [showProfileMenu]);
+  }, []);
 
   const handleLogout = async () => {
     try {
       await logout();
       addToast('Logged out successfully', 'success');
       setShowProfileMenu(false);
-    } catch (error) {
+    } catch {
       addToast('Logout failed', 'error');
     }
   };
 
-  const getInitials = (email) => {
-    if (!email) return 'U';
-    return email.charAt(0).toUpperCase();
-  };
+  const getInitials = (email) => email ? email.charAt(0).toUpperCase() : 'U';
 
   return (
     <header className="header">
       <div className="header-left">
+        {/* Mobile menu toggle */}
         <button 
           className="menu-button" 
           onClick={toggleMobileMenu}
@@ -66,6 +58,8 @@ const Header = () => {
         >
           <Menu size={24} />
         </button>
+
+        {/* Desktop sidebar toggle */}
         <button 
           className="sidebar-toggle" 
           onClick={toggleSidebar}
@@ -76,7 +70,7 @@ const Header = () => {
       </div>
 
       <div className="header-right">
-        {/* Notifications with Badge */}
+        {/* Notifications */}
         <button 
           className="icon-button notification-button" 
           aria-label="Notifications"
@@ -95,7 +89,7 @@ const Header = () => {
           <Settings size={20} />
         </button>
 
-        {/* User Profile with Dropdown */}
+        {/* Profile Dropdown */}
         <div className="profile-container" ref={profileMenuRef}>
           <button 
             className="profile-button"
@@ -103,9 +97,7 @@ const Header = () => {
             aria-label="User profile"
             aria-expanded={showProfileMenu}
           >
-            <div className="avatar">
-              {user?.email ? getInitials(user.email) : 'U'}
-            </div>
+            <div className="avatar">{getInitials(user?.email)}</div>
             {user?.email && (
               <span className="user-email">
                 {user.email.split('@')[0]}
@@ -114,42 +106,38 @@ const Header = () => {
             )}
           </button>
 
-          {/* Dropdown Menu */}
           {showProfileMenu && (
             <div className="profile-dropdown">
+              {/* Header */}
               <div className="dropdown-header">
-                <div className="dropdown-avatar">
-                  {user?.email ? getInitials(user.email) : 'U'}
-                </div>
+                <div className="dropdown-avatar">{getInitials(user?.email)}</div>
                 <div className="dropdown-user-info">
                   <div className="dropdown-email">{user?.email || 'User'}</div>
                   <div className="dropdown-account">
-                    Account: {user?.accountId ? `${user.accountId.slice(0, 8)}...` : 'N/A'}
+                    Account: {user?.accountId ? `${user.accountId.slice(0,8)}...` : 'N/A'}
+                  </div>
+                  <div className="dropdown-balance">
+                    Balance: ${balance?.toFixed(2)}
                   </div>
                 </div>
               </div>
-              
+
               <div className="dropdown-divider" />
-              
+
+              {/* Actions */}
               <div className="dropdown-section">
                 <div className="dropdown-item" onClick={() => window.location.href = '/settings/profile'}>
-                  <User size={16} />
-                  <span>Profile Settings</span>
+                  <User size={16} /><span>Profile Settings</span>
                 </div>
                 <div className="dropdown-item" onClick={() => window.location.href = '/settings/security'}>
-                  <Shield size={16} />
-                  <span>Security</span>
+                  <Shield size={16} /><span>Security</span>
                 </div>
               </div>
-              
+
               <div className="dropdown-divider" />
-              
-              <button 
-                className="dropdown-item logout-button" 
-                onClick={handleLogout}
-              >
-                <LogOut size={16} />
-                <span>Logout</span>
+
+              <button className="dropdown-item logout-button" onClick={handleLogout}>
+                <LogOut size={16} /><span>Logout</span>
               </button>
             </div>
           )}
