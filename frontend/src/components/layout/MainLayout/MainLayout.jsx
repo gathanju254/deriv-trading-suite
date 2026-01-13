@@ -10,7 +10,18 @@ import { Clock, RefreshCw, Bell, Settings, Play, StopCircle } from 'lucide-react
 
 const MainLayout = () => {
   const { sidebarCollapsed, mobileMenuOpen, toggleMobileMenu } = useApp();
-  const { loading, refreshAllData, lastUpdateTime, wsConnectionStatus, botStatus, handleQuickBotToggle, autoRefresh, refreshProgress, handleManualRefresh } = useTrading();
+  const {
+    loading,
+    refreshAllData,
+    lastUpdateTime,
+    wsConnectionStatus,
+    botStatus,
+    handleQuickBotToggle,
+    autoRefresh,
+    refreshProgress,
+    handleManualRefresh,
+  } = useTrading();
+
   const [isLoaded, setIsLoaded] = useState(false);
   const location = useLocation();
 
@@ -20,9 +31,8 @@ const MainLayout = () => {
     '/analytics': 'Analytics',
     '/settings': 'Settings',
   };
-  const pageTitle = PAGE_TITLES[location.pathname] || 'Deriv Trading Suite';
+  const pageTitle = PAGE_TITLES[location.pathname] || 'Trading Suite';
 
-  // Initial data load
   useEffect(() => {
     setIsLoaded(false);
     const loadData = async () => {
@@ -37,7 +47,6 @@ const MainLayout = () => {
     loadData();
   }, []);
 
-  // Helper to format time since last update
   const formatTimeSince = (timestamp) => {
     if (!timestamp) return '—';
     const diff = Math.floor((Date.now() - new Date(timestamp)) / 1000);
@@ -53,9 +62,9 @@ const MainLayout = () => {
       {!isLoaded && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-md">
           <LoadingSpinner 
-            size="xl" 
-            text="Loading dashboard..." 
-            type="premium" 
+            size="xl"
+            text="Loading dashboard..."
+            type="premium"
             fullScreen
           />
         </div>
@@ -70,7 +79,7 @@ const MainLayout = () => {
         {/* ================= HEADER ================= */}
         <Header>
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-6 py-4 bg-gray-900/50 backdrop-blur-sm border-b border-gray-800">
-            
+
             {/* Title & Status */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
@@ -90,8 +99,12 @@ const MainLayout = () => {
 
             {/* Controls */}
             <div className="flex items-center gap-2 mt-3 md:mt-0">
+
+              {/* Start/Stop Bot */}
               <button
-                className={`flex items-center gap-1 px-3 py-1 rounded-lg font-semibold transition-colors ${botStatus === 'running' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                className={`flex items-center gap-1 px-3 py-1 rounded-lg font-semibold transition-colors ${
+                  botStatus === 'running' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+                }`}
                 onClick={handleQuickBotToggle}
                 disabled={loading}
               >
@@ -99,6 +112,7 @@ const MainLayout = () => {
                 {botStatus === 'running' ? 'Stop Bot' : 'Start Bot'}
               </button>
 
+              {/* Manual Refresh */}
               <button
                 className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors relative"
                 onClick={() => handleManualRefresh('all')}
@@ -106,10 +120,14 @@ const MainLayout = () => {
               >
                 <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                 {autoRefresh && (
-                  <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-300" style={{ width: `${refreshProgress}%` }} />
+                  <div
+                    className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-300"
+                    style={{ width: `${refreshProgress}%` }}
+                  />
                 )}
               </button>
 
+              {/* Notifications & Settings */}
               <button className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors">
                 <Bell size={18} />
               </button>
@@ -120,7 +138,7 @@ const MainLayout = () => {
           </div>
         </Header>
 
-        {/* Main Content Area */}
+        {/* ================= MAIN CONTENT ================= */}
         <main className="flex-1 p-4 md:p-6 overflow-auto custom-scrollbar">
           <div className="max-w-7xl mx-auto">
             <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm border border-gray-800 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
@@ -135,7 +153,7 @@ const MainLayout = () => {
 
       {/* Mobile Menu Backdrop */}
       {mobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-30 md:hidden bg-black/70 backdrop-blur-sm transition-opacity duration-300"
           onClick={toggleMobileMenu}
         />
@@ -145,3 +163,4 @@ const MainLayout = () => {
 };
 
 export default MainLayout;
+
