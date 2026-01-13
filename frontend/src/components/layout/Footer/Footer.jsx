@@ -1,7 +1,7 @@
 // frontend/src/components/Layout/Footer/Footer.jsx
+// frontend/src/components/Layout/Footer/Footer.jsx
 import React from 'react';
 import { useTrading } from '../../../hooks/useTrading';
-import './Footer.css';
 
 const Footer = () => {
   const { botStatus, wsConnectionStatus } = useTrading();
@@ -9,7 +9,7 @@ const Footer = () => {
   const getStatusColor = (type, status) => {
     const map = {
       bot: { running: 'bg-green-500', stopped: 'bg-red-500', connecting: 'bg-yellow-500' },
-      ws: { connected: 'bg-green-500', disconnected: 'bg-red-500', connecting: 'bg-yellow-500' }
+      ws: { connected: 'bg-green-500', disconnected: 'bg-red-500', connecting: 'bg-yellow-500' },
     };
     return map[type][status] || 'bg-gray-500';
   };

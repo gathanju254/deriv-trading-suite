@@ -1,67 +1,35 @@
-// frontend/src/components/layout/MainLayout/MainLayout.jsx
-// frontend/src/components/layout/MainLayout/MainLayout.jsx
-import React, { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom'; // Add this import
-import Header from '../../../components/Common/Header/Header';
-import Sidebar from '../../../components/Common/Sidebar/Sidebar';
-import Footer from '../Footer/Footer';
+// frontend/src/components/Layout/MainLayout/MainLayout.jsx
+import React, { useState, useEffect } from 'react';
+import { Outlet } from 'react-router-dom';
+import Header from '../../Common/Header/Header';
+import Sidebar from '../../Common/Sidebar/Sidebar';
+import Footer from '../../Layout/Footer/Footer';
 import { useApp } from '../../../context/AppContext';
-import './MainLayout.css';
 
-const MainLayout = () => { // Remove children prop
+const MainLayout = () => {
   const { sidebarCollapsed, mobileMenuOpen, toggleMobileMenu } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [contentLoaded, setContentLoaded] = useState(false);
 
-  // Trigger fade-in on mount with staggered effect
   useEffect(() => {
-    setIsLoaded(true);
-    const timer = setTimeout(() => setContentLoaded(true), 300);
+    const timer = setTimeout(() => setIsLoaded(true), 100);
     return () => clearTimeout(timer);
   }, []);
 
   return (
-    <div 
-      className={`main-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${mobileMenuOpen ? 'mobile-menu-open' : ''} ${isLoaded ? 'loaded' : ''}`}
-      role="application"
-      aria-label="Main application layout"
-    >
-      {/* Enhanced skip link for accessibility */}
-      <a 
-        href="#main-content" 
-        className="skip-link"
-        aria-label="Skip to main content"
-      >
-        Skip to main content
-      </a>
-      
+    <div className="flex h-screen bg-gray-900 text-gray-200">
       <Sidebar />
-      
-      {/* Improved mobile overlay with better interaction */}
-      {mobileMenuOpen && (
-        <div 
-          className="mobile-overlay"
-          onClick={toggleMobileMenu}
-          onKeyDown={(e) => e.key === 'Escape' && toggleMobileMenu()}
-          tabIndex={-1}
-          aria-hidden="true"
-          role="presentation"
-        />
-      )}
-      
-      <div className={`main-content ${isLoaded ? 'fade-in' : ''} ${contentLoaded ? 'content-loaded' : ''}`}>
+
+      <div className={`flex flex-col flex-1 transition-all duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}>
         <Header />
-        <main 
-          id="main-content" 
-          className="content-area" 
-          role="main" 
-          aria-label="Main content area"
-        >
-          {/* Use Outlet to render child routes */}
+
+        <main id="main-content" className="flex-1 p-4 overflow-auto">
           <Outlet />
         </main>
+
         <Footer />
       </div>
+
+      {mobileMenuOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={toggleMobileMenu} />}
     </div>
   );
 };

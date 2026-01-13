@@ -1,15 +1,1 @@
 /* frontend/src/components/Layout/Footer/Footer.css */
-@keyframes pulse-slow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-  50% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
-}
-.animate-pulse-slow {
-  animation: pulse-slow 3s infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-pulse,
-  .animate-pulse-slow {
-    animation: none !important;
-  }
-}
