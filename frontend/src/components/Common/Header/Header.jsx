@@ -1,4 +1,5 @@
 // frontend/src/components/Common/Header/Header.jsx
+// frontend/src/components/Common/Header/Header.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Bell,
@@ -18,13 +19,7 @@ import { useTrading } from '../../../hooks/useTrading';
 import { useToast } from '../../../context/ToastContext';
 
 const Header = () => {
-  const {
-    darkMode,
-    toggleDarkMode,
-    toggleSidebar,
-    toggleMobileMenu,
-  } = useApp();
-
+  const { darkMode, toggleDarkMode, toggleSidebar, toggleMobileMenu } = useApp();
   const { user, logout } = useAuth();
   const { botStatus, wsConnectionStatus, balance } = useTrading();
   const { addToast } = useToast();
@@ -45,12 +40,12 @@ const Header = () => {
   const initials = user?.email?.[0]?.toUpperCase() || 'U';
 
   useEffect(() => {
-    const close = (e) => {
+    const closeMenus = (e) => {
       if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target)) setNotificationsOpen(false);
     };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
+    document.addEventListener('mousedown', closeMenus);
+    return () => document.removeEventListener('mousedown', closeMenus);
   }, []);
 
   const handleLogout = async () => {
@@ -69,22 +64,20 @@ const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-50 h-16 bg-gray-900/95 backdrop-blur border-b border-gray-800">
+    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-gray-900/95 backdrop-blur border-b border-gray-800 shadow-sm">
       <div className="h-full px-4 md:px-6 flex items-center justify-between">
 
-        {/* Left */}
+        {/* Left: Menu */}
         <div className="flex items-center gap-3">
           <button
-            onClick={() =>
-              window.innerWidth < 768 ? toggleMobileMenu() : toggleSidebar()
-            }
+            onClick={() => (window.innerWidth < 768 ? toggleMobileMenu() : toggleSidebar())}
             className="p-2 rounded-lg hover:bg-gray-800 transition"
           >
             <Menu size={22} />
           </button>
         </div>
 
-        {/* Right */}
+        {/* Right: Controls */}
         <div className="flex items-center gap-4">
 
           {/* Dark Mode */}
@@ -95,7 +88,7 @@ const Header = () => {
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          {/* Status */}
+          {/* Bot & Connection Status */}
           <div className="flex gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${statusDot(botStatus)}`} />
             <span className={`w-2.5 h-2.5 rounded-full ${statusDot(wsConnectionStatus)}`} />
@@ -104,7 +97,7 @@ const Header = () => {
           {/* Notifications */}
           <div className="relative" ref={notifRef}>
             <button
-              onClick={() => setNotificationsOpen(v => !v)}
+              onClick={() => setNotificationsOpen(prev => !prev)}
               className="p-2 rounded-lg hover:bg-gray-800 transition relative"
             >
               <Bell size={18} />
@@ -116,14 +109,12 @@ const Header = () => {
             </button>
 
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-xl">
-                <div className="p-3 font-semibold border-b border-gray-700">
-                  Notifications
-                </div>
+              <div className="absolute right-0 mt-2 w-72 bg-gray-800 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
+                <div className="p-3 font-semibold border-b border-gray-700">Notifications</div>
                 {notifications.map(n => (
                   <div
                     key={n.id}
-                    className={`px-3 py-2 text-sm hover:bg-gray-700 ${
+                    className={`px-3 py-2 text-sm hover:bg-gray-700 transition ${
                       n.unread ? 'bg-gray-900/50' : ''
                     }`}
                   >
@@ -137,7 +128,7 @@ const Header = () => {
           {/* Profile */}
           <div className="relative" ref={profileRef}>
             <button
-              onClick={() => setProfileOpen(v => !v)}
+              onClick={() => setProfileOpen(prev => !prev)}
               className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-800 transition"
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center font-bold">
@@ -168,7 +159,6 @@ const Header = () => {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </header>
@@ -178,7 +168,7 @@ const Header = () => {
 const MenuItem = ({ icon: Icon, label, to }) => (
   <button
     onClick={() => (window.location.href = to)}
-    className="w-full px-4 py-2 hover:bg-gray-700 flex items-center gap-2"
+    className="w-full px-4 py-2 hover:bg-gray-700 flex items-center gap-2 transition"
   >
     <Icon size={16} />
     {label}

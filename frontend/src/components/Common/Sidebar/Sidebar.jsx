@@ -18,16 +18,11 @@ import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
 
 const Sidebar = () => {
-  const {
-    sidebarCollapsed,
-    toggleSidebar,
-    mobileMenuOpen,
-    toggleMobileMenu,
-  } = useApp();
-
+  const { sidebarCollapsed, toggleSidebar, mobileMenuOpen, toggleMobileMenu } = useApp();
   const { balance, botStatus, wsConnectionStatus } = useTrading();
   const [pulse, setPulse] = useState(false);
 
+  // Pulse effect on balance update
   useEffect(() => {
     setPulse(true);
     const t = setTimeout(() => setPulse(false), 800);
@@ -44,19 +39,22 @@ const Sidebar = () => {
 
   return (
     <>
+      {/* Mobile overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/70 z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
           onClick={toggleMobileMenu}
         />
       )}
 
+      {/* Sidebar */}
       <aside
         className={`
           fixed left-0 top-0 z-50 h-full bg-gradient-to-b from-gray-900 to-gray-950
           border-r border-gray-800 transition-all duration-300
           ${sidebarCollapsed ? 'w-20' : 'w-64'}
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          flex flex-col justify-between
         `}
       >
         {/* Header */}
@@ -71,26 +69,24 @@ const Sidebar = () => {
           </div>
 
           {!sidebarCollapsed && (
-            <button onClick={toggleSidebar}>
+            <button onClick={toggleSidebar} className="p-1 hover:bg-gray-800 rounded">
               <ChevronLeft size={18} />
             </button>
           )}
         </div>
 
-        {/* Nav */}
+        {/* Navigation */}
         <nav className="flex-1 py-4 space-y-1">
           {menu.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
               onClick={() => window.innerWidth < 768 && toggleMobileMenu()}
-              className={({ isActive }) => `
-                mx-2 flex items-center gap-3 px-3 py-2.5 rounded-xl transition
-                ${isActive
-                  ? 'bg-blue-900/30 text-white'
-                  : 'text-gray-300 hover:bg-gray-800'}
-                ${sidebarCollapsed ? 'justify-center' : ''}
-              `}
+              className={({ isActive }) =>
+                `mx-2 flex items-center gap-3 px-3 py-2.5 rounded-xl transition
+                 ${isActive ? 'bg-blue-900/30 text-white' : 'text-gray-300 hover:bg-gray-800'}
+                 ${sidebarCollapsed ? 'justify-center' : ''}`
+              }
             >
               <Icon size={20} />
               {!sidebarCollapsed && <span>{label}</span>}
@@ -99,7 +95,8 @@ const Sidebar = () => {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-800 space-y-3">
+        <div className="p-4 border-t border-gray-800 space-y-3 relative">
+          {/* Connection Status */}
           <div className={`flex items-center gap-3 ${sidebarCollapsed && 'justify-center'}`}>
             <span
               className={`w-3 h-3 rounded-full ${
@@ -111,12 +108,10 @@ const Sidebar = () => {
             )}
           </div>
 
+          {/* Balance */}
           <div
-            className={`
-              flex items-center gap-3 p-3 rounded-xl bg-gray-900
-              ${pulse && 'animate-pulse'}
-              ${sidebarCollapsed && 'justify-center'}
-            `}
+            className={`flex items-center gap-3 p-3 rounded-xl bg-gray-900 transition
+                        ${pulse && 'animate-pulse'} ${sidebarCollapsed && 'justify-center'}`}
           >
             <Wallet size={18} />
             {!sidebarCollapsed && (
@@ -129,10 +124,11 @@ const Sidebar = () => {
             )}
           </div>
 
+          {/* Expand button when collapsed */}
           {sidebarCollapsed && (
             <button
               onClick={toggleSidebar}
-              className="absolute -right-3 top-1/2 w-6 h-12 bg-gray-900 border border-gray-700 rounded-r-lg"
+              className="absolute -right-3 top-1/2 w-6 h-12 bg-gray-900 border border-gray-700 rounded-r-lg flex items-center justify-center hover:bg-gray-800 transition"
             >
               <ChevronRight size={16} />
             </button>

@@ -1,5 +1,4 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
-// frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar, Header, LoadingSpinner } from '../../Common';
