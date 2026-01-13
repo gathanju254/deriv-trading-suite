@@ -1,23 +1,23 @@
 // frontend/src/components/Dashboard/SignalIndicator/SignalIndicator.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useTrading } from '../../../hooks/useTrading';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
+import {
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
   Clock,
   Zap,
   RefreshCw,
-  Activity
+  Activity,
 } from 'lucide-react';
-import './SignalIndicator.css';
+
+/* ---------------- utils ---------------- */
 
 const safeNum = (v, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
 
-// Confidence normalization: backend may send 0..1 or 0..100
 const normalizeConfidence = (c) => {
   if (c === null || c === undefined) return 0.5;
   const n = Number(c);
@@ -26,312 +26,201 @@ const normalizeConfidence = (c) => {
   return Math.min(Math.max(n, 0), 1);
 };
 
-// Timestamp normalization: accepts seconds or milliseconds or ISO string
 const toTimestampMs = (t) => {
   if (!t) return Date.now();
   const n = Number(t);
-  if (Number.isFinite(n)) {
-    return n < 1e11 ? Math.round(n * 1000) : Math.round(n);
-  }
+  if (Number.isFinite(n)) return n < 1e11 ? n * 1000 : n;
   const parsed = Date.parse(String(t));
   return Number.isFinite(parsed) ? parsed : Date.now();
 };
 
-const formatTime = (ts) => {
-  try {
-    const d = new Date(toTimestampMs(ts));
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  } catch {
-    return '—';
-  }
-};
+const formatTime = (ts) =>
+  new Date(toTimestampMs(ts)).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 
 const formatTimeAgo = (ts) => {
-  try {
-    const secs = Math.floor((Date.now() - toTimestampMs(ts)) / 1000);
-    if (secs < 60) return `${secs}s ago`;
-    if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-    if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-    return `${Math.floor(secs / 86400)}d ago`;
-  } catch {
-    return '--';
-  }
+  const secs = Math.floor((Date.now() - toTimestampMs(ts)) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
 };
 
-const getSignalColor = (direction) => {
-  const dir = String(direction || '').toLowerCase();
-  if (dir.includes('buy') || dir.includes('bullish') || dir.includes('long') || dir.includes('up') || dir.includes('call')) return '#10b981';
-  if (dir.includes('sell') || dir.includes('bearish') || dir.includes('short') || dir.includes('down') || dir.includes('put')) return '#ef4444';
-  return '#94a3b8';
+const signalType = (dir = '') => {
+  const d = dir.toLowerCase();
+  if (['buy', 'bullish', 'long', 'up', 'call'].some(k => d.includes(k))) return 'bull';
+  if (['sell', 'bearish', 'short', 'down', 'put'].some(k => d.includes(k))) return 'bear';
+  return 'neutral';
 };
 
-const getSignalIcon = (direction) => {
-  const dir = String(direction || '').toLowerCase();
-  if (dir.includes('buy') || dir.includes('bullish') || dir.includes('long') || dir.includes('up') || dir.includes('call')) return <TrendingUp size={16} />;
-  if (dir.includes('sell') || dir.includes('bearish') || dir.includes('short') || dir.includes('down') || dir.includes('put')) return <TrendingDown size={16} />;
-  return <AlertTriangle size={16} />;
-};
+/* ---------------- component ---------------- */
 
 const SignalIndicator = () => {
   const { signals, marketData, loading, refreshSignals } = useTrading();
+
   const [activeSignals, setActiveSignals] = useState([]);
   const [signalStrength, setSignalStrength] = useState(0);
   const [lastSignalUpdate, setLastSignalUpdate] = useState(null);
-  const [showAllSignals, setShowAllSignals] = useState(false); // Add state for toggle
-  const prevSignalsRef = useRef(null);
+  const [showAll, setShowAll] = useState(false);
+
+  const prevRef = useRef(null);
 
   useEffect(() => {
-    if (!signals || !Array.isArray(signals)) {
-      setActiveSignals([]);
-      setSignalStrength(0);
-      return;
-    }
+    if (!Array.isArray(signals)) return;
 
-    // Only process if signals have actually changed
-    if (JSON.stringify(signals) === JSON.stringify(prevSignalsRef.current)) {
-      return;
-    }
-    prevSignalsRef.current = signals;
+    if (JSON.stringify(signals) === JSON.stringify(prevRef.current)) return;
+    prevRef.current = signals;
 
-    try {
-      // Normalize incoming signals safely
-      const processed = signals.slice(0, 20).map((signal, idx) => {
-        if (!signal) return null;
+    const processed = signals.slice(0, 20).map((s, i) => ({
+      id: s?.id || `sig-${i}`,
+      direction: s?.direction || 'NEUTRAL',
+      symbol: s?.symbol || marketData?.symbol || 'R_100',
+      timestamp: toTimestampMs(s?.timestamp),
+      confidence: normalizeConfidence(s?.confidence),
+      message: s?.message || 'Signal detected',
+      price: safeNum(s?.price),
+    }));
 
-        const confidence = normalizeConfidence(
-          signal.confidence ?? signal.strength ?? signal.probability ?? 0.5
-        );
-        const priceCandidate = signal.price ?? signal.entry_price ?? marketData?.lastPrice ?? 0;
-        const price = safeNum(priceCandidate, 0);
-        const ts = signal.timestamp ?? signal.time ?? signal.created_at ?? signal.purchase_time ?? Date.now();
+    setActiveSignals(processed);
+    setLastSignalUpdate(Date.now());
 
-        return {
-          id: signal.id || signal.signal_id || `signal-${idx}-${Date.now()}`,
-          direction: signal.direction || signal.action || signal.recommendation || (signal.side ? String(signal.side).toUpperCase() : 'NEUTRAL'),
-          symbol: signal.symbol || signal.pair || marketData?.symbol || 'R_100',
-          timestamp: toTimestampMs(ts),
-          confidence,
-          message: signal.message || signal.reason || signal.description || signal.longcode || 'Signal detected',
-          price,
-          source: signal.source || signal.strategy || 'unknown'
-        };
-      }).filter(s => s !== null);
+    if (!processed.length) return setSignalStrength(0);
 
-      setActiveSignals(processed);
-      setLastSignalUpdate(Date.now());
+    const avgConf =
+      processed.reduce((a, b) => a + b.confidence, 0) / processed.length;
 
-      // Compute signal strength with proper error handling
-      if (processed.length > 0) {
-        const avgConf = processed.reduce((s, x) => s + (x.confidence ?? 0.5), 0) / processed.length;
-        const bull = processed.filter(s => {
-          const dir = String(s.direction || '').toLowerCase();
-          return ['buy','bullish','long','up','call'].some(k => dir.includes(k));
-        }).length;
-        const bear = processed.filter(s => {
-          const dir = String(s.direction || '').toLowerCase();
-          return ['sell','bearish','short','down','put'].some(k => dir.includes(k));
-        }).length;
-        
-        const raw = (bull - bear) * avgConf;
-        const normalized = processed.length ? raw / processed.length : 0;
-        setSignalStrength(Math.max(-1, Math.min(1, normalized)));
-      } else {
-        setSignalStrength(0);
-      }
-    } catch (error) {
-      console.error('Error processing signals:', error);
-      setActiveSignals([]);
-      setSignalStrength(0);
-    }
+    const bull = processed.filter(s => signalType(s.direction) === 'bull').length;
+    const bear = processed.filter(s => signalType(s.direction) === 'bear').length;
+
+    setSignalStrength(Math.max(-1, Math.min(1, (bull - bear) * avgConf / processed.length)));
   }, [signals, marketData]);
 
-  const handleRefresh = async () => {
-    try {
-      await refreshSignals();
-    } catch (e) {
-      console.error('Failed to refresh signals', e);
-    }
-  };
+  /* ---------------- render ---------------- */
 
   return (
-    <div className="signal-indicator">
-      <div className="card">
-        <div className="strength-header">
-          <h3><Zap size={18}/> Market Sentiment</h3>
-          <div className="strength-actions">
-            <button 
-              className="refresh-btn" 
-              onClick={handleRefresh} 
-              disabled={loading} 
-              title="Refresh signals"
-            >
-              <RefreshCw size={14} className={loading ? 'spinning' : ''} />
-            </button>
-            <div 
-              className={`sentiment-${
-                signalStrength >= 0.3 ? 'bullish' : 
-                signalStrength <= -0.3 ? 'bearish' : 
-                'neutral'
-              }`} 
-              aria-hidden
-            >
-              {signalStrength > 0.65 ? 'Strong Bullish' : 
-               signalStrength > 0.2 ? 'Bullish' : 
-               signalStrength > -0.2 ? 'Neutral' : 
-               signalStrength > -0.65 ? 'Bearish' : 
-               'Strong Bearish'}
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6">
 
-        <div className="strength-meter">
-          <div className="meter-background" aria-hidden>
-            <div
-              className="meter-fill"
-              style={{ width: `${((signalStrength + 1) / 2) * 100}%` }}
+      {/* === MARKET SENTIMENT === */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="flex items-center gap-2 font-semibold text-slate-100">
+            <Zap className="text-emerald-400" size={18} />
+            Market Sentiment
+          </h3>
+
+          <button
+            onClick={refreshSignals}
+            disabled={loading}
+            className="rounded-md border border-slate-700 p-2 hover:bg-slate-800 disabled:opacity-50"
+          >
+            <RefreshCw
+              size={14}
+              className={loading ? 'animate-spin' : ''}
             />
-          </div>
-          <div className="meter-labels">
-            <span>Bearish</span>
-            <span>Neutral</span>
-            <span>Bullish</span>
-          </div>
-
-          <div className="strength-stats" role="list" aria-label="Signal statistics">
-            <div className="stat" role="listitem">
-              <div className="stat-label">Total</div>
-              <div className="stat-value">{activeSignals.length}</div>
-            </div>
-            <div className="stat" role="listitem">
-              <div className="stat-label">Bullish</div>
-              <div className="stat-value bullish">
-                {activeSignals.filter(s => {
-                  const dir = String(s.direction || '').toLowerCase();
-                  return ['buy','bullish','long','up','call'].some(k => dir.includes(k));
-                }).length}
-              </div>
-            </div>
-            <div className="stat" role="listitem">
-              <div className="stat-label">Bearish</div>
-              <div className="stat-value bearish">
-                {activeSignals.filter(s => {
-                  const dir = String(s.direction || '').toLowerCase();
-                  return ['sell','bearish','short','down','put'].some(k => dir.includes(k));
-                }).length}
-              </div>
-            </div>
-          </div>
-
-          {lastSignalUpdate && (
-            <div className="last-update-info">
-              <Clock size={12} /> Updated {formatTime(lastSignalUpdate)}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="card signals-list">
-        <div className="signals-header">
-          <h3>Recent Signals</h3>
-          <div className="signals-count">
-            Showing {Math.min(activeSignals.length, showAllSignals ? 20 : 5)} of {activeSignals.length}
-            {activeSignals.length > 5 && (
-              <button 
-                className="toggle-btn" 
-                onClick={() => setShowAllSignals(!showAllSignals)}
-                title={showAllSignals ? 'Show fewer signals' : 'Show more signals'}
-              >
-                {showAllSignals ? 'Show Less' : 'Show More'}
-              </button>
-            )}
-          </div>
+          </button>
         </div>
 
-        {activeSignals.length === 0 ? (
-          <div className="no-signals" aria-live="polite">
-            <AlertTriangle size={32} />
-            <p>No active signals</p>
-            <small>Signals will appear when the trading bot is active</small>
-          </div>
-        ) : (
-          <div className="signals-grid" role="list">
-            {activeSignals.slice(0, showAllSignals ? 20 : 5).map((sig, idx) => (
-              <div
-                key={`${sig.id}-${sig.timestamp || idx}`}
-                role="listitem"
-                className="signal-card"
-                style={{
-                  borderLeftColor: getSignalColor(sig.direction)
-                }}
-                title={`Signal from ${sig.source || 'unknown'} strategy`}
-              >
-                <div className="signal-header">
-                  <div className="signal-direction">
-                    {getSignalIcon(sig.direction)}
-                    <span 
-                      className="direction-text" 
-                      style={{color: getSignalColor(sig.direction)}}
-                    >
-                      {String(sig.direction).toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="signal-meta">
-                    <div className="signal-symbol">{sig.symbol}</div>
-                    <div className="signal-time">{formatTimeAgo(sig.timestamp)}</div>
-                  </div>
-                </div>
+        {/* Meter */}
+        <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 ${
+              signalStrength > 0
+                ? 'bg-emerald-500'
+                : signalStrength < 0
+                ? 'bg-red-500'
+                : 'bg-slate-500'
+            }`}
+            style={{ width: `${((signalStrength + 1) / 2) * 100}%` }}
+          />
+        </div>
 
-                <div className="signal-body">
-                  <p className="signal-message">{sig.message}</p>
+        <div className="mt-3 flex justify-between text-xs text-slate-400">
+          <span>Bearish</span>
+          <span>Neutral</span>
+          <span>Bullish</span>
+        </div>
 
-                  <div className="signal-details" aria-hidden>
-                    <div className="detail-item">
-                      <div className="price-label">Price</div>
-                      <div className="price-value">
-                        ${safeNum(sig.price, 0).toFixed(4)}
-                      </div>
-                    </div>
-
-                    <div className="detail-item">
-                      <div className="confidence-label">Confidence</div>
-                      <div className="confidence-bar" aria-hidden>
-                        <div 
-                          className="confidence-fill" 
-                          style={{ width: `${(sig.confidence ?? 0.5) * 100}%` }} 
-                        />
-                      </div>
-                      <div className="confidence-value">
-                        {Math.round((sig.confidence ?? 0.5) * 100)}%
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {lastSignalUpdate && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+            <Clock size={12} />
+            Updated {formatTime(lastSignalUpdate)}
           </div>
         )}
       </div>
 
-      {activeSignals.length > 0 && (
-        <div className="card signal-summary" aria-hidden>
-          <div style={{display:'flex', gap:12, alignItems:'center', flexWrap:'wrap'}}>
-            <Activity size={14} />
-            <span>Active: {activeSignals.length}</span>
-            <TrendingUp size={14} style={{marginLeft:12}} />
-            <span className="bullish">
-              {activeSignals.filter(s => {
-                const dir = String(s.direction || '').toLowerCase();
-                return ['buy','bullish','long','up','call'].some(k => dir.includes(k));
-              }).length} Bullish
-            </span>
-            <TrendingDown size={14} style={{marginLeft:12}} />
-            <span className="bearish">
-              {activeSignals.filter(s => {
-                const dir = String(s.direction || '').toLowerCase();
-                return ['sell','bearish','short','down','put'].some(k => dir.includes(k));
-              }).length} Bearish
-            </span>
+      {/* === SIGNALS LIST === */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-slate-100">Recent Signals</h3>
+
+          {activeSignals.length > 5 && (
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="text-xs text-emerald-400 hover:underline"
+            >
+              {showAll ? 'Show less' : 'Show more'}
+            </button>
+          )}
+        </div>
+
+        {!activeSignals.length ? (
+          <div className="flex flex-col items-center py-10 text-slate-500">
+            <AlertTriangle size={32} />
+            <p className="mt-2">No active signals</p>
           </div>
+        ) : (
+          <div className="space-y-3">
+            {activeSignals.slice(0, showAll ? 20 : 5).map(sig => {
+              const type = signalType(sig.direction);
+              return (
+                <div
+                  key={sig.id}
+                  className={`rounded-lg border-l-4 p-4 bg-slate-800/60 ${
+                    type === 'bull'
+                      ? 'border-emerald-500'
+                      : type === 'bear'
+                      ? 'border-red-500'
+                      : 'border-slate-500'
+                  }`}
+                >
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-semibold text-slate-100">
+                      {sig.direction.toUpperCase()} · {sig.symbol}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {formatTimeAgo(sig.timestamp)}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-slate-300 mb-2">{sig.message}</p>
+
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>Price: ${sig.price.toFixed(4)}</span>
+                    <span>{Math.round(sig.confidence * 100)}% confidence</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* === SUMMARY === */}
+      {!!activeSignals.length && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 flex items-center gap-4 text-sm text-slate-300">
+          <Activity size={14} />
+          <span>{activeSignals.length} active</span>
+          <TrendingUp size={14} className="text-emerald-400" />
+          <span>
+            {activeSignals.filter(s => signalType(s.direction) === 'bull').length} bullish
+          </span>
+          <TrendingDown size={14} className="text-red-400" />
+          <span>
+            {activeSignals.filter(s => signalType(s.direction) === 'bear').length} bearish
+          </span>
         </div>
       )}
     </div>

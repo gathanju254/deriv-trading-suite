@@ -3,8 +3,6 @@ import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTrading } from '../../../hooks/useTrading';
 
-import './BotControls.css';
-
 const BotControls = () => {
   const {
     botStatus,
@@ -12,175 +10,121 @@ const BotControls = () => {
     startBot,
     stopBot,
     wsConnectionStatus,
-    refreshPerformance
+    refreshPerformance,
   } = useTrading();
 
-  const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null);
+  const [message, setMessage] = useState(null); // { text, type }
 
-  // Utility to show temporary messages
-  const showMessage = useCallback((message, type = 'success') => {
-    if (type === 'success') {
-      setSuccessMessage(message);
-      setError(null);
-    } else {
-      setError(message);
-      setSuccessMessage(null);
-    }
-
-    setTimeout(() => {
-      setSuccessMessage(null);
-      setError(null);
-    }, 3000);
+  const showMessage = useCallback((text, type = 'success') => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 3000);
   }, []);
 
-  // Start bot
-  const handleStartBot = useCallback(async () => {
-    try {
-      setError(null);
-      setSuccessMessage(null);
-
-      if (wsConnectionStatus !== 'connected') {
-        showMessage('⚠️ WebSocket not connected. Attempting to reconnect...', 'error');
-        return;
-      }
-
-      await startBot();
-      showMessage('✅ Trading bot started successfully!', 'success');
-
-      setTimeout(() => refreshPerformance(), 500);
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.message || err.message || 'Failed to start bot';
-
-      showMessage(`❌ ${errorMsg}`, 'error');
-      console.error('Start bot error:', err);
-    }
-  }, [startBot, wsConnectionStatus, showMessage, refreshPerformance]);
-
-  // Stop bot
-  const handleStopBot = useCallback(async () => {
-    try {
-      setError(null);
-      setSuccessMessage(null);
-
-      await stopBot();
-      showMessage('✅ Trading bot stopped successfully!', 'success');
-
-      setTimeout(() => refreshPerformance(), 500);
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.message || err.message || 'Failed to stop bot';
-
-      showMessage(`❌ ${errorMsg}`, 'error');
-      console.error('Stop bot error:', err);
-    }
-  }, [stopBot, showMessage, refreshPerformance]);
-
-  // UI state
   const isRunning = botStatus === 'running';
   const wsConnected = wsConnectionStatus === 'connected';
 
-  const isStartDisabled =
-    isRunning || loading || wsConnectionStatus !== 'connected';
+  /* ---------- handlers ---------- */
 
-  const isStopDisabled = !isRunning || loading;
+  const handleStart = async () => {
+    if (!wsConnected) {
+      showMessage('WebSocket disconnected. Cannot start bot.', 'error');
+      return;
+    }
+
+    try {
+      await startBot();
+      showMessage('Bot started successfully.');
+      setTimeout(refreshPerformance, 500);
+    } catch (err) {
+      showMessage(
+        err.response?.data?.message || err.message || 'Failed to start bot',
+        'error'
+      );
+    }
+  };
+
+  const handleStop = async () => {
+    try {
+      await stopBot();
+      showMessage('Bot stopped successfully.');
+      setTimeout(refreshPerformance, 500);
+    } catch (err) {
+      showMessage(
+        err.response?.data?.message || err.message || 'Failed to stop bot',
+        'error'
+      );
+    }
+  };
+
+  /* ---------- ui ---------- */
 
   return (
     <motion.div
-      className="bot-controls"
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4"
     >
-      {/* MESSAGES */}
-      <AnimatePresence mode="popLayout">
-        {error && (
+      {/* MESSAGE */}
+      <AnimatePresence>
+        {message && (
           <motion.div
-            className="message error-message"
-            role="alert"
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.25 }}
+            className={`rounded-md border px-3 py-2 text-sm ${
+              message.type === 'error'
+                ? 'border-red-500/30 bg-red-500/10 text-red-400'
+                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+            }`}
           >
-            {error}
-          </motion.div>
-        )}
-
-        {successMessage && (
-          <motion.div
-            className="message success-message"
-            role="alert"
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.25 }}
-          >
-            {successMessage}
+            {message.text}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* BUTTONS */}
-      <div className="button-group">
+      <div className="flex gap-3">
         <motion.button
-          whileTap={{ scale: 0.94 }}
-          className={`btn btn-start ${isRunning ? 'disabled' : ''}`}
-          onClick={handleStartBot}
-          disabled={isStartDisabled}
+          whileTap={{ scale: 0.96 }}
+          onClick={handleStart}
+          disabled={isRunning || loading || !wsConnected}
+          className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition
+            ${
+              isRunning || !wsConnected
+                ? 'cursor-not-allowed bg-slate-800 text-slate-500'
+                : 'bg-emerald-600 text-white hover:bg-emerald-500'
+            }`}
         >
-          {loading && isStartDisabled ? (
-            <>
-              <span className="spinner" />
-              Starting...
-            </>
-          ) : (
-            '▶️ START BOT'
-          )}
+          {loading && !isRunning ? 'Starting…' : 'Start Bot'}
         </motion.button>
 
         <motion.button
-          whileTap={{ scale: 0.94 }}
-          className={`btn btn-stop ${!isRunning ? 'disabled' : ''}`}
-          onClick={handleStopBot}
-          disabled={isStopDisabled}
+          whileTap={{ scale: 0.96 }}
+          onClick={handleStop}
+          disabled={!isRunning || loading}
+          className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition
+            ${
+              !isRunning
+                ? 'cursor-not-allowed bg-slate-800 text-slate-500'
+                : 'bg-red-600 text-white hover:bg-red-500'
+            }`}
         >
-          {loading && isStopDisabled ? (
-            <>
-              <span className="spinner" />
-              Stopping...
-            </>
-          ) : (
-            '⏹️ STOP BOT'
-          )}
+          {loading && isRunning ? 'Stopping…' : 'Stop Bot'}
         </motion.button>
       </div>
 
-      {/* WS WARNING */}
+      {/* CONNECTION STATUS */}
       {!wsConnected && (
-        <motion.div
-          className="warning-box"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
-          <strong>⚠️ Connection Warning:</strong><br />
-          WebSocket is disconnected. Bot cannot operate.
-        </motion.div>
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+          WebSocket disconnected. Trading is paused.
+        </div>
       )}
 
-      {/* INFO BOX — simplified */}
-      <motion.div
-        className="info-box"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        <strong>ℹ️ Quick Info:</strong>
-        <ul>
-          <li>• Start begins automated trading</li>
-          <li>• Stop ends the current session</li>
-        </ul>
-      </motion.div>
+      {/* INFO */}
+      <div className="text-xs text-slate-400">
+        <p>• Start initiates automated trading</p>
+        <p>• Stop safely ends the current session</p>
+      </div>
     </motion.div>
   );
 };

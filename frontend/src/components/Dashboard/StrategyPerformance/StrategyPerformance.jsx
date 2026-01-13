@@ -1,9 +1,16 @@
 // frontend/src/components/Dashboard/StrategyPerformance/StrategyPerformance.jsx
-
 import React from 'react';
 import { useTrading } from '../../../hooks/useTrading';
-import { TrendingUp, TrendingDown, Target, Activity, PieChart, Shield, Zap } from 'lucide-react';
-import './StrategyPerformance.css';
+import {
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Activity,
+  Shield,
+  Zap,
+} from 'lucide-react';
+
+/* ---------------- utils ---------------- */
 
 const safeNum = (v, fallback = 0) => {
   const n = Number(v);
@@ -11,186 +18,188 @@ const safeNum = (v, fallback = 0) => {
 };
 
 const toPercent = (v) => {
-  // Backend may already return percent (e.g. 50.46) or ratio (0.5).
   if (v === null || v === undefined) return 0;
   const n = Number(v);
   if (!Number.isFinite(n)) return 0;
   return n <= 1 && n >= 0 ? n * 100 : n;
 };
 
-const normalizePerformance = (p = {}) => {
-  const totalProfit = safeNum(p.pnl ?? p.total_profit ?? p.totalProfit ?? p.profit ?? 0);
-  const avgProfit = safeNum(p.avg_profit ?? p.avgProfit ?? 0);
-  
-  // These now come directly from backend!
-  const profitFactorRaw = p.profit_factor ?? p.profitFactor ?? null;
-  const bestDayRaw = p.best_day ?? p.bestDay ?? null;
-  const worstDayRaw = p.worst_day ?? p.worstDay ?? null;
+const normalizePerformance = (p = {}) => ({
+  totalProfit: safeNum(p.pnl ?? p.total_profit ?? p.totalProfit ?? 0),
+  winRate: toPercent(p.win_rate ?? p.winRate ?? 0),
+  totalTrades: safeNum(p.total_trades ?? p.totalTrades ?? 0),
+  winningTrades: safeNum(p.winning_trades ?? p.wins ?? 0),
+  activeTrades: safeNum(p.active_trades ?? 0),
+  avgTradesPerDay: safeNum(p.avg_trades_per_day ?? 0),
+  sharpe: safeNum(p.sharpe_ratio ?? p.sharpe ?? 0),
+  maxDrawdown: safeNum(p.max_drawdown ?? p.maxDrawdown ?? 0),
+  volatility: safeNum(p.volatility ?? 0),
+  dailyPnl: safeNum(p.daily_pnl ?? 0),
+  monthlyPnl: safeNum(p.monthly_pnl ?? 0),
+  avgProfit: safeNum(p.avg_profit ?? 0),
+  profitFactor:
+    p.profit_factor !== undefined && p.profit_factor !== null
+      ? safeNum(p.profit_factor, 1)
+      : null,
+  bestDay:
+    p.best_day !== undefined && p.best_day !== null
+      ? safeNum(p.best_day, 0)
+      : null,
+  worstDay:
+    p.worst_day !== undefined && p.worst_day !== null
+      ? safeNum(p.worst_day, 0)
+      : null,
+});
 
-  return {
-    totalProfit,
-    winRate: toPercent(p.win_rate ?? p.winRate ?? p.win_percent ?? 0),
-    totalTrades: safeNum(p.total_trades ?? p.completed_trades ?? p.totalTrades ?? 0),
-    winningTrades: safeNum(p.winning_trades ?? p.won_trades ?? p.wins ?? 0),
-    activeTrades: safeNum(p.active_trades ?? p.activeTrades ?? 0),
-    avgTradesPerDay: safeNum(p.avg_trades_per_day ?? p.avgTradesPerDay ?? 0),
-    sharpe: safeNum(p.sharpe_ratio ?? p.sharpe ?? p.sharpeRatio ?? 0),
-    maxDrawdown: safeNum(p.max_drawdown ?? p.maxDrawdown ?? p.max_drawdown_percent ?? 0),
-    volatility: safeNum(p.volatility ?? p.volatiltiy ?? 0),
-    dailyPnl: safeNum(p.daily_pnl ?? p.dailyPnl ?? p.daily_profit ?? 0),
-    monthlyPnl: safeNum(p.monthly_pnl ?? p.monthlyPnl ?? 0),
-    avgProfit,
-    // These are now numbers or null - much cleaner!
-    profitFactor: profitFactorRaw !== null && profitFactorRaw !== undefined ? safeNum(profitFactorRaw, 1) : null,
-    bestDay: bestDayRaw !== null && bestDayRaw !== undefined ? safeNum(bestDayRaw, 0) : null,
-    worstDay: worstDayRaw !== null && worstDayRaw !== undefined ? safeNum(worstDayRaw, 0) : null
-  };
-};
+/* ---------------- component ---------------- */
 
 const StrategyPerformance = () => {
   const { performance: raw } = useTrading();
-  const performance = normalizePerformance(raw);
+  const p = normalizePerformance(raw);
 
-  const strategyMetrics = [
+  const metrics = [
     {
-      id: 'overall_performance',
-      title: 'Total P&L',
-      value: `$${performance.totalProfit.toFixed(2)}`,
-      trend: performance.totalProfit >= 0 ? 'up' : 'down',
+      id: 'pnl',
+      label: 'Total P&L',
+      value: `$${p.totalProfit.toFixed(2)}`,
       icon: TrendingUp,
-      color: performance.totalProfit >= 0 ? 'success' : 'error',
-      details: [
-        { label: 'Daily', value: `$${performance.dailyPnl.toFixed(2)}` },
-        { label: 'Monthly', value: `$${performance.monthlyPnl.toFixed(2)}` }
-      ]
+      trend: p.totalProfit >= 0,
+      sub: [
+        { label: 'Daily', value: `$${p.dailyPnl.toFixed(2)}` },
+        { label: 'Monthly', value: `$${p.monthlyPnl.toFixed(2)}` },
+      ],
     },
     {
-      id: 'accuracy',
-      title: 'Win Rate',
-      value: `${performance.winRate.toFixed(1)}%`,
-      trend: performance.winRate >= 50 ? 'up' : 'down',
+      id: 'winrate',
+      label: 'Win Rate',
+      value: `${p.winRate.toFixed(1)}%`,
       icon: Target,
-      color: performance.winRate >= 50 ? 'success' : performance.winRate >= 40 ? 'warning' : 'error',
-      details: [
-        { label: 'Wins', value: performance.winningTrades },
-        { label: 'Total', value: performance.totalTrades }
-      ]
+      trend: p.winRate >= 50,
+      sub: [
+        { label: 'Wins', value: p.winningTrades },
+        { label: 'Total', value: p.totalTrades },
+      ],
     },
     {
       id: 'trades',
-      title: 'Total Trades',
-      value: `${performance.totalTrades || 0}`,
-      trend: 'neutral',
+      label: 'Trades',
+      value: p.totalTrades,
       icon: Activity,
-      color: 'info',
-      details: [
-        { label: 'Active', value: performance.activeTrades },
-        { label: 'Daily Avg', value: performance.avgTradesPerDay.toFixed(1) }
-      ]
+      trend: null,
+      sub: [
+        { label: 'Active', value: p.activeTrades },
+        { label: 'Avg / Day', value: p.avgTradesPerDay.toFixed(1) },
+      ],
     },
     {
-      id: 'risk_metrics',
-      title: 'Sharpe Ratio',
-      value: performance.sharpe.toFixed(2),
-      trend: performance.sharpe >= 1 ? 'up' : 'down',
+      id: 'risk',
+      label: 'Sharpe Ratio',
+      value: p.sharpe.toFixed(2),
       icon: Shield,
-      color: performance.sharpe >= 1 ? 'success' : performance.sharpe >= 0.5 ? 'warning' : 'error',
-      details: [
-        { label: 'Max Drawdown', value: `${performance.maxDrawdown.toFixed(1)}%` },
-        { label: 'Volatility', value: `${performance.volatility.toFixed(1)}%` }
-      ]
-    }
+      trend: p.sharpe >= 1,
+      sub: [
+        { label: 'Drawdown', value: `${p.maxDrawdown.toFixed(1)}%` },
+        { label: 'Volatility', value: `${p.volatility.toFixed(1)}%` },
+      ],
+    },
   ];
 
-  const getTrendIcon = (trend) => {
-    if (trend === 'up') return <TrendingUp size={16} className="trend-up" />;
-    if (trend === 'down') return <TrendingDown size={16} className="trend-down" />;
-    return null;
-  };
-
   return (
-    <div className="strategy-performance">
-      <div className="metrics-grid">
-        {strategyMetrics.map((metric) => {
-          const Icon = metric.icon;
+    <div className="space-y-6">
+
+      {/* === TOP METRICS === */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((m) => {
+          const Icon = m.icon;
           return (
-            <div key={metric.id} className={`metric-card ${metric.color}`}>
-              <div className="metric-header">
-                <div className="metric-icon">
-                  <Icon size={20} />
-                </div>
-                <div className="metric-title">
-                  <h3>{metric.title}</h3>
-                  <div className="metric-trend">
-                    {getTrendIcon(metric.trend)}
-                  </div>
-                </div>
+            <div
+              key={m.id}
+              className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-slate-400">{m.label}</span>
+                <Icon
+                  size={18}
+                  className={
+                    m.trend === null
+                      ? 'text-slate-400'
+                      : m.trend
+                      ? 'text-emerald-400'
+                      : 'text-red-400'
+                  }
+                />
               </div>
-              
-              <div className="metric-main">
-                <div className="metric-value">{metric.value}</div>
-                <div className="metric-details">
-                  {metric.details.map((detail, index) => (
-                    <div key={index} className="detail-item">
-                      <span className="detail-label">{detail.label}</span>
-                      <span className="detail-value">{detail.value}</span>
-                    </div>
-                  ))}
-                </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-semibold text-slate-100">
+                  {m.value}
+                </span>
+                {m.trend !== null && (
+                  m.trend ? (
+                    <TrendingUp size={16} className="text-emerald-400" />
+                  ) : (
+                    <TrendingDown size={16} className="text-red-400" />
+                  )
+                )}
+              </div>
+
+              <div className="mt-3 space-y-1 text-xs text-slate-400">
+                {m.sub.map((s, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span>{s.label}</span>
+                    <span className="text-slate-300">{s.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Additional Performance Stats - FIXED */}
-      <div className="performance-stats">
-        <div className="stat-item">
-          <div className="stat-icon">
-            <Zap size={16} />
+      {/* === SUPPORTING STATS === */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+          
+          <div className="flex items-center gap-3">
+            <Zap size={16} className="text-emerald-400" />
+            <div>
+              <div className="text-slate-400 text-xs">Best Day</div>
+              <div className="text-emerald-400 font-medium">
+                {p.bestDay !== null ? `+$${p.bestDay.toFixed(2)}` : '—'}
+              </div>
+            </div>
           </div>
-          <div className="stat-content">
-            <span className="stat-label">Best Day</span>
-            <span className="stat-value positive">
-              {performance.bestDay !== null ? `+$${performance.bestDay.toFixed(2)}` : '—'}
-            </span>
+
+          <div className="flex items-center gap-3">
+            <TrendingDown size={16} className="text-red-400" />
+            <div>
+              <div className="text-slate-400 text-xs">Worst Day</div>
+              <div className="text-red-400 font-medium">
+                {p.worstDay !== null ? `-$${Math.abs(p.worstDay).toFixed(2)}` : '—'}
+              </div>
+            </div>
           </div>
-        </div>
-        
-        <div className="stat-item">
-          <div className="stat-icon">
-            <TrendingDown size={16} />
+
+          <div className="flex items-center gap-3">
+            <Target size={16} className="text-sky-400" />
+            <div>
+              <div className="text-slate-400 text-xs">Profit Factor</div>
+              <div className="text-slate-200 font-medium">
+                {p.profitFactor !== null ? p.profitFactor.toFixed(2) : 'N/A'}
+              </div>
+            </div>
           </div>
-          <div className="stat-content">
-            <span className="stat-label">Worst Day</span>
-            <span className="stat-value negative">
-              {performance.worstDay !== null ? `-$${Math.abs(performance.worstDay).toFixed(2)}` : '—'}
-            </span>
+
+          <div className="flex items-center gap-3">
+            <Activity size={16} className="text-indigo-400" />
+            <div>
+              <div className="text-slate-400 text-xs">Avg Profit</div>
+              <div className="text-slate-200 font-medium">
+                ${p.avgProfit.toFixed(2)}
+              </div>
+            </div>
           </div>
-        </div>
-        
-        <div className="stat-item">
-          <div className="stat-icon">
-            <Target size={16} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Profit Factor</span>
-            <span className="stat-value">
-              {performance.profitFactor !== null ? performance.profitFactor.toFixed(2) : 'N/A'}
-            </span>
-          </div>
-        </div>
-        
-        <div className="stat-item">
-          <div className="stat-icon">
-            <Activity size={16} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Avg Profit</span>
-            <span className="stat-value">
-              ${performance.avgProfit.toFixed(2)}
-            </span>
-          </div>
+
         </div>
       </div>
     </div>
