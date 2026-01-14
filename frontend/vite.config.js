@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { copyFileSync } from 'fs'  // Add this import
+import { copyFileSync } from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -11,7 +11,6 @@ const __dirname = path.dirname(__filename)
 export default defineConfig({
   plugins: [
     react(),
-    // Add this custom plugin to copy _redirects after build
     {
       name: 'copy-redirects',
       writeBundle() {
@@ -33,21 +32,16 @@ export default defineConfig({
     },
   },
 
-  // For production build on Render
   build: {
     outDir: 'dist',
-    // IMPORTANT: Add emptyOutDir to clean dist folder
     emptyOutDir: true,
-    // Add rollup options for SPA
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
       },
     },
-    // Remove assetsInclude for _redirects (not needed now)
   },
 
-  // For local development
   server: {
     port: 5173,
     host: true,

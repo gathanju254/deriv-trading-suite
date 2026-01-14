@@ -20,6 +20,19 @@ const OAuthCallback = () => {
   useEffect(() => {
     console.log('OAuthCallback: location', location.pathname, location.search);
     
+    // Check if we have the direct URL parameters from backend redirect
+    if (!location.search && window.location.hash) {
+      // Try to parse from hash if needed (some OAuth flows use hash fragments)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      if (hashParams.has('user_id') || hashParams.has('access_token')) {
+        // Redirect to proper URL with query params
+        const newUrl = `${window.location.origin}/oauth/callback?${hashParams.toString()}`;
+        console.log('Redirecting from hash to query params:', newUrl);
+        window.location.replace(newUrl);
+        return;
+      }
+    }
+    
     // Only run authentication once
     if (hasProcessed) return;
     
@@ -40,7 +53,13 @@ const OAuthCallback = () => {
         const email = params.get('email');
         const code = params.get('code'); // fallback
 
-        console.log('Auth params:', { user_id, hasSessionToken: !!session_token, hasAccessToken: !!access_token, email });
+        console.log('Auth params:', { 
+          user_id, 
+          hasSessionToken: !!session_token, 
+          hasAccessToken: !!access_token, 
+          email,
+          code: code ? '***' : null
+        });
 
         /**
          * ✅ PRIMARY FLOW — backend already authenticated
@@ -198,7 +217,8 @@ const OAuthCallback = () => {
             <div className="mt-8 p-4 rounded-lg bg-gray-900/30 border border-gray-800/30">
               <div className="text-xs text-gray-500 font-mono space-y-1">
                 <div>Path: {location.pathname}</div>
-                <div>Has params: {location.search ? 'Yes' : 'No'}</div>
+                <div>Has query params: {location.search ? 'Yes' : 'No'}</div>
+                <div>Has hash params: {window.location.hash ? 'Yes' : 'No'}</div>
                 <div>Status: Processing...</div>
               </div>
             </div>
