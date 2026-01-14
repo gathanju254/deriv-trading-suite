@@ -1,20 +1,39 @@
 [build]
-  publish = "dist"  # Changed from "frontend/dist"
-  command = "npm run build"  # Removed "cd frontend &&"
+  publish = "dist"
+  command = "npm run build"
 
 [build.environment]
   NODE_VERSION = "20.19.0"
 
-# Single SPA redirect
+# ⭐ IMPORTANT: Exclude assets from SPA redirect
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/icons/*"
+  to = "/icons/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/favicon.ico"
+  to = "/favicon.ico"
+  status = 200
+
+# SPA redirect ONLY for non-asset routes
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  conditions = { "Not" = [{ "URL" = "^/assets/" }, { "URL" = "^/icons/" }, { "URL" = "^/favicon" }] }
 
-# Optional security headers
+# Security headers
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    # ⭐ Add cache headers for assets
+    Cache-Control = "public, max-age=31536000, immutable"
