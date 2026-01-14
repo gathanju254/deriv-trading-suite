@@ -1,309 +1,190 @@
 // frontend/src/components/Dashboard/RecentTrades/RecentTrades.jsx
-import React, { useMemo } from 'react';
+// frontend/src/components/Dashboard/RecentTrades/RecentTrades.jsx
+import React from 'react';
 import { useTrading } from '../../../hooks/useTrading';
-import {
-  ArrowUpRight,
-  ArrowDownRight,
-  DollarSign,
-  BarChart3
-} from 'lucide-react';
-import './RecentTrades.css';
+import { ArrowUpRight, ArrowDownRight, DollarSign, Clock } from 'lucide-react';
 
 const RecentTrades = () => {
   const { tradeHistory, loading } = useTrading();
 
-  // -------------------
-  // Date helpers
-  // -------------------
-  const formatDateParts = (timestamp) => {
-    if (!timestamp) {
-      return { date: '—', time: '--:--:--' };
-    }
-
+  // Format date/time
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return { date: '--', time: '--:--' };
     try {
-      const d = new Date(timestamp);
+      const date = new Date(timestamp);
       return {
-        date: d.toLocaleDateString([], {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }),
-        time: d.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        })
+        date: date.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+        time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
     } catch {
-      return { date: '—', time: '--:--:--' };
+      return { date: '--', time: '--:--' };
     }
   };
 
-  // -------------------
-  // Profit helpers - FIXED
-  // -------------------
-  const formatProfit = (trade) => {
-    // Use net_profit from contract OR calculate from payout
+  // Calculate profit with fallbacks
+  const calculateProfit = (trade) => {
+    // Try net_profit first
     if (trade.net_profit !== undefined && trade.net_profit !== null) {
-      return Number(trade.net_profit).toFixed(2);
+      return Number(trade.net_profit);
     }
     
+    // Try profit field
     if (trade.profit !== undefined && trade.profit !== null) {
-      return Number(trade.profit).toFixed(2);
+      return Number(trade.profit);
     }
     
-    // Fallback calculation based on status
+    // Calculate based on status
     if (trade.status?.toUpperCase() === 'WON') {
       const stake = trade.stake_amount || 0;
-      const payout = stake * 1.82; // 82% profit on win
-      const profit = payout - stake;
-      return profit.toFixed(2);
+      return stake * 0.82; // 82% profit
     } else if (trade.status?.toUpperCase() === 'LOST') {
-      return (-(trade.stake_amount || 0)).toFixed(2);
+      return -(trade.stake_amount || 0);
     }
     
-    return '0.00';
+    return 0;
   };
 
-  const getProfitColor = (trade) => {
-    let profit = 0;
-    
-    if (trade.net_profit !== undefined && trade.net_profit !== null) {
-      profit = trade.net_profit;
-    } else if (trade.profit !== undefined && trade.profit !== null) {
-      profit = trade.profit;
-    } else if (trade.status?.toUpperCase() === 'WON') {
-      const stake = trade.stake_amount || 0;
-      profit = stake * 0.82; // 82% profit
-    } else if (trade.status?.toUpperCase() === 'LOST') {
-      profit = -(trade.stake_amount || 0);
-    }
-    
-    if (profit > 0) return 'profit-positive';
-    if (profit < 0) return 'profit-negative';
-    return 'profit-neutral';
-  };
-
-  const getProfitIcon = (trade) => {
-    let profit = 0;
-    
-    if (trade.net_profit !== undefined && trade.net_profit !== null) {
-      profit = trade.net_profit;
-    } else if (trade.profit !== undefined && trade.profit !== null) {
-      profit = trade.profit;
-    } else if (trade.status?.toUpperCase() === 'WON') {
-      const stake = trade.stake_amount || 0;
-      profit = stake * 0.82;
-    } else if (trade.status?.toUpperCase() === 'LOST') {
-      profit = -(trade.stake_amount || 0);
-    }
-    
-    if (profit > 0) return <ArrowUpRight size={14} />;
-    if (profit < 0) return <ArrowDownRight size={14} />;
-    return null;
-  };
-
-  // -------------------
-  // Entry/Exit helpers - FIXED
-  // -------------------
-  const getEntryExitDisplay = (trade) => {
-    // Check if we have entry_tick and exit_tick directly on trade
-    if (trade.entry_tick !== undefined || trade.exit_tick !== undefined) {
-      return (
-        <>
-          <div>Entry: {trade.entry_tick?.toFixed(4) || '—'}</div>
-          <div>Exit: {trade.exit_tick?.toFixed(4) || '—'}</div>
-        </>
-      );
-    }
-    
-    // Check if we have contract data
-    if (trade.contract) {
-      const entry = trade.contract.entry_tick?.toFixed(4) || trade.contract.entry_spot || '—';
-      const exit = trade.contract.exit_tick?.toFixed(4) || trade.contract.exit_spot || trade.contract.sell_spot || trade.contract.current_spot || '—';
-      return (
-        <>
-          <div>Entry: {entry}</div>
-          <div>Exit: {exit}</div>
-        </>
-      );
-    } else if (trade.status?.toUpperCase() === 'ACTIVE' && trade.current_price) {
-      return (
-        <>
-          <div>Entry: Pending</div>
-          <div>Current: ${trade.current_price.toFixed(4)}</div>
-        </>
-      );
-    } else {
-      return 'N/A';
+  // Get status color
+  const getStatusColor = (status) => {
+    switch(status?.toUpperCase()) {
+      case 'WON': return 'text-green-500';
+      case 'LOST': return 'text-red-500';
+      case 'ACTIVE': return 'text-yellow-500';
+      default: return 'text-gray-400';
     }
   };
 
-  // -------------------
-  // Status helpers
-  // -------------------
-  const getStatusDisplay = (status) => {
-    const map = {
-      PENDING: { text: 'PENDING', class: 'status-pending' },
-      ACTIVE: { text: 'ACTIVE', class: 'status-pending' },
-      WON: { text: 'WON', class: 'status-won' },
-      LOST: { text: 'LOST', class: 'status-lost' },
-      ERROR: { text: 'ERROR', class: 'status-lost' }
-    };
-
-    return map[status?.toUpperCase()] || {
-      text: 'UNKNOWN',
-      class: 'status-pending'
-    };
-  };
-
-  // -------------------
-  // Direction helpers (RISE/FALL)
-  // -------------------
-  const getDirectionDisplay = (trade) => {
-    const side = trade.direction || trade.side || trade.consensus_data?.side;
+  // Get direction display
+  const getDirection = (trade) => {
+    const side = trade.direction || trade.side;
     const s = side?.toUpperCase();
-
     if (s === 'RISE' || s === 'BUY' || s === 'CALL') return 'RISE';
     if (s === 'FALL' || s === 'SELL' || s === 'PUT') return 'FALL';
-    return 'UNKNOWN';
+    return '--';
   };
 
-  const getDirectionClass = (trade) => {
-    const side = trade.direction || trade.side || trade.consensus_data?.side;
+  // Get direction color
+  const getDirectionColor = (trade) => {
+    const side = trade.direction || trade.side;
     const s = side?.toUpperCase();
-
-    if (s === 'RISE' || s === 'BUY' || s === 'CALL') return 'direction-rise';
-    if (s === 'FALL' || s === 'SELL' || s === 'PUT') return 'direction-fall';
-    return '';
+    if (s === 'RISE' || s === 'BUY' || s === 'CALL') return 'text-green-500';
+    if (s === 'FALL' || s === 'SELL' || s === 'PUT') return 'text-red-500';
+    return 'text-gray-400';
   };
 
-  // -------------------
-  // Summary (memoized) - FIXED
-  // -------------------
-  const summary = useMemo(() => {
+  // Calculate summary
+  const summary = React.useMemo(() => {
     if (!tradeHistory?.length) {
-      return { total: 0, won: 0, lost: 0, winRate: 0, totalProfit: '0.00' };
+      return { total: 0, won: 0, profit: 0 };
     }
 
-    const total = tradeHistory.length;
     const won = tradeHistory.filter(t => t.status?.toUpperCase() === 'WON').length;
-    const lost = tradeHistory.filter(t => t.status?.toUpperCase() === 'LOST').length;
-    const winRate = ((won / total) * 100).toFixed(1);
-    
-    // Calculate total profit with multiple fallback options
-    const totalProfit = tradeHistory.reduce((sum, t) => {
-      // Try net_profit first
-      if (t.net_profit !== undefined && t.net_profit !== null) {
-        return sum + t.net_profit;
-      }
-      
-      // Try profit field
-      if (t.profit !== undefined && t.profit !== null) {
-        return sum + t.profit;
-      }
-      
-      // Calculate based on status
-      if (t.status?.toUpperCase() === 'WON') {
-        const stake = t.stake_amount || 0;
-        return sum + (stake * 0.82); // 82% profit
-      } else if (t.status?.toUpperCase() === 'LOST') {
-        return sum - (t.stake_amount || 0);
-      }
-      
-      return sum;
-    }, 0).toFixed(2);
+    const profit = tradeHistory.reduce((sum, t) => sum + calculateProfit(t), 0);
 
-    return { total, won, lost, winRate, totalProfit };
+    return {
+      total: tradeHistory.length,
+      won,
+      winRate: ((won / tradeHistory.length) * 100).toFixed(1),
+      profit: profit.toFixed(2)
+    };
   }, [tradeHistory]);
 
-  // -------------------
-  // LOADING
-  // -------------------
   if (loading && !tradeHistory?.length) {
     return (
-      <div className="recent-trades">
-        <div className="trades-loading">
-          <div className="loading-spinner" />
-          <p>Loading trade history...</p>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <div className="text-gray-400">Loading trades...</div>
         </div>
       </div>
     );
   }
 
-  // -------------------
-  // EMPTY
-  // -------------------
   if (!tradeHistory?.length) {
     return (
-      <div className="recent-trades">
-        <div className="no-trades">
-          <DollarSign size={32} />
-          <p>No trades found</p>
-          <small>Trades will appear once the bot starts executing.</small>
-        </div>
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <DollarSign className="w-12 h-12 text-gray-600 mb-3" />
+        <div className="text-gray-400">No trades found</div>
+        <div className="text-sm text-gray-600 mt-1">Trades will appear here when executed</div>
       </div>
     );
   }
 
-  // -------------------
-  // MAIN TABLE - FIXED
-  // -------------------
   return (
-    <div className="recent-trades">
-      <div className="trades-table-container">
-        <table className="trades-table">
+    <div className="space-y-5">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-gray-900/50 rounded-lg p-3">
+          <div className="text-xs text-gray-400 mb-1">Total Trades</div>
+          <div className="text-lg font-semibold text-white">{summary.total}</div>
+        </div>
+        
+        <div className="bg-gray-900/50 rounded-lg p-3">
+          <div className="text-xs text-gray-400 mb-1">Win Rate</div>
+          <div className="text-lg font-semibold text-green-500">{summary.winRate}%</div>
+        </div>
+        
+        <div className="bg-gray-900/50 rounded-lg p-3">
+          <div className="text-xs text-gray-400 mb-1">Total Profit</div>
+          <div className={`text-lg font-semibold ${parseFloat(summary.profit) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            ${summary.profit}
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full">
           <thead>
-            <tr>
-              <th>Time</th>
-              <th>Symbol</th>
-              <th>Direction</th>
-              <th>Stake</th>
-              <th>Duration</th>
-              <th>Entry / Exit</th>
-              <th>P/L</th>
-              <th>Status</th>
+            <tr className="text-xs text-gray-400 border-b border-gray-800">
+              <th className="pb-2 px-2 text-left">Time</th>
+              <th className="pb-2 px-2 text-left">Direction</th>
+              <th className="pb-2 px-2 text-left">Amount</th>
+              <th className="pb-2 px-2 text-left">P/L</th>
+              <th className="pb-2 px-2 text-left">Status</th>
             </tr>
           </thead>
           <tbody>
-            {tradeHistory.map((trade, index) => {
-              const { date, time } = formatDateParts(trade.created_at);
-              const statusInfo = getStatusDisplay(trade.status);
-
+            {tradeHistory.slice(0, 10).map((trade, index) => {
+              const { date, time } = formatDateTime(trade.created_at);
+              const profit = calculateProfit(trade);
+              const status = trade.status?.toUpperCase();
+              
               return (
-                <tr key={trade.id || index} className="trade-row">
-                  <td>
-                    <div className="trade-datetime">
-                      <span className="trade-date">{date}</span>
-                      <span className="trade-time">{time}</span>
+                <tr 
+                  key={trade.id || index} 
+                  className="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors duration-200"
+                >
+                  <td className="py-3 px-2">
+                    <div className="text-sm">
+                      <div className="text-gray-300">{date}</div>
+                      <div className="text-xs text-gray-500">{time}</div>
                     </div>
                   </td>
-
-                  <td className="trade-symbol">{trade.symbol || 'N/A'}</td>
-
-                  <td className="trade-direction">
-                    <span className={getDirectionClass(trade)}>
-                      {getDirectionDisplay(trade)}
+                  
+                  <td className="py-3 px-2">
+                    <span className={`font-medium ${getDirectionColor(trade)}`}>
+                      {getDirection(trade)}
                     </span>
                   </td>
-
-                  {/* FIXED: Use stake_amount instead of amount */}
-                  <td>${Number(trade.stake_amount || 0).toFixed(2)}</td>
-
-                  {/* FIXED: Show duration if available */}
-                  <td>{trade.duration ? `${trade.duration}t` : '5t'}</td>
-
-                  <td className="trade-entry-exit">
-                    {getEntryExitDisplay(trade)}
+                  
+                  <td className="py-3 px-2">
+                    <div className="text-gray-300">
+                      ${(trade.stake_amount || 0).toFixed(2)}
+                    </div>
                   </td>
-
-                  <td className={`trade-profit ${getProfitColor(trade)}`}>
-                    {getProfitIcon(trade)}
-                    ${formatProfit(trade)}
+                  
+                  <td className="py-3 px-2">
+                    <div className={`flex items-center gap-1 ${profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {profit >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                      <span>${Math.abs(profit).toFixed(2)}</span>
+                    </div>
                   </td>
-
-                  <td className="trade-status">
-                    <span className={statusInfo.class}>{statusInfo.text}</span>
+                  
+                  <td className="py-3 px-2">
+                    <span className={getStatusColor(status)}>
+                      {status || '--'}
+                    </span>
                   </td>
                 </tr>
               );
@@ -312,25 +193,14 @@ const RecentTrades = () => {
         </table>
       </div>
 
-      {/* SUMMARY */}
-      <div className="trades-summary">
-        <div className="summary-item">
-          <span className="summary-label">Total Trades</span>
-          <span className="summary-value">{summary.total}</span>
+      {/* View More */}
+      {tradeHistory.length > 10 && (
+        <div className="text-center">
+          <button className="text-sm text-blue-500 hover:text-blue-400">
+            View all {tradeHistory.length} trades →
+          </button>
         </div>
-        <div className="summary-item">
-          <span className="summary-label">Win Rate</span>
-          <span className="summary-value">
-            {summary.winRate}% ({summary.won}/{summary.total})
-          </span>
-        </div>
-        <div className="summary-item">
-          <span className="summary-label">Total Profit</span>
-          <span className={`summary-value ${parseFloat(summary.totalProfit) >= 0 ? 'profit-positive' : 'profit-negative'}`}>
-            ${summary.totalProfit}
-          </span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

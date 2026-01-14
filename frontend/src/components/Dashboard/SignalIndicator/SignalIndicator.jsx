@@ -1,228 +1,197 @@
 // frontend/src/components/Dashboard/SignalIndicator/SignalIndicator.jsx
-import React, { useState, useEffect, useRef } from 'react';
+// frontend/src/components/Dashboard/SignalIndicator/SignalIndicator.jsx
+import React, { useState } from 'react';
 import { useTrading } from '../../../hooks/useTrading';
-import {
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-  Clock,
-  Zap,
-  RefreshCw,
-  Activity,
-} from 'lucide-react';
-
-/* ---------------- utils ---------------- */
-
-const safeNum = (v, fallback = 0) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-};
-
-const normalizeConfidence = (c) => {
-  if (c === null || c === undefined) return 0.5;
-  const n = Number(c);
-  if (!Number.isFinite(n)) return 0.5;
-  if (n > 1) return Math.min(n / 100, 1);
-  return Math.min(Math.max(n, 0), 1);
-};
-
-const toTimestampMs = (t) => {
-  if (!t) return Date.now();
-  const n = Number(t);
-  if (Number.isFinite(n)) return n < 1e11 ? n * 1000 : n;
-  const parsed = Date.parse(String(t));
-  return Number.isFinite(parsed) ? parsed : Date.now();
-};
-
-const formatTime = (ts) =>
-  new Date(toTimestampMs(ts)).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-
-const formatTimeAgo = (ts) => {
-  const secs = Math.floor((Date.now() - toTimestampMs(ts)) / 1000);
-  if (secs < 60) return `${secs}s ago`;
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-  return `${Math.floor(secs / 86400)}d ago`;
-};
-
-const signalType = (dir = '') => {
-  const d = dir.toLowerCase();
-  if (['buy', 'bullish', 'long', 'up', 'call'].some(k => d.includes(k))) return 'bull';
-  if (['sell', 'bearish', 'short', 'down', 'put'].some(k => d.includes(k))) return 'bear';
-  return 'neutral';
-};
-
-/* ---------------- component ---------------- */
+import { TrendingUp, TrendingDown, Activity, Zap, RefreshCw, AlertCircle } from 'lucide-react';
 
 const SignalIndicator = () => {
-  const { signals, marketData, loading, refreshSignals } = useTrading();
+  const { signals, loading, refreshSignals } = useTrading();
+  const [expanded, setExpanded] = useState(false);
 
-  const [activeSignals, setActiveSignals] = useState([]);
-  const [signalStrength, setSignalStrength] = useState(0);
-  const [lastSignalUpdate, setLastSignalUpdate] = useState(null);
-  const [showAll, setShowAll] = useState(false);
+  // Process signals
+  const processedSignals = Array.isArray(signals) 
+    ? signals.slice(0, expanded ? 10 : 5).map(signal => ({
+        id: signal.id || Math.random().toString(36),
+        direction: signal.direction || 'NEUTRAL',
+        confidence: Math.min(Math.max(signal.confidence || 0.5, 0), 1),
+        timestamp: signal.timestamp || Date.now(),
+        symbol: signal.symbol || 'R_100',
+        message: signal.message || 'Signal detected'
+      }))
+    : [];
 
-  const prevRef = useRef(null);
+  // Calculate market sentiment
+  const bullishSignals = processedSignals.filter(s => 
+    s.direction.toUpperCase().includes('BUY') || 
+    s.direction.toUpperCase().includes('RISE') ||
+    s.direction.toUpperCase().includes('CALL')
+  ).length;
 
-  useEffect(() => {
-    if (!Array.isArray(signals)) return;
+  const bearishSignals = processedSignals.filter(s => 
+    s.direction.toUpperCase().includes('SELL') || 
+    s.direction.toUpperCase().includes('FALL') ||
+    s.direction.toUpperCase().includes('PUT')
+  ).length;
 
-    if (JSON.stringify(signals) === JSON.stringify(prevRef.current)) return;
-    prevRef.current = signals;
+  const sentimentScore = processedSignals.length > 0 
+    ? (bullishSignals - bearishSignals) / processedSignals.length 
+    : 0;
 
-    const processed = signals.slice(0, 20).map((s, i) => ({
-      id: s?.id || `sig-${i}`,
-      direction: s?.direction || 'NEUTRAL',
-      symbol: s?.symbol || marketData?.symbol || 'R_100',
-      timestamp: toTimestampMs(s?.timestamp),
-      confidence: normalizeConfidence(s?.confidence),
-      message: s?.message || 'Signal detected',
-      price: safeNum(s?.price),
-    }));
+  // Format time
+  const formatTime = (timestamp) => {
+    const now = Date.now();
+    const diff = Math.floor((now - timestamp) / 1000);
+    
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  };
 
-    setActiveSignals(processed);
-    setLastSignalUpdate(Date.now());
+  // Get signal color
+  const getSignalColor = (direction) => {
+    const dir = direction.toUpperCase();
+    if (dir.includes('BUY') || dir.includes('RISE') || dir.includes('CALL')) return 'text-green-500';
+    if (dir.includes('SELL') || dir.includes('FALL') || dir.includes('PUT')) return 'text-red-500';
+    return 'text-gray-400';
+  };
 
-    if (!processed.length) return setSignalStrength(0);
-
-    const avgConf =
-      processed.reduce((a, b) => a + b.confidence, 0) / processed.length;
-
-    const bull = processed.filter(s => signalType(s.direction) === 'bull').length;
-    const bear = processed.filter(s => signalType(s.direction) === 'bear').length;
-
-    setSignalStrength(Math.max(-1, Math.min(1, (bull - bear) * avgConf / processed.length)));
-  }, [signals, marketData]);
-
-  /* ---------------- render ---------------- */
+  const getSignalBg = (direction) => {
+    const dir = direction.toUpperCase();
+    if (dir.includes('BUY') || dir.includes('RISE') || dir.includes('CALL')) return 'bg-green-500/10';
+    if (dir.includes('SELL') || dir.includes('FALL') || dir.includes('PUT')) return 'bg-red-500/10';
+    return 'bg-gray-500/10';
+  };
 
   return (
-    <div className="space-y-6">
-
-      {/* === MARKET SENTIMENT === */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="flex items-center gap-2 font-semibold text-slate-100">
-            <Zap className="text-emerald-400" size={18} />
-            Market Sentiment
-          </h3>
-
-          <button
-            onClick={refreshSignals}
-            disabled={loading}
-            className="rounded-md border border-slate-700 p-2 hover:bg-slate-800 disabled:opacity-50"
-          >
-            <RefreshCw
-              size={14}
-              className={loading ? 'animate-spin' : ''}
-            />
-          </button>
+    <div className="space-y-5">
+      {/* Header with sentiment meter */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-blue-500/10">
+            <Zap size={20} className="text-blue-500" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Market Signals</h3>
+            <div className="text-sm text-gray-400">
+              {processedSignals.length} active signals
+            </div>
+          </div>
         </div>
+        
+        <button
+          onClick={refreshSignals}
+          disabled={loading}
+          className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 transition-colors duration-200"
+        >
+          <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
 
-        {/* Meter */}
-        <div className="h-2 w-full rounded-full bg-slate-800 overflow-hidden">
-          <div
-            className={`h-full transition-all duration-500 ${
-              signalStrength > 0
-                ? 'bg-emerald-500'
-                : signalStrength < 0
-                ? 'bg-red-500'
-                : 'bg-slate-500'
-            }`}
-            style={{ width: `${((signalStrength + 1) / 2) * 100}%` }}
+      {/* Sentiment Indicator */}
+      <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm text-gray-300">Market Sentiment</div>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${sentimentScore > 0 ? 'bg-green-500' : sentimentScore < 0 ? 'bg-red-500' : 'bg-yellow-500'}`} />
+            <span className="text-sm text-gray-300">
+              {sentimentScore > 0.2 ? 'Bullish' : sentimentScore < -0.2 ? 'Bearish' : 'Neutral'}
+            </span>
+          </div>
+        </div>
+        
+        <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div 
+            className={`h-full transition-all duration-300 ${sentimentScore >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
+            style={{ 
+              width: `${Math.abs(sentimentScore) * 50 + 50}%`,
+              marginLeft: sentimentScore < 0 ? `${50 - Math.abs(sentimentScore) * 50}%` : '0'
+            }}
           />
         </div>
-
-        <div className="mt-3 flex justify-between text-xs text-slate-400">
+        
+        <div className="flex justify-between text-xs text-gray-500 mt-2">
           <span>Bearish</span>
           <span>Neutral</span>
           <span>Bullish</span>
         </div>
-
-        {lastSignalUpdate && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-            <Clock size={12} />
-            Updated {formatTime(lastSignalUpdate)}
-          </div>
-        )}
       </div>
 
-      {/* === SIGNALS LIST === */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-100">Recent Signals</h3>
-
-          {activeSignals.length > 5 && (
-            <button
-              onClick={() => setShowAll(!showAll)}
-              className="text-xs text-emerald-400 hover:underline"
-            >
-              {showAll ? 'Show less' : 'Show more'}
-            </button>
-          )}
-        </div>
-
-        {!activeSignals.length ? (
-          <div className="flex flex-col items-center py-10 text-slate-500">
-            <AlertTriangle size={32} />
-            <p className="mt-2">No active signals</p>
+      {/* Signal List */}
+      <div className="space-y-3">
+        {processedSignals.length === 0 ? (
+          <div className="text-center py-6 border border-gray-800 rounded-xl">
+            <AlertCircle className="w-8 h-8 text-gray-500 mx-auto mb-2" />
+            <div className="text-gray-400">No active signals</div>
           </div>
         ) : (
-          <div className="space-y-3">
-            {activeSignals.slice(0, showAll ? 20 : 5).map(sig => {
-              const type = signalType(sig.direction);
-              return (
-                <div
-                  key={sig.id}
-                  className={`rounded-lg border-l-4 p-4 bg-slate-800/60 ${
-                    type === 'bull'
-                      ? 'border-emerald-500'
-                      : type === 'bear'
-                      ? 'border-red-500'
-                      : 'border-slate-500'
-                  }`}
-                >
-                  <div className="flex justify-between mb-1">
-                    <span className="text-sm font-semibold text-slate-100">
-                      {sig.direction.toUpperCase()} · {sig.symbol}
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      {formatTimeAgo(sig.timestamp)}
+          <>
+            {processedSignals.map((signal) => (
+              <div 
+                key={signal.id}
+                className={`border-l-4 rounded-lg p-3 ${getSignalBg(signal.direction)} border-gray-800`}
+                style={{ borderLeftColor: getSignalColor(signal.direction).replace('text-', '') }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${getSignalColor(signal.direction).replace('text-', 'bg-')}`} />
+                    <span className={`font-medium ${getSignalColor(signal.direction)}`}>
+                      {signal.direction.toUpperCase()}
                     </span>
                   </div>
-
-                  <p className="text-sm text-slate-300 mb-2">{sig.message}</p>
-
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span>Price: ${sig.price.toFixed(4)}</span>
-                    <span>{Math.round(sig.confidence * 100)}% confidence</span>
+                  <div className="text-xs text-gray-500">
+                    {formatTime(signal.timestamp)}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+                
+                <div className="text-sm text-gray-300">
+                  {signal.message}
+                </div>
+                
+                <div className="flex items-center justify-between mt-2 text-xs">
+                  <span className="text-gray-500">{signal.symbol}</span>
+                  <span className="text-gray-400">
+                    {Math.round(signal.confidence * 100)}% confidence
+                  </span>
+                </div>
+              </div>
+            ))}
+            
+            {signals.length > 5 && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-full py-2 text-center text-sm text-blue-500 hover:text-blue-400"
+              >
+                {expanded ? 'Show less' : `Show ${signals.length - 5} more signals`}
+              </button>
+            )}
+          </>
         )}
       </div>
 
-      {/* === SUMMARY === */}
-      {!!activeSignals.length && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 flex items-center gap-4 text-sm text-slate-300">
-          <Activity size={14} />
-          <span>{activeSignals.length} active</span>
-          <TrendingUp size={14} className="text-emerald-400" />
-          <span>
-            {activeSignals.filter(s => signalType(s.direction) === 'bull').length} bullish
-          </span>
-          <TrendingDown size={14} className="text-red-400" />
-          <span>
-            {activeSignals.filter(s => signalType(s.direction) === 'bear').length} bearish
-          </span>
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+          <div className="text-xs text-gray-400 mb-1">Total</div>
+          <div className="text-lg font-semibold text-white">
+            {processedSignals.length}
+          </div>
         </div>
-      )}
+        
+        <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+          <div className="text-xs text-gray-400 mb-1">Bullish</div>
+          <div className="text-lg font-semibold text-green-500">
+            {bullishSignals}
+          </div>
+        </div>
+        
+        <div className="bg-gray-900/50 rounded-lg p-3 text-center">
+          <div className="text-xs text-gray-400 mb-1">Bearish</div>
+          <div className="text-lg font-semibold text-red-500">
+            {bearishSignals}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
