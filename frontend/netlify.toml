@@ -5,12 +5,8 @@
 [build.environment]
   NODE_VERSION = "20.19.0"
 
-# SPA redirect - ONLY for HTML routes, not assets
+# SPA redirect - catch all routes and serve index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  # Add condition to exclude assets
-  conditions = {
-    Role = ["role=404"]
-  }
