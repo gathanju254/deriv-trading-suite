@@ -19,8 +19,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    sourcemap: false, // Disable sourcemaps in production for smaller bundle
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),
+      output: {
+        // ⭐ Ensure assets go to /assets folder
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
     },
   },
 
