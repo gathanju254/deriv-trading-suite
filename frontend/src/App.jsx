@@ -16,6 +16,7 @@ import { TradingProvider } from './context/TradingContext';
 import { ToastProvider } from './context/ToastContext';
 
 import MainLayout from './components/layout/MainLayout/MainLayout';
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'; // Add this import
 
 import Dashboard from './pages/Dashboard/Dashboard';
 import Trading from './pages/Trading/Trading';
@@ -127,18 +128,20 @@ const AppRoutes = () => {
 -------------------------------------------- */
 function App() {
   return (
-    <AppProvider>
-      <ToastProvider>
-        <AuthProvider>
-          <TradingProvider>
-            {/* Add basename="/" for proper routing on Render */}
-            <Router basename="/">
-              <AppRoutes />
-            </Router>
-          </TradingProvider>
-        </AuthProvider>
-      </ToastProvider>
-    </AppProvider>
+    <ErrorBoundary> {/* Wrap the entire app */}
+      <AuthProvider>
+        <AppProvider>
+          <ToastProvider>
+            <TradingProvider>
+              {/* Add basename="/" for proper routing on Render */}
+              <Router basename="/">
+                <AppRoutes />
+              </Router>
+            </TradingProvider>
+          </ToastProvider>
+        </AppProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
