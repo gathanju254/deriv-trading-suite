@@ -9,7 +9,7 @@ services:
       - key: BACKEND_URL
         value: https://deriv-trading-backend.onrender.com
       - key: FRONTEND_URL
-        value: https://deriv-trading-suite.onrender.com
+        value: https://deriv-trading-suite-67mv.onrender.com
       - key: DERIV_APP_ID
         value: 113709
       - key: DERIV_API_TOKEN
