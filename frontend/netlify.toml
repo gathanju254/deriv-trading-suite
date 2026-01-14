@@ -1,11 +1,18 @@
 [build]
-  command = "npm run build"
   publish = "dist"
+  command = "npm run build"
 
 [build.environment]
   NODE_VERSION = "20.19.0"
 
-# SPA fallback — DO NOT TOUCH ASSETS
+# ⚠️ CRITICAL: Use this exact redirect syntax
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+  force = true  # This ensures assets are served as files, not HTML
+
+# SPA redirect for everything else
 [[redirects]]
   from = "/*"
   to = "/index.html"

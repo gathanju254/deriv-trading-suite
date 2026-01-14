@@ -4,26 +4,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   
-  // Base path - important for production
-  base: '/',
+  // Base path is CRITICAL
+  base: './',  // Changed from '/' to './'
   
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: false,  // Disable source maps in production
-    minify: 'terser',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor': ['react', 'react-dom', 'axios'],
-        }
-      }
-    }
-  },
-  
-  // Development server
-  server: {
-    port: 5173,
-    host: true,
+    // Remove all rollupOptions - let Vite handle it
   },
 })
