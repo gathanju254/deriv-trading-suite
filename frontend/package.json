@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "homepage": "https://deriv-trading-suite-67mv.onrender.com/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

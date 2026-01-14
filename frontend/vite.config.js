@@ -4,12 +4,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   
-  // Base path is CRITICAL
-  base: './',  // Changed from '/' to './'
+  // Base path (keep relative for static hosting)
+  base: './',
   
   build: {
-    outDir: 'dist',
+    outDir: 'build', // changed from 'dist' to match Render publish directory
     emptyOutDir: true,
-    // Remove all rollupOptions - let Vite handle it
   },
 })
