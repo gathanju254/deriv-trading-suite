@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://deriv-trading-suite-67mv.onrender.com/sitemap.xml

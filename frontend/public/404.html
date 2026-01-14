@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Redirecting...</title>
+    <script>
+        // Get the current URL
+        const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+        
+        // Only redirect if we're not already on index.html
+        if (!window.location.pathname.includes('index.html')) {
+            // Preserve query parameters and hash
+            const redirectUrl = '/index.html' + window.location.search + window.location.hash;
+            
+            // Use replace to avoid adding to history
+            window.location.replace(redirectUrl);
+        }
+    </script>
+</head>
+<body>
+    <noscript>
+        <h1>Page Not Found</h1>
+        <p>This page requires JavaScript to function properly.</p>
+        <p>Please <a href="/">go to the home page</a> or enable JavaScript.</p>
+    </noscript>
+    <div style="display: none;">
+        <h1>Redirecting...</h1>
+        <p>If you are not redirected automatically, <a id="redirect-link" href="/">click here</a>.</p>
+    </div>
+    <script>
+        // Fallback in case the main redirect doesn't work
+        setTimeout(function() {
+            document.getElementById('redirect-link').click();
+        }, 1000);
+    </script>
+</body>
+</html>
