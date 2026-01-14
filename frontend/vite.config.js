@@ -10,7 +10,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    // Don't specify rollupOptions unless needed
+    sourcemap: false,  // Disable source maps in production
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['react', 'react-dom', 'axios'],
+        }
+      }
+    }
   },
   
   // Development server

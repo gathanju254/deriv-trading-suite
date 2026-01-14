@@ -5,8 +5,12 @@
 [build.environment]
   NODE_VERSION = "20.19.0"
 
-# Simple SPA redirect - Netlify serves static files automatically
+# SPA redirect - ONLY for HTML routes, not assets
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  # Add condition to exclude assets
+  conditions = {
+    Role = ["role=404"]
+  }
