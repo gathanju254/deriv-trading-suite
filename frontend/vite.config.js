@@ -20,9 +20,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
-      },
+      input: path.resolve(__dirname, 'index.html'),
     },
   },
 
@@ -30,24 +28,18 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      '/auth': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
-      },
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        secure: false,
+      },
+      '/auth': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
       },
       '/ws': {
         target: 'http://localhost:8000',
         ws: true,
-        changeOrigin: true,
       },
-    },
-    hmr: {
-      port: 5173,
     },
   },
 })

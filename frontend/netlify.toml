@@ -1,93 +1,20 @@
 [build]
-  publish = "dist"
-  command = "npm run build"
+  publish = "frontend/dist"
+  command = "cd frontend && npm install && npm run build"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20.19.0"
 
-# First, handle static assets - NO redirect for these
-[[redirects]]
-  from = "/assets/*"
-  to = "/assets/:splat"
-  status = 200
-  force = false  # Don't force redirect
-
-[[redirects]]
-  from = "/*.css"
-  to = "/:splat"
-  status = 200
-  force = false
-
-[[redirects]]
-  from = "/*.js"
-  to = "/:splat"
-  status = 200
-  force = false
-
-[[redirects]]
-  from = "/*.json"
-  to = "/:splat"
-  status = 200
-  force = false
-
-[[redirects]]
-  from = "/*.ico"
-  to = "/:splat"
-  status = 200
-  force = false
-
-[[redirects]]
-  from = "/*.png"
-  to = "/:splat"
-  status = 200
-  force = false
-
-[[redirects]]
-  from = "/*.jpg"
-  to = "/:splat"
-  status = 200
-  force = false
-
-[[redirects]]
-  from = "/*.svg"
-  to = "/:splat"
-  status = 200
-  force = false
-
-# Then, catch-all for SPA routes
+# Single SPA redirect — let Vite handle assets
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
+# Security headers (optional but solid)
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-
-# Cache static assets
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-    Content-Type = "text/css"  # Explicitly set MIME type for CSS
-
-[[headers]]
-  for = "/*.css"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-    Content-Type = "text/css"
-
-[[headers]]
-  for = "/*.js"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-    Content-Type = "application/javascript"
-
-# Don't cache HTML
-[[headers]]
-  for = "/*.html"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
