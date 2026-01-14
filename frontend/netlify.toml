@@ -1,13 +1,12 @@
 [build]
-  publish = "dist"
   command = "npm run build"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20.19.0"
 
-# Only redirect non-file routes to index.html
+# SPA fallback — DO NOT TOUCH ASSETS
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  conditions = { NOT = {path = "/assets/*"} }
