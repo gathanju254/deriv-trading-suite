@@ -28,16 +28,16 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile overlay - Improved for full overlay */}
+      {/* Mobile overlay */}
       {mobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/80 z-40 md:hidden animate-fade-in" 
           onClick={toggleMobileMenu} 
-          aria-hidden="true"
+          aria-hidden="true" 
         />
       )}
 
-      {/* Sidebar - Fixed positioning, overlay on mobile */}
+      {/* Sidebar */}
       <aside
         className={`fixed left-0 top-0 z-50 h-full bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 border-r border-gray-800/50 shadow-2xl transition-all duration-500 ease-out
           ${sidebarCollapsed ? 'w-20' : 'w-72'} ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} flex flex-col justify-between`}

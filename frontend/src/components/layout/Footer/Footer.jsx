@@ -11,10 +11,12 @@ const Footer = () => {
   // Uptime counter and clock
   useEffect(() => {
     const startTime = Date.now();
+    
     const interval = setInterval(() => {
       setUptime(Math.floor((Date.now() - startTime) / 1000));
       setCurrentTime(new Date());
     }, 1000);
+    
     return () => clearInterval(interval);
   }, []);
 
@@ -42,32 +44,27 @@ const Footer = () => {
       },
       ws: {
         connected: { color: 'bg-success-500', text: 'Connected', icon: '🌐' },
-        disconnected: { color: 'bg-secondary-500', text: 'Disconnected', icon: '❌' },
+        disconnected: { color: 'bg-secondary-500', text: 'Disconnected', icon: '🔌' },
         connecting: { color: 'bg-accent-500', text: 'Connecting', icon: '🔄' }
       }
     };
-    return config[type]?.[status] || { color: 'bg-gray-500', text: 'Unknown', icon: '?' };
+    
+    return config[type]?.[status] || { color: 'bg-gray-500', text: 'Unknown', icon: '❓' };
   };
 
   const StatusPill = ({ type, status }) => {
     const config = getStatusConfig(type, status);
     return (
-      <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${config.color} text-white`}>
-        <span>{config.icon}</span>
-        <span>{config.text}</span>
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/50 border border-gray-700/50">
+        <div className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${config.color} ${status === 'running' || status === 'connected' ? 'animate-pulse-slow' : ''}`} />
+          <span className="text-xs font-medium text-gray-300 capitalize">
+            {type}: {config.text}
+          </span>
+        </div>
       </div>
     );
   };
-
-  const StatusDot = ({ status }) => (
-    <span className={`w-3 h-3 rounded-full ${
-      status === 'running' || status === 'connected'
-        ? 'bg-success-500 animate-pulse-slow'
-        : status === 'connecting'
-          ? 'bg-accent-500 animate-pulse'
-          : 'bg-secondary-500'
-    }`} />
-  );
 
   const StatCard = ({ icon: Icon, label, value, color = 'text-white', subtext = null }) => (
     <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gray-800/30 border border-gray-700/50 backdrop-blur-sm">
@@ -85,12 +82,12 @@ const Footer = () => {
   );
 
   return (
-    <footer className="sticky bottom-0 bg-gradient-to-t from-gray-950 via-gray-900 to-gray-950 border-t border-gray-800/50 px-4 md:px-6 py-4 shadow-2xl">
+    <footer className="bg-gradient-to-t from-gray-950 via-gray-900 to-gray-950 border-t border-gray-800/50 px-6 py-4 shadow-2xl">
       <div className="max-w-7xl mx-auto">
-        {/* Main Footer Content - Stack on small screens */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-4">
+        {/* Main Footer Content */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           {/* Left: Status & Info */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center">
                 <Shield size={20} className="text-white" />
@@ -101,9 +98,9 @@ const Footer = () => {
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <StatusDot status={botStatus} />
-              <StatusDot status={wsConnectionStatus} />
+            <div className="space-y-2">
+              <StatusPill type="bot" status={botStatus} />
+              <StatusPill type="ws" status={wsConnectionStatus} />
             </div>
             
             <div className="flex items-center gap-4 text-sm text-gray-400">
@@ -111,7 +108,7 @@ const Footer = () => {
                 <Globe size={14} />
                 <span>v1.0.0</span>
               </div>
-              <span className="text-gray-600 hidden md:inline">•</span>
+              <span className="text-gray-600">•</span>
               <div className="flex items-center gap-2">
                 <Clock size={14} />
                 <span>{formatTime(currentTime)}</span>
@@ -120,7 +117,7 @@ const Footer = () => {
           </div>
 
           {/* Center: Performance Stats */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             <h4 className="font-semibold text-white flex items-center gap-2">
               <BarChart3 size={16} />
               Performance Overview
@@ -154,38 +151,40 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Right: Market Info */}
-          <div className="space-y-3">
-            <h4 className="font-semibold text-white">Market Info</h4>
-            {marketData?.symbol ? (
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-400">Symbol:</span>
-                  <span className="text-sm font-semibold text-white font-mono">{marketData.symbol}</span>
+          {/* Right: Market Info & Copyright */}
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-gradient-to-br from-gray-900 to-gray-950 border border-gray-800/50">
+              <h4 className="font-semibold text-white mb-2">Market Info</h4>
+              {marketData?.symbol ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Symbol:</span>
+                    <span className="text-sm font-semibold text-white font-mono">{marketData.symbol}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Last Price:</span>
+                    <span className="text-sm font-semibold text-success-500">
+                      ${marketData.lastPrice?.toFixed(4) || '—'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-400">Last Price:</span>
-                  <span className="text-sm font-semibold text-success-500">
-                    ${marketData.lastPrice?.toFixed(4) || '—'}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">No market data available</p>
-            )}
+              ) : (
+                <p className="text-sm text-gray-500">No market data available</p>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-3 border-t border-gray-800/30">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-3">
-            <p className="text-xs md:text-sm text-gray-500 text-center md:text-left">
+        <div className="pt-4 border-t border-gray-800/30">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-sm text-gray-500 text-center md:text-left">
               &copy; {new Date().getFullYear()} Deriv Trading Suite. All rights reserved. 
               <span className="hidden md:inline"> | </span>
               <span className="block md:inline mt-1 md:mt-0">This is a demonstration platform. Trading involves risk.</span>
             </p>
             
-            <div className="flex items-center gap-3 md:gap-4 text-xs md:text-sm">
+            <div className="flex items-center gap-4 text-sm">
               <button className="text-gray-400 hover:text-white transition-colors duration-200">
                 Terms
               </button>

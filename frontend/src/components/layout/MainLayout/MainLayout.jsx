@@ -6,7 +6,7 @@ import Footer from '../Footer/Footer';
 import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
 import { useToast } from '../../../context/ToastContext';
-import { Clock, Activity } from 'lucide-react';
+import { Clock, Wifi, WifiOff, RefreshCw, Activity } from 'lucide-react';
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
@@ -48,14 +48,23 @@ const MainLayout = () => {
     return `${Math.floor(diff / 3600)}h ago`;
   }, []);
 
-  const StatusIndicator = ({ status }) => (
-    <span className={`w-3 h-3 rounded-full ${
-      status === 'connected' || status === 'running' 
-        ? 'bg-success-500 animate-pulse-slow' 
-        : status === 'connecting' 
-          ? 'bg-accent-500 animate-pulse' 
-          : 'bg-secondary-500'
-    }`} />
+  const StatusIndicator = ({ status, label, icon: Icon }) => (
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-800/60 backdrop-blur-sm rounded-xl border border-gray-700/50">
+      <div className="flex items-center gap-2">
+        {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+        <span className="text-sm font-medium text-gray-300 capitalize">{label}:</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className={`w-2.5 h-2.5 rounded-full ${
+          status === 'connected' || status === 'running' 
+            ? 'bg-success-500 animate-pulse-slow' 
+            : status === 'connecting' 
+              ? 'bg-accent-500 animate-pulse' 
+              : 'bg-secondary-500'
+        }`} />
+        <span className="text-sm font-semibold text-white capitalize">{status}</span>
+      </div>
+    </div>
   );
 
   return (
@@ -79,14 +88,11 @@ const MainLayout = () => {
 
       <Sidebar />
 
-      <div className={`flex-1 flex flex-col transition-all duration-500 ease-out ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-72'}`}>
-        {/* Fixed Header Container - Now truly fixed at top */}
-        <div className="fixed top-0 left-0 right-0 z-40 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
-          <Header />
-        </div>
+      <div className={`flex-1 flex flex-col transition-all duration-500 ease-out ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+        <Header />
         
-        {/* Page Header with Status Bar - Adjusted top padding for fixed header */}
-        <div className="px-6 py-4 bg-gray-900/80 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl mt-18"> {/* mt-18 to account for fixed header height */}
+        {/* Page Header with Status Bar */}
+        <div className="sticky top-0 z-30 px-6 py-4 bg-gray-900/80 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
           <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
             {/* Page Title */}
             <div className="flex items-center gap-3">
@@ -98,11 +104,22 @@ const MainLayout = () => {
               </h1>
             </div>
 
-            {/* Status Bar - Simplified to dots only */}
-            <div className="flex items-center gap-3">
-              <StatusIndicator status={botStatus} />
-              <StatusIndicator status={wsConnectionStatus} />
-              
+            {/* Status Bar */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Bot Status */}
+              <StatusIndicator 
+                status={botStatus} 
+                label="Bot" 
+                icon={Activity}
+              />
+
+              {/* WebSocket Status */}
+              <StatusIndicator 
+                status={wsConnectionStatus} 
+                label="WebSocket"
+                icon={wsConnectionStatus === 'connected' ? Wifi : WifiOff}
+              />
+
               {/* Last Update */}
               <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-800/60 backdrop-blur-sm rounded-xl border border-gray-700/50">
                 <Clock className="w-4 h-4 text-gray-400" />
@@ -139,8 +156,8 @@ const MainLayout = () => {
           </div>
         </div>
 
-        {/* Main Content - Adjusted top margin for fixed elements */}
-        <main className="flex-1 p-6 overflow-auto mt-0"> {/* Removed extra margin; content scrolls under fixed header */}
+        {/* Main Content */}
+        <main className="flex-1 p-6 overflow-auto">
           <div className="max-w-7xl mx-auto">
             <div className="animate-fade-in">
               <Outlet />
@@ -151,10 +168,10 @@ const MainLayout = () => {
         <Footer />
       </div>
 
-      {/* Mobile Backdrop - Improved for better UX */}
+      {/* Mobile Backdrop */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-30 md:hidden bg-black/70 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-40 md:hidden bg-black/70 backdrop-blur-sm animate-fade-in"
           onClick={toggleMobileMenu}
           aria-hidden="true"
         />
