@@ -6,7 +6,7 @@ import Footer from '../Footer/Footer';
 import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
 import { useToast } from '../../../context/ToastContext';
-import { Clock, Wifi, WifiOff, RefreshCw, Activity } from 'lucide-react';
+import { Clock, Activity } from 'lucide-react';
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
@@ -79,14 +79,14 @@ const MainLayout = () => {
 
       <Sidebar />
 
-      <div className={`flex-1 flex flex-col transition-all duration-500 ease-out ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-        {/* Fixed Header Container */}
-        <div className="sticky top-0 z-40 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
+      <div className={`flex-1 flex flex-col transition-all duration-500 ease-out ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-72'}`}>
+        {/* Fixed Header Container - Now truly fixed at top */}
+        <div className="fixed top-0 left-0 right-0 z-40 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
           <Header />
         </div>
         
-        {/* Page Header with Status Bar */}
-        <div className="px-6 py-4 bg-gray-900/80 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
+        {/* Page Header with Status Bar - Adjusted top padding for fixed header */}
+        <div className="px-6 py-4 bg-gray-900/80 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl mt-18"> {/* mt-18 to account for fixed header height */}
           <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4">
             {/* Page Title */}
             <div className="flex items-center gap-3">
@@ -139,8 +139,8 @@ const MainLayout = () => {
           </div>
         </div>
 
-        {/* Main Content */}
-        <main className="flex-1 p-6 overflow-auto">
+        {/* Main Content - Adjusted top margin for fixed elements */}
+        <main className="flex-1 p-6 overflow-auto mt-0"> {/* Removed extra margin; content scrolls under fixed header */}
           <div className="max-w-7xl mx-auto">
             <div className="animate-fade-in">
               <Outlet />
@@ -151,10 +151,10 @@ const MainLayout = () => {
         <Footer />
       </div>
 
-      {/* Mobile Backdrop */}
+      {/* Mobile Backdrop - Improved for better UX */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 md:hidden bg-black/70 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-30 md:hidden bg-black/70 backdrop-blur-sm animate-fade-in"
           onClick={toggleMobileMenu}
           aria-hidden="true"
         />

@@ -1,6 +1,6 @@
 // frontend/src/components/Common/Header/Header.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Menu, ChevronDown, Sun, Moon, LogOut, User, Settings, Shield, Zap, HelpCircle, ExternalLink } from 'lucide-react';
+import { Bell, Menu, ChevronDown, Sun, Moon, LogOut, User, Settings, Shield, Zap, HelpCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useTrading } from '../../../hooks/useTrading';
@@ -65,20 +65,14 @@ const Header = () => {
         addToast('Trading bot started', 'success');
       }
     } catch (error) {
-      addToast('Failed to toggle bot', 'error');
+      addToast('Bot toggle failed', 'error');
     }
   };
 
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'running':
-      case 'connected':
-        return 'text-success-500 bg-success-500/10 border-success-500/20';
-      case 'connecting':
-        return 'text-accent-500 bg-accent-500/10 border-accent-500/20';
-      default:
-        return 'text-secondary-500 bg-secondary-500/10 border-secondary-500/20';
-    }
+    if (status === 'running' || status === 'connected') return 'text-success-500';
+    if (status === 'connecting') return 'text-accent-500';
+    return 'text-secondary-500';
   };
 
   const getStatusDot = (status) => (
@@ -93,17 +87,17 @@ const Header = () => {
 
   return (
     <header className="h-18 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50 shadow-2xl">
-      <div className="h-full px-6 flex items-center justify-between">
-        {/* Menu Toggle */}
+      <div className="h-full px-4 md:px-6 flex items-center justify-between">
+        {/* Menu Toggle - More visible on mobile */}
         <button 
           onClick={() => (window.innerWidth < 768 ? toggleMobileMenu() : toggleSidebar())} 
-          className="p-2.5 rounded-xl hover:bg-gray-800/50 transition-all duration-200 hover:scale-110 border border-gray-700/50"
+          className="p-2.5 rounded-xl hover:bg-gray-800/50 transition-all duration-200 hover:scale-110 border border-gray-700/50 md:block"
           aria-label="Toggle menu"
         >
           <Menu size={22} className="text-gray-300" />
         </button>
 
-        {/* Quick Bot Control - Simplified with dot */}
+        {/* Quick Bot Control - Hidden on very small screens */}
         <div className="hidden md:flex items-center gap-4">
           <button
             onClick={handleQuickBotToggle}
@@ -118,38 +112,8 @@ const Header = () => {
           </button>
         </div>
 
-        {/* Right Controls */}
-        <div className="flex items-center gap-3">
-          {/* Help Menu */}
-          <div className="relative" ref={helpRef}>
-            <button 
-              onClick={() => setHelpOpen(prev => !prev)} 
-              className="p-2.5 rounded-xl hover:bg-gray-800/50 transition-all duration-200 hover:scale-110 border border-gray-700/50"
-              aria-label="Help menu"
-            >
-              <HelpCircle size={20} className="text-gray-400" />
-            </button>
-            {helpOpen && (
-              <div className="absolute right-0 mt-3 w-56 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
-                <div className="p-4 border-b border-gray-800 bg-gradient-to-r from-gray-900 to-gray-900/50">
-                  <div className="flex items-center gap-2">
-                    <HelpCircle size={18} className="text-primary-500" />
-                    <span className="font-semibold text-white">Help & Support</span>
-                  </div>
-                </div>
-                {helpItems.map((item) => (
-                  <button
-                    key={item.label}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-800 flex items-center gap-3 transition-colors duration-200 border-b border-gray-800/50 last:border-0"
-                  >
-                    <item.icon size={16} className="text-gray-400" />
-                    <span className="text-sm text-gray-300">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
+        {/* Right Controls - Stack vertically on small screens */}
+        <div className="flex items-center gap-2 md:gap-3">
           {/* Dark Mode Toggle */}
           <button 
             onClick={toggleDarkMode} 
@@ -163,8 +127,8 @@ const Header = () => {
             )}
           </button>
 
-          {/* Notifications */}
-          <div className="relative" ref={notifRef}>
+          {/* Notifications - Hidden on very small screens */}
+          <div className="relative hidden sm:block" ref={notifRef}>
             <button 
               onClick={() => setNotificationsOpen(prev => !prev)} 
               className="p-2.5 rounded-xl hover:bg-gray-800/50 transition-all duration-200 hover:scale-110 border border-gray-700/50 relative"
@@ -172,7 +136,7 @@ const Header = () => {
             >
               <Bell size={20} className="text-gray-400" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 text-xs font-bold bg-secondary-500 rounded-full flex items-center justify-center animate-pulse shadow-lg">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
                   {unreadCount}
                 </span>
               )}
@@ -213,6 +177,36 @@ const Header = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+          </div>
+
+          {/* Help Menu - Hidden on very small screens */}
+          <div className="relative hidden sm:block" ref={helpRef}>
+            <button 
+              onClick={() => setHelpOpen(prev => !prev)} 
+              className="p-2.5 rounded-xl hover:bg-gray-800/50 transition-all duration-200 hover:scale-110 border border-gray-700/50"
+              aria-label="Help menu"
+            >
+              <HelpCircle size={20} className="text-gray-400" />
+            </button>
+            {helpOpen && (
+              <div className="absolute right-0 mt-3 w-56 bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
+                <div className="p-4 border-b border-gray-800 bg-gradient-to-r from-gray-900 to-gray-900/50">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle size={18} className="text-primary-500" />
+                    <span className="font-semibold text-white">Help & Support</span>
+                  </div>
+                </div>
+                {helpItems.map((item) => (
+                  <button
+                    key={item.label}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-800 flex items-center gap-3 transition-colors duration-200 border-b border-gray-800/50 last:border-0"
+                  >
+                    <item.icon size={16} className="text-gray-400" />
+                    <span className="text-sm text-gray-300">{item.label}</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -268,11 +262,11 @@ const Header = () => {
                 <div className="p-3 border-t border-gray-800">
                   <button 
                     onClick={handleLogout}
-                    className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-gray-800 to-gray-900 hover:from-secondary-900/30 hover:to-secondary-900/20 text-secondary-400 hover:text-white flex items-center justify-center gap-2 transition-all duration-200 border border-gray-800/50"
-                  >
-                    <LogOut size={16} />
-                    <span className="font-medium">Logout</span>
-                  </button>
+                    className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-gray-800 to-gray-900 hover:from-secondary-900/30 hover:to-secondary-900/20 text-secondary-400 hover:text-white flex items-center justify-center gap-2 transition-all duration-200 border border-gray-800/50"assName="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-gray-800 to-gray-900 hover:from-secondary-900/30 hover:to-secondary-900/20 text-secondary-400 hover:text-white flex items-center justify-center gap-2 transition-all duration-200 border border-gray-800/50"
+                  >                  >
+                    <LogOut size={16} /> />
+                    <span className="font-medium">Logout</span>>
+                  </button>>
                 </div>
               </div>
             )}
@@ -283,14 +277,14 @@ const Header = () => {
   );
 };
 
-const MenuItem = ({ icon: Icon, label, to }) => (
+const MenuItem = ({ icon: Icon, label, to }) => ( = ({ icon: Icon, label, to }) => (
   <button 
-    onClick={() => (window.location.href = to)} 
-    className="w-full px-4 py-3 text-left hover:bg-gray-800 flex items-center gap-3 transition-colors duration-200 border-b border-gray-800/50 last:border-0"
-  >
-    <Icon size={18} className="text-gray-400" />
-    <span className="text-sm text-gray-300">{label}</span>
-  </button>
+    onClick={() => (window.location.href = to)} () => (window.location.href = to)} 
+    className="w-full px-4 py-3 text-left hover:bg-gray-800 flex items-center gap-3 transition-colors duration-200 border-b border-gray-800/50 last:border-0"className="w-full px-4 py-3 text-left hover:bg-gray-800 flex items-center gap-3 transition-colors duration-200 border-b border-gray-800/50 last:border-0"
+  >>
+    <Icon size={18} className="text-gray-400" />    <Icon size={18} className="text-gray-400" />
+    <span className="text-sm text-gray-300">{label}</span>l}</span>
+  </button>>
 );
 
 export default Header;
