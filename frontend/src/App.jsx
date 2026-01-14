@@ -16,7 +16,7 @@ import { TradingProvider } from './context/TradingContext';
 import { ToastProvider } from './context/ToastContext';
 
 import MainLayout from './components/layout/MainLayout/MainLayout';
-import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'; // Add this import
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary';
 
 import Dashboard from './pages/Dashboard/Dashboard';
 import Trading from './pages/Trading/Trading';
@@ -72,7 +72,6 @@ const MainLayoutWrapper = () => {
 -------------------------------------------- */
 const AppRoutes = () => {
   const location = useLocation();
-  const navigate = useNavigate();
 
   // Fix for OAuth callback from backend redirect
   useEffect(() => {
@@ -128,12 +127,12 @@ const AppRoutes = () => {
 -------------------------------------------- */
 function App() {
   return (
-    <ErrorBoundary> {/* Wrap the entire app */}
+    <ErrorBoundary>
       <AuthProvider>
         <AppProvider>
           <ToastProvider>
             <TradingProvider>
-              {/* Add basename="/" for proper routing on Render */}
+              {/* Add basename="/" for proper routing on static hosting */}
               <Router basename="/">
                 <AppRoutes />
               </Router>
