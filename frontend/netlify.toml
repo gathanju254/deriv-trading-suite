@@ -5,28 +5,12 @@
 [build.environment]
   NODE_VERSION = "20.19.0"
 
-# ⭐ IMPORTANT: Exclude assets from SPA redirect
-[[redirects]]
-  from = "/assets/*"
-  to = "/assets/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/icons/*"
-  to = "/icons/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/favicon.ico"
-  to = "/favicon.ico"
-  status = 200
-
-# SPA redirect ONLY for non-asset routes
+# Netlify handles static files automatically
+# Only need SPA redirect for non-existent files
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  conditions = { "Not" = [{ "URL" = "^/assets/" }, { "URL" = "^/icons/" }, { "URL" = "^/favicon" }] }
 
 # Security headers
 [[headers]]
@@ -35,5 +19,3 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    # ⭐ Add cache headers for assets
-    Cache-Control = "public, max-age=31536000, immutable"

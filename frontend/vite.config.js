@@ -1,4 +1,5 @@
 // frontend/vite.config.js
+// frontend/vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -10,6 +11,9 @@ const __dirname = path.dirname(__filename)
 export default defineConfig({
   plugins: [react()],
 
+  // Base public path - crucial for production
+  base: '/',
+  
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
@@ -19,11 +23,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: false, // Disable sourcemaps in production for smaller bundle
+    sourcemap: false,
+    // Assets configuration
+    assetsDir: 'assets',
     rollupOptions: {
-      input: path.resolve(__dirname, 'index.html'),
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+      },
       output: {
-        // ⭐ Ensure assets go to /assets folder
+        // Consistent naming
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
@@ -31,22 +39,9 @@ export default defineConfig({
     },
   },
 
+  // Development server (local only)
   server: {
     port: 5173,
     host: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-      '/auth': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
-      '/ws': {
-        target: 'http://localhost:8000',
-        ws: true,
-      },
-    },
   },
 })
