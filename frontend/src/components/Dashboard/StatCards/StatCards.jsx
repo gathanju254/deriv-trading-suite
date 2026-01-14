@@ -1,17 +1,11 @@
 // frontend/src/components/Dashboard/StatCards/StatCards.jsx
-// frontend/src/components/Dashboard/StatCards/StatCards.jsx
+// Alternative Cleaner Version
 import React, { useEffect, useState, useRef } from 'react';
 import { useTrading } from '../../../hooks/useTrading';
-import {
-  DollarSign,
-  Percent,
-  BarChart3,
-  Target,
-  Zap
-} from 'lucide-react';
+import { DollarSign, Percent, BarChart3, Target, TrendingUp, TrendingDown } from 'lucide-react';
 
 const StatCards = () => {
-  const { performance, wsConnectionStatus } = useTrading();
+  const { performance } = useTrading();
   const [updatedCard, setUpdatedCard] = useState(null);
   const prevRef = useRef({});
 
@@ -31,36 +25,12 @@ const StatCards = () => {
     for (const key in normalized) {
       if (prevRef.current[key] !== normalized[key]) {
         setUpdatedCard(key);
-        setTimeout(() => setUpdatedCard(null), 600);
+        setTimeout(() => setUpdatedCard(null), 300);
         break;
       }
     }
     prevRef.current = normalized;
   }, [normalized]);
-
-  const getColorClass = (type, value) => {
-    if (type === 'profit') {
-      return value >= 0 ? 'text-green-500' : 'text-red-500';
-    }
-    if (type === 'winRate') {
-      if (value >= 70) return 'text-green-500';
-      if (value >= 50) return 'text-yellow-500';
-      return 'text-red-500';
-    }
-    return 'text-gray-300';
-  };
-
-  const getBgColor = (type, value) => {
-    if (type === 'profit') {
-      return value >= 0 ? 'bg-green-500/10' : 'bg-red-500/10';
-    }
-    if (type === 'winRate') {
-      if (value >= 70) return 'bg-green-500/10';
-      if (value >= 50) return 'bg-yellow-500/10';
-      return 'bg-red-500/10';
-    }
-    return 'bg-gray-800/50';
-  };
 
   const cards = [
     {
@@ -68,79 +38,72 @@ const StatCards = () => {
       title: 'Total P&L',
       value: `$${normalized.totalProfit.toFixed(2)}`,
       icon: DollarSign,
-      color: getColorClass('profit', normalized.totalProfit),
-      bgColor: getBgColor('profit', normalized.totalProfit),
-      sub: `Daily: $${normalized.dailyPnl.toFixed(2)}`
+      change: normalized.dailyPnl,
+      trend: normalized.totalProfit >= 0
     },
     {
       id: 'winRate',
       title: 'Win Rate',
       value: `${normalized.winRate.toFixed(1)}%`,
       icon: Percent,
-      color: getColorClass('winRate', normalized.winRate),
-      bgColor: getBgColor('winRate', normalized.winRate),
-      sub: `${normalized.winningTrades}/${normalized.completedTrades} trades`
+      change: `${normalized.winningTrades}/${normalized.completedTrades}`,
+      trend: normalized.winRate >= 50
     },
     {
       id: 'totalTrades',
       title: 'Total Trades',
       value: normalized.totalTrades,
       icon: BarChart3,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
-      sub: `${normalized.activeTrades} active`
+      change: `${normalized.activeTrades} active`,
+      trend: null
     },
     {
       id: 'sharpeRatio',
-      title: 'Sharpe Ratio',
+      title: 'Risk Score',
       value: normalized.sharpeRatio.toFixed(2),
       icon: Target,
-      color: normalized.sharpeRatio > 1 ? 'text-purple-500' : 'text-gray-400',
-      bgColor: normalized.sharpeRatio > 1 ? 'bg-purple-500/10' : 'bg-gray-800/50',
-      sub: `Drawdown: ${normalized.maxDrawdown.toFixed(1)}%`
+      change: `DD: ${normalized.maxDrawdown.toFixed(1)}%`,
+      trend: normalized.sharpeRatio > 1
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {cards.map(card => {
         const Icon = card.icon;
-        const pulse = updatedCard === card.id;
-
+        const isPositive = card.trend === true;
+        const isNegative = card.trend === false;
+        
         return (
           <div
             key={card.id}
-            className={`relative rounded-xl border border-gray-800 bg-gray-900/50 p-5 transition-all duration-300
-              ${pulse ? 'ring-2 ring-green-500/30 scale-[1.02]' : 'hover:border-gray-700'}
+            className={`bg-gray-900/50 border border-gray-800 rounded-lg p-4 transition-colors duration-200
+              ${updatedCard === card.id ? 'ring-1 ring-blue-500/30' : ''}
             `}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`rounded-lg p-2 ${card.bgColor} ${card.color}`}>
-                  <Icon size={18} />
-                </div>
-                <span className="text-sm font-medium text-gray-300">
-                  {card.title}
-                </span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Icon size={16} className="text-gray-400" />
+                <span className="text-sm text-gray-400">{card.title}</span>
               </div>
-
-              {wsConnectionStatus === 'connected' && (
-                <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-xs text-green-400">Live</span>
+              
+              {card.trend !== null && (
+                <div className={`p-1 rounded ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                  {isPositive ? (
+                    <TrendingUp size={12} />
+                  ) : (
+                    <TrendingDown size={12} />
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Value */}
-            <div className={`text-2xl font-bold ${card.color} mb-2`}>
+            <div className="text-2xl font-bold text-white mb-1">
               {card.value}
             </div>
 
-            {/* Subtitle */}
-            <div className="text-sm text-gray-400">
-              {card.sub}
+            <div className="text-xs text-gray-500">
+              {card.change}
             </div>
           </div>
         );
