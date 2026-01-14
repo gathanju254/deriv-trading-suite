@@ -1,109 +1,140 @@
 // frontend/src/components/Dashboard/StatCards/StatCards.jsx
-// Alternative Cleaner Version
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTrading } from '../../../hooks/useTrading';
-import { DollarSign, Percent, BarChart3, Target, TrendingUp, TrendingDown } from 'lucide-react';
+import {
+  DollarSign,
+  Percent,
+  BarChart3,
+  Target,
+  TrendingUp,
+  TrendingDown,
+} from 'lucide-react';
+
+/* ---------------------------
+   Small helpers (keep UI sane)
+---------------------------- */
+const fmtMoney = (v) => `$${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+const fmtPercent = (v) => `${Number(v).toFixed(1)}%`;
+const fmtNumber = (v) => Number(v).toLocaleString();
+const isPositive = (v) => v > 0;
 
 const StatCards = () => {
   const { performance } = useTrading();
-  const [updatedCard, setUpdatedCard] = useState(null);
-  const prevRef = useRef({});
+  const [highlight, setHighlight] = useState(null);
+  const prev = useRef({});
 
-  const normalized = {
+  /* ---------------------------
+     Normalize backend chaos
+  ---------------------------- */
+  const stats = useMemo(() => ({
     totalProfit: performance?.total_profit ?? performance?.pnl ?? 0,
+    dailyPnl: performance?.daily_pnl ?? 0,
+
     winRate: performance?.win_rate ?? 0,
     totalTrades: performance?.total_trades ?? 0,
-    sharpeRatio: performance?.sharpe_ratio ?? 0,
-    dailyPnl: performance?.daily_pnl ?? 0,
     activeTrades: performance?.active_trades ?? 0,
     completedTrades: performance?.completed_trades ?? 0,
     winningTrades: performance?.winning_trades ?? 0,
-    maxDrawdown: performance?.max_drawdown ?? 0,
-  };
 
+    sharpeRatio: performance?.sharpe_ratio ?? 0,
+    maxDrawdown: performance?.max_drawdown ?? 0,
+  }), [performance]);
+
+  /* ---------------------------
+     Subtle update pulse
+  ---------------------------- */
   useEffect(() => {
-    for (const key in normalized) {
-      if (prevRef.current[key] !== normalized[key]) {
-        setUpdatedCard(key);
-        setTimeout(() => setUpdatedCard(null), 300);
+    for (const key in stats) {
+      if (prev.current[key] !== stats[key]) {
+        setHighlight(key);
+        setTimeout(() => setHighlight(null), 350);
         break;
       }
     }
-    prevRef.current = normalized;
-  }, [normalized]);
+    prev.current = stats;
+  }, [stats]);
 
+  /* ---------------------------
+     Card definitions
+  ---------------------------- */
   const cards = [
     {
       id: 'totalProfit',
-      title: 'Total P&L',
-      value: `$${normalized.totalProfit.toFixed(2)}`,
+      label: 'Total P&L',
+      value: fmtMoney(stats.totalProfit),
+      sub: `Today: ${fmtMoney(stats.dailyPnl)}`,
       icon: DollarSign,
-      change: normalized.dailyPnl,
-      trend: normalized.totalProfit >= 0
+      trend: stats.totalProfit,
     },
     {
       id: 'winRate',
-      title: 'Win Rate',
-      value: `${normalized.winRate.toFixed(1)}%`,
+      label: 'Win Rate',
+      value: fmtPercent(stats.winRate),
+      sub: `${stats.winningTrades}/${stats.completedTrades} wins`,
       icon: Percent,
-      change: `${normalized.winningTrades}/${normalized.completedTrades}`,
-      trend: normalized.winRate >= 50
+      trend: stats.winRate - 50,
     },
     {
       id: 'totalTrades',
-      title: 'Total Trades',
-      value: normalized.totalTrades,
+      label: 'Total Trades',
+      value: fmtNumber(stats.totalTrades),
+      sub: `${stats.activeTrades} active`,
       icon: BarChart3,
-      change: `${normalized.activeTrades} active`,
-      trend: null
+      trend: null,
     },
     {
       id: 'sharpeRatio',
-      title: 'Risk Score',
-      value: normalized.sharpeRatio.toFixed(2),
+      label: 'Risk Score',
+      value: stats.sharpeRatio.toFixed(2),
+      sub: `DD: ${stats.maxDrawdown.toFixed(1)}%`,
       icon: Target,
-      change: `DD: ${normalized.maxDrawdown.toFixed(1)}%`,
-      trend: normalized.sharpeRatio > 1
-    }
+      trend: stats.sharpeRatio - 1,
+    },
   ];
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-      {cards.map(card => {
-        const Icon = card.icon;
-        const isPositive = card.trend === true;
-        const isNegative = card.trend === false;
-        
+      {cards.map(({ id, label, value, sub, icon: Icon, trend }) => {
+        const positive = trend !== null && isPositive(trend);
+        const negative = trend !== null && !isPositive(trend);
+
         return (
           <div
-            key={card.id}
-            className={`bg-gray-900/50 border border-gray-800 rounded-lg p-4 transition-colors duration-200
-              ${updatedCard === card.id ? 'ring-1 ring-blue-500/30' : ''}
+            key={id}
+            className={`
+              relative rounded-lg border border-gray-800
+              bg-gray-900/50 p-4 transition-all duration-200
+              ${highlight === id ? 'ring-1 ring-primary/40 bg-gray-900/70' : ''}
             `}
           >
+            {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Icon size={16} className="text-gray-400" />
-                <span className="text-sm text-gray-400">{card.title}</span>
+                <span className="text-sm text-gray-400">{label}</span>
               </div>
-              
-              {card.trend !== null && (
-                <div className={`p-1 rounded ${isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                  {isPositive ? (
-                    <TrendingUp size={12} />
-                  ) : (
-                    <TrendingDown size={12} />
-                  )}
+
+              {trend !== null && (
+                <div
+                  className={`
+                    p-1 rounded-md
+                    ${positive && 'bg-green-500/10 text-green-400'}
+                    ${negative && 'bg-red-500/10 text-red-400'}
+                  `}
+                >
+                  {positive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                 </div>
               )}
             </div>
 
-            <div className="text-2xl font-bold text-white mb-1">
-              {card.value}
+            {/* Value */}
+            <div className="text-2xl font-bold text-white leading-tight">
+              {value}
             </div>
 
-            <div className="text-xs text-gray-500">
-              {card.change}
+            {/* Subtext */}
+            <div className="mt-1 text-xs text-gray-500">
+              {sub}
             </div>
           </div>
         );
