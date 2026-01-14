@@ -27,6 +27,8 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
       },
     },
+    // Explicitly copy _redirects
+    assetsInclude: ['public/_redirects'],
   },
 
   // For local development
