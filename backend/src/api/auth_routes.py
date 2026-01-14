@@ -200,7 +200,7 @@ async def deriv_callback(
         # ----------------------------
         # URL encode all parameters
         frontend_redirect = (
-            f"{settings.FRONTEND_URL}/auth/callback"
+            f"{settings.FRONTEND_URL}/#/oauth/callback"
             f"?user_id={user.id}"
             f"&session_token={quote(app_token)}"
             f"&access_token={quote(access_token)}"
