@@ -1,7 +1,7 @@
 // frontend/src/pages/Dashboard.jsx
 // frontend/src/pages/Dashboard/Dashboard.jsx
 import React from 'react';
-import { useTrading } from '../../../hooks/useTrading';
+import { useTrading } from '../../hooks/useTrading';
 import LoadingSpinner from '../../components/Common/LoadingSpinner/LoadingSpinner';
 
 // Dashboard Components
