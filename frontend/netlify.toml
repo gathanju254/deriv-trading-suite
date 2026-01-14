@@ -5,8 +5,9 @@
 [build.environment]
   NODE_VERSION = "20.19.0"
 
-# SPA redirect - catch all routes and serve index.html
+# Only redirect non-file routes to index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  conditions = { NOT = {path = "/assets/*"} }
