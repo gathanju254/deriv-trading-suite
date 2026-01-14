@@ -1,17 +1,17 @@
 [build]
-  publish = "frontend/dist"
-  command = "cd frontend && npm install && npm run build"
+  publish = "dist"  # Changed from "frontend/dist"
+  command = "npm run build"  # Removed "cd frontend &&"
 
 [build.environment]
   NODE_VERSION = "20.19.0"
 
-# Single SPA redirect — let Vite handle assets
+# Single SPA redirect
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Security headers (optional but solid)
+# Optional security headers
 [[headers]]
   for = "/*"
   [headers.values]
