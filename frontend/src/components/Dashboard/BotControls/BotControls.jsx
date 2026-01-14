@@ -1,7 +1,8 @@
 // frontend/src/components/Dashboard/BotControls/BotControls.jsx
+// frontend/src/components/Dashboard/BotControls/BotControls.jsx
 import React, { useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useTrading } from '../../../hooks/useTrading';
+import { Zap, Pause, AlertCircle } from 'lucide-react';
 
 const BotControls = () => {
   const {
@@ -10,10 +11,9 @@ const BotControls = () => {
     startBot,
     stopBot,
     wsConnectionStatus,
-    refreshPerformance,
   } = useTrading();
 
-  const [message, setMessage] = useState(null); // { text, type }
+  const [message, setMessage] = useState(null);
 
   const showMessage = useCallback((text, type = 'success') => {
     setMessage({ text, type });
@@ -23,8 +23,6 @@ const BotControls = () => {
   const isRunning = botStatus === 'running';
   const wsConnected = wsConnectionStatus === 'connected';
 
-  /* ---------- handlers ---------- */
-
   const handleStart = async () => {
     if (!wsConnected) {
       showMessage('WebSocket disconnected. Cannot start bot.', 'error');
@@ -33,99 +31,108 @@ const BotControls = () => {
 
     try {
       await startBot();
-      showMessage('Bot started successfully.');
-      setTimeout(refreshPerformance, 500);
+      showMessage('Bot started successfully');
     } catch (err) {
-      showMessage(
-        err.response?.data?.message || err.message || 'Failed to start bot',
-        'error'
-      );
+      showMessage('Failed to start bot', 'error');
     }
   };
 
   const handleStop = async () => {
     try {
       await stopBot();
-      showMessage('Bot stopped successfully.');
-      setTimeout(refreshPerformance, 500);
+      showMessage('Bot stopped successfully');
     } catch (err) {
-      showMessage(
-        err.response?.data?.message || err.message || 'Failed to stop bot',
-        'error'
-      );
+      showMessage('Failed to stop bot', 'error');
     }
   };
 
-  /* ---------- ui ---------- */
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4"
-    >
-      {/* MESSAGE */}
-      <AnimatePresence>
-        {message && (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            className={`rounded-md border px-3 py-2 text-sm ${
-              message.type === 'error'
-                ? 'border-red-500/30 bg-red-500/10 text-red-400'
-                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-            }`}
-          >
-            {message.text}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* BUTTONS */}
-      <div className="flex gap-3">
-        <motion.button
-          whileTap={{ scale: 0.96 }}
-          onClick={handleStart}
-          disabled={isRunning || loading || !wsConnected}
-          className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition
-            ${
-              isRunning || !wsConnected
-                ? 'cursor-not-allowed bg-slate-800 text-slate-500'
-                : 'bg-emerald-600 text-white hover:bg-emerald-500'
-            }`}
-        >
-          {loading && !isRunning ? 'Starting…' : 'Start Bot'}
-        </motion.button>
-
-        <motion.button
-          whileTap={{ scale: 0.96 }}
-          onClick={handleStop}
-          disabled={!isRunning || loading}
-          className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition
-            ${
-              !isRunning
-                ? 'cursor-not-allowed bg-slate-800 text-slate-500'
-                : 'bg-red-600 text-white hover:bg-red-500'
-            }`}
-        >
-          {loading && isRunning ? 'Stopping…' : 'Stop Bot'}
-        </motion.button>
+    <div className="space-y-5">
+      {/* Status Display */}
+      <div className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg">
+        <div className="flex items-center gap-3">
+          <div className={`w-3 h-3 rounded-full ${isRunning ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+          <div>
+            <div className="text-sm text-gray-300">Bot Status</div>
+            <div className="text-lg font-semibold text-white capitalize">
+              {isRunning ? 'Running' : 'Stopped'}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span className="text-sm text-gray-400">WS</span>
+        </div>
       </div>
 
-      {/* CONNECTION STATUS */}
-      {!wsConnected && (
-        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-          WebSocket disconnected. Trading is paused.
+      {/* Message Alert */}
+      {message && (
+        <div className={`rounded-lg p-3 text-sm ${
+          message.type === 'error' 
+            ? 'bg-red-500/10 border border-red-500/30 text-red-400' 
+            : 'bg-green-500/10 border border-green-500/30 text-green-400'
+        }`}>
+          {message.text}
         </div>
       )}
 
-      {/* INFO */}
-      <div className="text-xs text-slate-400">
-        <p>• Start initiates automated trading</p>
-        <p>• Stop safely ends the current session</p>
+      {/* Control Buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={handleStart}
+          disabled={isRunning || loading || !wsConnected}
+          className={`flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-medium transition-all duration-200
+            ${isRunning || !wsConnected
+              ? 'bg-gray-800 cursor-not-allowed text-gray-500'
+              : 'bg-green-600 hover:bg-green-700 text-white'
+            }`}
+        >
+          <Zap size={18} />
+          {loading && !isRunning ? 'Starting...' : 'Start Bot'}
+        </button>
+
+        <button
+          onClick={handleStop}
+          disabled={!isRunning || loading}
+          className={`flex items-center justify-center gap-2 rounded-lg px-4 py-3 font-medium transition-all duration-200
+            ${!isRunning
+              ? 'bg-gray-800 cursor-not-allowed text-gray-500'
+              : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
+        >
+          <Pause size={18} />
+          {loading && isRunning ? 'Stopping...' : 'Stop Bot'}
+        </button>
       </div>
-    </motion.div>
+
+      {/* Connection Warning */}
+      {!wsConnected && (
+        <div className="flex items-center gap-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3">
+          <AlertCircle size={16} className="text-yellow-500" />
+          <div className="text-sm text-yellow-400">
+            WebSocket disconnected. Trading is paused.
+          </div>
+        </div>
+      )}
+
+      {/* Info Panel */}
+      <div className="rounded-lg bg-gray-800/30 p-4">
+        <div className="text-sm text-gray-400 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+            <span>Bot runs automated trading strategies</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+            <span>Stop safely ends current session</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+            <span>Requires active WebSocket connection</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
