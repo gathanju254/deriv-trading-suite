@@ -1,17 +1,19 @@
-// frontend/src/services/api.js - UPDATED
+// frontend/src/services/api.js - CORRECTED VERSION
 import axios from 'axios';
 
-// Use dynamic base URL - NO /api suffix for auth routes
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  (import.meta.env.PROD 
-    ? 'https://deriv-trading-backend.onrender.com'  // NO /api suffix
-    : 'http://localhost:8000');
+// Get base URL from environment (WITHOUT /api suffix for auth routes)
+const BASE_URL = import.meta.env.VITE_API_BASE_URL 
+  ? import.meta.env.VITE_API_BASE_URL.replace('/api', '')  // Remove /api suffix
+  : (import.meta.env.PROD 
+    ? 'https://deriv-trading-backend.onrender.com'  // WITHOUT /api
+    : 'http://localhost:8000');  // WITHOUT /api
 
-console.log('✅ API Base URL:', API_BASE_URL);
+console.log('✅ API Base URL for auth routes:', BASE_URL);
+console.log('✅ API Base URL for api routes:', BASE_URL + '/api');
 
-// ✅ Auth routes: NO /api prefix
+// ✅ Auth routes: Use BASE_URL directly (NO /api prefix)
 export const authApi = axios.create({
-  baseURL: `${API_BASE_URL}`,  // Direct to backend root (NO /api)
+  baseURL: `${BASE_URL}`,  // Direct to backend root for auth routes
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -19,9 +21,9 @@ export const authApi = axios.create({
   withCredentials: false,
 });
 
-// ✅ Trading API routes: WITH /api prefix
+// ✅ Trading API routes: Use BASE_URL + /api
 export const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,  // WITH /api prefix
+  baseURL: `${BASE_URL}/api`,  // WITH /api prefix for trading endpoints
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -29,7 +31,7 @@ export const api = axios.create({
   withCredentials: false,
 });
 
-// Setup interceptors
+// Setup interceptors (keep your existing interceptor code)
 const setupInterceptor = (axiosInstance, isAuthApi = false) => {
   axiosInstance.interceptors.request.use(
     (config) => {
