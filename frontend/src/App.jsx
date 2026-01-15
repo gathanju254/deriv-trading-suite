@@ -133,7 +133,7 @@ function App() {
           <ToastProvider>
             <TradingProvider>
               {/* Add basename="/" for proper routing on static hosting */}
-              <Router >
+              <Router basename="/">
                 <AppRoutes />
               </Router>
             </TradingProvider>
