@@ -1,37 +1,102 @@
 #!/bin/bash
-# backend/start.sh
+# backend/start.sh - Enhanced version with better diagnostics
 
-echo "🚀 Starting Deriv Trading Backend..."
+echo "===================================================================="
+echo "🚀 Starting Deriv Trading Backend"
+echo "===================================================================="
 echo "📊 Environment: ${ENVIRONMENT:-production}"
+echo "📊 Build timestamp: $(date)"
+echo "--------------------------------------------------------------------"
 
-# Wait for database to be ready (important for Render)
-echo "⏳ Waiting for database (5 seconds)..."
-sleep 5
+# Function to check package with fallback
+check_package() {
+    local package_name=$1
+    local import_name=$2
+    local version_cmd=$3
+    
+    echo -n "🔍 $package_name: "
+    python -c "
+try:
+    import $import_name
+    $version_cmd
+except ImportError:
+    print('❌ NOT INSTALLED')
+except Exception as e:
+    print(f'⚠️ ERROR: {str(e)[:50]}')
+" 2>/dev/null || echo "❌ CHECK FAILED"
+}
 
-# Test database connection
-echo "🔍 Testing database connection..."
+# Comprehensive version checks
+echo "📦 Package versions:"
+check_package "Python" "sys" "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"
+check_package "PostgreSQL" "psycopg2" "print(psycopg2.__version__)"
+check_package "SQLAlchemy" "sqlalchemy" "print(sqlalchemy.__version__)"
+check_package "scikit-learn" "sklearn" "print(sklearn.__version__)"
+check_package "FastAPI" "fastapi" "print(fastapi.__version__)"
+check_package "NumPy" "numpy" "print(numpy.__version__)"
+check_package "Pandas" "pandas" "print(pandas.__version__)"
+
+echo "--------------------------------------------------------------------"
+
+# Wait for database to be ready
+echo "⏳ Waiting for database connection..."
+for i in {1..10}; do
+    python -c "
+import sys
+from sqlalchemy import create_engine, text
+try:
+    engine = create_engine('${DATABASE_URL}', pool_pre_ping=True, pool_recycle=300, connect_args={'connect_timeout': 5})
+    with engine.connect() as conn:
+        result = conn.execute(text('SELECT version()'))
+        version = result.fetchone()[0]
+        print(f'✅ PostgreSQL: {version}')
+        sys.exit(0)
+except Exception as e:
+    if i < 10:
+        sys.exit(1)
+    else:
+        print(f'❌ Database connection failed after 10 attempts: {e}')
+        sys.exit(1)
+" 2>/dev/null
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Database connection established"
+        break
+    else
+        echo "⏳ Attempt $i/10 failed, retrying in 2 seconds..."
+        sleep 2
+    fi
+done
+
+# Check for existing tables
+echo "📊 Checking database schema..."
 python -c "
 import sys
 from sqlalchemy import create_engine, text
 try:
-    engine = create_engine('${DATABASE_URL}', pool_pre_ping=True, pool_recycle=300)
+    engine = create_engine('${DATABASE_URL}')
     with engine.connect() as conn:
-        result = conn.execute(text('SELECT version()'))
-        print(f'✅ Connected to PostgreSQL: {result.fetchone()[0]}')
-        # Check if tables exist
-        result = conn.execute(text(\"SELECT EXISTS(SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'trades');\"))
-        tables_exist = result.fetchone()[0]
-        if not tables_exist:
-            print('⚠️ Tables not found, will be created on startup')
+        # Check for our main tables
+        tables = ['users', 'trades', 'contracts', 'proposals', 'commissions', 'user_sessions']
+        for table in tables:
+            result = conn.execute(text(f\"SELECT EXISTS(SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table}');\"))
+            exists = result.fetchone()[0]
+            status = '✅' if exists else '⚠️'
+            print(f'{status} Table {table}: {'Found' if exists else 'Missing'}')
+        
+        if not all([conn.execute(text(f\"SELECT EXISTS(SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table}');\")).fetchone()[0] for table in tables]):
+            print('📝 Some tables missing, will be created on startup')
 except Exception as e:
-    print(f'❌ Database connection failed: {e}')
-    sys.exit(1)
-"
+    print(f'⚠️ Schema check failed: {e}')
+" 2>/dev/null
 
-# Optional: run database migrations if RUN_MIGRATIONS is enabled
+echo "--------------------------------------------------------------------"
+
+# Run migrations if enabled
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
-  echo "🔁 Running Alembic migrations..."
-  python -c "
+    echo "🔁 Running Alembic migrations..."
+    if [ -f "alembic.ini" ]; then
+        python -c "
 import sys
 from alembic.config import Config
 from alembic import command
@@ -41,11 +106,18 @@ try:
     print('✅ Migrations completed successfully')
 except Exception as e:
     print(f'⚠️ Alembic migrations failed: {e}')
-    print('⚠️ Falling back to SQLAlchemy create_all()')
-"
+    print('📝 Using SQLAlchemy create_all() instead')
+" 2>/dev/null
+    else
+        echo "⚠️ alembic.ini not found, skipping migrations"
+    fi
 fi
 
-# Start the application using PORT (Render provides $PORT)
+# Start the application
 PORT=${PORT:-8000}
-echo "🌐 Starting server on port ${PORT}..."
+echo "===================================================================="
+echo "🌐 Starting FastAPI server on port ${PORT}"
+echo "⏱️ Server start time: $(date)"
+echo "===================================================================="
+
 exec uvicorn src.main:app --host 0.0.0.0 --port "${PORT}" --log-level info
