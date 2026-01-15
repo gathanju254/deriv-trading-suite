@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from src.config.settings import settings
 from src.db.session import SessionLocal
 from src.db.models.user import User, UserSession
-from src.db.repositories.user_settings_repo import UserSettingsRepo  # Add this import
+from src.db.repositories.user_settings_repo import UserSettingsRepo
 from src.utils.logger import logger
 from src.utils.security import create_access_token, decode_access_token
 
@@ -173,8 +173,8 @@ async def deriv_callback(
         # ----------------------------
         if is_new_user:
             try:
-                # Create default settings for the new user
-                settings = UserSettingsRepo.create_default_settings(user.id)
+                # ✅ FIX: Use different variable name to avoid shadowing `settings`
+                user_settings = UserSettingsRepo.create_default_settings(user.id)
                 logger.info(f"Default settings created for user {user.id}")
             except Exception as e:
                 logger.error(f"Failed to create default settings for user {user.id}: {e}")
@@ -217,6 +217,7 @@ async def deriv_callback(
         # ----------------------------
         from urllib.parse import quote
 
+        # ✅ FIX: `settings` here is still the config object (not shadowed)
         frontend_redirect = (
             f"{settings.FRONTEND_URL}/oauth/callback"
             f"?user_id={quote(user.id)}"
@@ -309,15 +310,16 @@ async def get_current_user(
             raise HTTPException(status_code=404, detail="User not found")
 
         # Get user settings
-        user_settings = UserSettingsRepo.get_dict(user_id)
+        # ✅ FIX: Use different variable name
+        user_settings_dict = UserSettingsRepo.get_dict(user_id)
         
         return {
             "id": user.id,
             "email": user.email,
             "deriv_account_id": user.deriv_account_id,
             "is_active": user.is_active,
-            "settings": user_settings,  # Include settings in response
-            "has_settings": user_settings is not None,
+            "settings": user_settings_dict,  # Include settings in response
+            "has_settings": user_settings_dict is not None,
         }
 
     except Exception as e:
