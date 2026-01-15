@@ -99,15 +99,23 @@ export const derivService = {
   // ✅ NEW: Fetch OAuth redirect URL from backend
   async getOAuthRedirectUrl() {
     try {
-      const baseURL = import.meta.env.VITE_API_BASE_URL || 
+      // Get the base URL (without /api)
+      const baseURL = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 
         (import.meta.env.PROD 
           ? 'https://deriv-trading-backend.onrender.com'
           : 'http://localhost:8000');
       
       const response = await axios.get(`${baseURL}/auth/login`);
+      
+      console.log('OAuth redirect URL response:', response.data);
+      
+      if (!response.data?.redirect_url) {
+        throw new Error('Missing redirect_url in response');
+      }
+      
       return response.data;
     } catch (error) {
-      console.error('Error getting OAuth redirect URL:', error);
+      console.error('Error getting OAuth redirect URL:', error.response?.data || error.message);
       throw error;
     }
   },
