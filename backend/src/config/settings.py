@@ -68,7 +68,7 @@ class Settings:
     def ALLOWED_ORIGINS(self):
         return [
             self.FRONTEND_URL,
-            "https://deriv-trading-suite.onrender.com",
+            "https://deriv-trading-suite-67mv.onrender.com",
             "http://localhost:5173",
             "http://localhost:3000",
             "http://127.0.0.1:5173",

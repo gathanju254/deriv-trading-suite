@@ -220,7 +220,7 @@ async def deriv_callback(
 
         # ✅ FIXED: Remove the duplicate /oauth/callback
         frontend_redirect = (
-            f"{settings.FRONTEND_URL}"  # ✅ Just /oauth/callback (once)
+            f"{settings.FRONTEND_URL}/oauth/callback"  # ✅ Just /oauth/callback (once)
             f"?user_id={quote(user.id)}"
             f"&session_token={quote(app_token)}"
             f"&access_token={quote(access_token)}"
