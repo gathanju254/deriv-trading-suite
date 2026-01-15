@@ -1,5 +1,4 @@
 // frontend/src/context/AuthContext.jsx
-// frontend/src/context/AuthContext.jsx
 import React, {
   createContext,
   useContext,
@@ -33,17 +32,19 @@ export const AuthProvider = ({ children }) => {
      Restore session on app load
   -------------------------------------------- */
   useEffect(() => {
+    console.log('AuthProvider: Checking for existing session...');
     const userId = localStorage.getItem('user_id');
     const sessionToken = localStorage.getItem('session_token');
-    const email = localStorage.getItem('email');
-    const accountId = localStorage.getItem('deriv_account_id');
 
     if (userId && sessionToken) {
+      console.log('AuthProvider: Restoring session from localStorage');
       setUser({
         id: userId,
-        email,
-        accountId,
+        email: localStorage.getItem('email'),
+        accountId: localStorage.getItem('deriv_account_id'),
       });
+    } else {
+      console.log('AuthProvider: No existing session found');
     }
 
     setLoading(false);
@@ -54,47 +55,43 @@ export const AuthProvider = ({ children }) => {
   -------------------------------------------- */
   const login = useCallback(async (payload) => {
     try {
-      let authData = null;
+      console.log('AuthContext: login called');
 
-      // ✅ Direct OAuth redirect flow
-      if (typeof payload === 'object') {
-        authData = payload;
-      }
-
-      // 🔁 Legacy OAuth code flow
-      if (typeof payload === 'string') {
-        authData = await derivService.handleOAuthCallback(payload);
+      if (typeof payload !== 'object' || !payload) {
+        throw new Error('Invalid login payload');
       }
 
       const {
         user_id,
         session_token,
-        access_token,
-        email,
-        deriv_account_id,
-      } = authData;
+        access_token = '',
+        email = '',
+        deriv_account_id = '',
+      } = payload;
 
       if (!user_id || !session_token) {
-        throw new Error('Invalid authentication payload');
+        throw new Error('Missing user_id or session_token');
       }
 
-      // Persist session
+      // Store in localStorage
       localStorage.setItem('user_id', user_id);
       localStorage.setItem('session_token', session_token);
-      localStorage.setItem('auth_token', session_token); // for axios
-      localStorage.setItem('deriv_access_token', access_token || '');
-      localStorage.setItem('email', email || '');
-      localStorage.setItem('deriv_account_id', deriv_account_id || '');
+      localStorage.setItem('auth_token', session_token);
+      localStorage.setItem('deriv_access_token', access_token);
+      localStorage.setItem('email', email);
+      localStorage.setItem('deriv_account_id', deriv_account_id);
 
+      // Update state
       setUser({
         id: user_id,
         email,
         accountId: deriv_account_id,
       });
 
+      console.log('AuthContext: Login successful');
       return true;
     } catch (err) {
-      console.error('Login failed:', err);
+      console.error('AuthContext: Login failed:', err);
       throw err;
     }
   }, []); // Empty dependency array - derivService is imported
@@ -105,13 +102,13 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(async () => {
     try {
       await derivService.logout();
-    } catch {
-      // Backend logout failure should never block UI logout
-      console.warn('Backend logout failed — clearing local session');
+    } catch (err) {
+      console.warn('Backend logout failed:', err);
     }
 
     localStorage.clear();
     setUser(null);
+    console.log('AuthContext: Logout complete');
   }, []);
 
   /* -------------------------------------------

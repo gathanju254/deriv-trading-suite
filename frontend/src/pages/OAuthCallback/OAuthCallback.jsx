@@ -4,13 +4,13 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Loader2, CheckCircle, XCircle, Shield, Lock, UserCheck, ArrowRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 const OAuthCallback = () => {
-  const [status, setStatus] = useState('processing'); // processing | success | error
+  const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
-  const [hasProcessed, setHasProcessed] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -18,68 +18,99 @@ const OAuthCallback = () => {
   const { addToast } = useToast();
 
   useEffect(() => {
-    console.log('OAuthCallback: location', location.pathname, location.search);
-    
-    if (hasProcessed) return;
-    setHasProcessed(true);
+    // Prevent concurrent processing
+    if (isProcessing) return;
 
     const processCallback = async () => {
+      setIsProcessing(true);
+
       try {
         setProgress(10);
-        
-        // Parse URL parameters
-        const params = new URLSearchParams(location.search);
-        
-        const user_id = params.get('user_id');
-        const session_token = params.get('session_token');
-        const access_token = params.get('access_token');
-        const email = params.get('email');
-        const account_id = params.get('account_id');
+        console.log('OAuthCallback: Starting processing');
+        console.log('Location search:', location.search);
+        console.log('Window hash:', window.location.hash);
 
-        console.log('OAuth params extracted:', {
-          user_id: user_id ? '***' : 'missing',
-          session_token: session_token ? '***' : 'missing',
-          access_token: access_token ? '***' : 'missing',
-          email,
-          account_id
+        // Parse URL parameters from query string
+        const params = new URLSearchParams(location.search);
+
+        // Fallback to hash if no query params (some OAuth flows use hash)
+        let user_id = params.get('user_id');
+        let session_token = params.get('session_token');
+        let access_token = params.get('access_token');
+        let email = params.get('email');
+        let account_id = params.get('account_id');
+
+        if (!user_id && window.location.hash) {
+          console.log('No query params found, checking hash...');
+          const hashParams = new URLSearchParams(
+            window.location.hash.replace('#', '?')
+          );
+          user_id = hashParams.get('user_id');
+          session_token = hashParams.get('session_token');
+          access_token = hashParams.get('access_token');
+          email = hashParams.get('email');
+          account_id = hashParams.get('account_id');
+        }
+
+        console.log('Extracted OAuth params:', {
+          user_id: user_id ? '✓' : '✗',
+          session_token: session_token ? '✓' : '✗',
+          access_token: access_token ? '✓' : '✗',
+          email: email ? '✓' : '✗',
+          account_id: account_id ? '✓' : '✗',
         });
 
         if (!user_id || !session_token) {
-          throw new Error('Missing required authentication parameters from backend');
+          throw new Error(
+            `Missing authentication parameters: ${
+              !user_id ? 'user_id ' : ''
+            }${!session_token ? 'session_token' : ''}`
+          );
         }
 
         setProgress(30);
 
-        // Call login with the OAuth data from backend
+        // Call login with OAuth data
+        console.log('Calling login with OAuth data...');
         await login({
           user_id,
           session_token,
-          access_token,
-          email,
-          deriv_account_id: account_id,
+          access_token: access_token || '',
+          email: email || '',
+          deriv_account_id: account_id || '',
         });
 
         setProgress(60);
         setStatus('success');
         setProgress(100);
 
-        addToast('Login successful! Redirecting...', 'success');
+        addToast('✅ Login successful! Redirecting...', 'success');
 
-        // Redirect after a short delay to show success state
+        // Redirect to dashboard
         setTimeout(() => {
+          console.log('Redirecting to dashboard...');
           navigate('/dashboard', { replace: true });
         }, 1500);
-
       } catch (err) {
-        console.error('OAuth callback error:', err);
-        setError(err.message || 'Authentication failed. Please try again.');
+        console.error('❌ OAuth callback error:', err);
+        setError(err.message || 'Authentication failed');
         setStatus('error');
         addToast(err.message || 'Authentication failed', 'error');
+
+        // Redirect to login after showing error
+        setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 3000);
+      } finally {
+        setIsProcessing(false);
       }
     };
 
-    processCallback();
-  }, [location.search, hasProcessed, login, navigate, addToast]);
+    // Only process if we're on the callback route with params
+    if (location.pathname === '/oauth/callback') {
+      processCallback();
+    }
+  }, [location.pathname, location.search, login, navigate, addToast, isProcessing]);
 
   // Processing State
   if (status === 'processing') {
@@ -108,7 +139,7 @@ const OAuthCallback = () => {
                 <Loader2 className="w-10 h-10 text-primary-400" />
               </motion.div>
               <h2 className="text-2xl font-bold text-white mb-2">Authenticating</h2>
-              <p className="text-gray-400">Processing OAuth callback from Deriv</p>
+              <p className="text-gray-400">Processing your Deriv credentials</p>
             </div>
 
             {/* Progress Bar */}
@@ -150,19 +181,9 @@ const OAuthCallback = () => {
                   <UserCheck className="w-4 h-4 text-primary-400" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-white">Loading user profile</div>
+                  <div className="text-sm font-medium text-white">Loading profile</div>
                   <div className="text-xs text-gray-400">Fetching account details</div>
                 </div>
-              </div>
-            </div>
-
-            {/* Debug Info */}
-            <div className="mt-8 p-4 rounded-lg bg-gray-900/30 border border-gray-800/30">
-              <div className="text-xs text-gray-500 font-mono space-y-1">
-                <div>Path: {location.pathname}</div>
-                <div>Has query params: {location.search ? 'Yes' : 'No'}</div>
-                <div>Has hash params: {window.location.hash ? 'Yes' : 'No'}</div>
-                <div>Status: Processing...</div>
               </div>
             </div>
           </div>
@@ -207,7 +228,7 @@ const OAuthCallback = () => {
                 transition={{ delay: 0.2 }}
                 className="text-2xl font-bold text-white mb-3"
               >
-                Authentication Successful
+                Success!
               </motion.h2>
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
@@ -215,36 +236,16 @@ const OAuthCallback = () => {
                 transition={{ delay: 0.3 }}
                 className="text-gray-300 mb-6"
               >
-                Welcome to Deriv Trading Suite! Your account has been securely authenticated.
+                Your account has been authenticated.
               </motion.p>
-            </div>
-
-            {/* Countdown */}
-            <div className="flex items-center justify-center gap-3 mb-8">
-              <div className="flex items-center gap-2">
-                <div className="flex space-x-1">
-                  {[0, 1, 2].map((i) => (
-                    <motion.div
-                      key={i}
-                      className="w-2 h-2 rounded-full bg-success-500"
-                      animate={{ y: [0, -8, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.2 }}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm text-gray-400">Redirecting to dashboard</span>
-              </div>
             </div>
 
             {/* Continue Button */}
             <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/dashboard', { replace: true })}
-              className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-success-600 to-emerald-700 text-white font-semibold flex items-center justify-center gap-2 hover:shadow-glow-success transition-all duration-300"
+              className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-success-600 to-emerald-700 text-white font-semibold flex items-center justify-center gap-2"
             >
               Continue to Dashboard
               <ArrowRight className="w-4 h-4" />
@@ -299,7 +300,7 @@ const OAuthCallback = () => {
                 transition={{ delay: 0.3 }}
                 className="text-gray-300 mb-4"
               >
-                {error || 'An unexpected error occurred during authentication.'}
+                {error}
               </motion.p>
               <motion.p
                 initial={{ opacity: 0 }}
@@ -320,22 +321,10 @@ const OAuthCallback = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/login', { replace: true })}
-                className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold flex items-center justify-center gap-2 hover:shadow-glow transition-all duration-300"
-              >
-                Try Again
-                <ArrowRight className="w-4 h-4" />
-              </motion.button>
-
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.6 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => navigate('/login', { replace: true })}
-                className="w-full py-3 px-6 rounded-xl bg-gray-800/50 border border-gray-700/50 text-white font-semibold flex items-center justify-center gap-2 hover:bg-gray-800 transition-all duration-300"
+                className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold flex items-center justify-center gap-2"
               >
                 Back to Login
+                <ArrowRight className="w-4 h-4" />
               </motion.button>
             </div>
           </div>
