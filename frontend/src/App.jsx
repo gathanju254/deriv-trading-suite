@@ -97,7 +97,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* IMPORTANT: OAuth callback route MUST be defined before protected routes */}
+      {/* The OAuthCallback route MUST be defined BEFORE protected routes */}
       <Route path="/oauth/callback" element={<OAuthCallback />} />
 
       {/* Protected routes with MainLayout */}
