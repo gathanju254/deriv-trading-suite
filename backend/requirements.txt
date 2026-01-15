@@ -2,7 +2,7 @@
 
 # Web framework
 fastapi==0.104.1
-uvicorn[standard]==0.24.0
+uvicorn>=0.23.0
 
 # Environment & config
 python-dotenv==1.0.0
