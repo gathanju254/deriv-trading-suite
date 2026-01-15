@@ -1,7 +1,5 @@
 # backend/src/config/settings.py
 
-# backend/src/config/settings.py
-
 import os
 from dotenv import load_dotenv
 
@@ -14,6 +12,14 @@ class Settings:
     # =======================
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
+
+    # =======================
+    # Database (CRITICAL)
+    # =======================
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:///./trading.db"  # Default fallback for local development
+    )
 
     # =======================
     # URLs (CRITICAL)

@@ -54,20 +54,37 @@ async def lifespan(app: FastAPI):
     # ---------- STARTUP ----------
     logger.info("🚀 Starting Deriv Trading Suite with Multi-User Support")
     logger.info(f"📊 App Markup: {deriv.app_markup_percentage}%")
+    logger.info(f"📊 Database: {settings.DATABASE_URL[:50]}...")
 
     logger.info("📦 Creating database tables (if not exist)...")
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database tables created/verified")
+    except Exception as e:
+        logger.error(f"❌ Database setup failed: {e}")
+        logger.warning("⚠️  App will attempt to use database on first request")
+        # Don't crash if database is temporarily unavailable
+        # The app can retry on first database operation
 
     logger.info("📊 Initializing performance tracker...")
-    performance.initialize_after_db()
+    try:
+        performance.initialize_after_db()
+        logger.info("✅ Performance tracker initialized")
+    except Exception as e:
+        logger.warning(f"⚠️  Performance tracker initialization deferred: {e}")
 
     logger.info("✅ Startup complete. Bot is NOT auto-started.")
     yield
 
     # ---------- SHUTDOWN ----------
     logger.info("🛑 Shutting down Deriv Trading Suite...")
-    for user_id in list(bot_manager.user_bots.keys()):
-        await bot_manager.stop_bot_for_user(user_id)
+    try:
+        for user_id in list(bot_manager.user_bots.keys()):
+            await bot_manager.stop_bot_for_user(user_id)
+        logger.info("✅ All user bots stopped")
+    except Exception as e:
+        logger.error(f"Error stopping bots: {e}")
+    
     logger.info("👋 Shutdown complete.")
 
 # ==========================================================

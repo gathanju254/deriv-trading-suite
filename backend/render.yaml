@@ -2,30 +2,85 @@
 services:
   - type: web
     name: deriv-trading-backend
-    runtime: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "bash start.sh"
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: ./start.sh
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
-      - key: BACKEND_URL
-        value: https://deriv-trading-backend.onrender.com
-      - key: FRONTEND_URL
-        value: https://deriv-trading-suite-67mv.onrender.com
-      - key: DERIV_APP_ID
-        value: 113709
-      - key: DERIV_API_TOKEN
-        value: AvmG1pjPLdCuDKx
       - key: DATABASE_URL
         fromDatabase:
-          name: trading-db
+          name: deriv_trading_db
           property: connectionString
-    healthCheckPath: /
+      - key: APP_MARKUP_PERCENTAGE
+        value: 2.0
+      - key: BACKEND_URL
+        sync: false
+      - key: BASE_CURRENCY
+        value: USD
+      - key: CONTRACT_DURATION
+        value: 1
+      - key: COOLDOWN_AFTER_LOSS
+        value: 0
+      - key: COOLDOWN_AFTER_WIN
+        value: 25
+      - key: DAILY_LOSS_LIMIT_PCT
+        value: 20
+      - key: DAILY_PROFIT_LIMIT_PCT
+        value: 20
+      - key: DERIV_API_TOKEN
+        value: AvmG1pjPLdCuDKx
+      - key: DERIV_APP_ID
+        value: 113709
+      - key: DERIV_OAUTH_CLIENT_ID
+        value: 113709
+      - key: FRONTEND_URL
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRE_HOURS
+        value: 24
+      - key: JWT_SECRET_KEY
+        value: w22Tjtw_Jk2EsyhMocc9yfkuMfBr2FiG7klOcGgm3Jw
+      - key: MAX_RECOVERY_AMOUNT_MULTIPLIER
+        value: 8.0
+      - key: MAX_RECOVERY_STREAK
+        value: 10
+      - key: MAX_TRADES
+        value: 10
+      - key: MAX_TRADES_PER_HOUR
+        value: 50
+      - key: MIN_CONSENSUS_SCORE
+        value: 0.75
+      - key: ML_CONSENSUS_ENABLED
+        value: True
+      - key: RECOVERY_ENABLED
+        value: True
+      - key: RECOVERY_MODE
+        value: HYBRID
+      - key: RECOVERY_MULTIPLIER
+        value: 1.6
+      - key: RESET_ON_WIN
+        value: True
+      - key: SECRET_KEY
+        value: otUPYcH0regf8VC2PyZWr-NzDgcl75Mr_rS9VfMntd8
+      - key: SMART_RECOVERY
+        value: True
+      - key: STRATEGY_OPTIMIZATION_ENABLED
+        value: True
+      - key: SYMBOL
+        value: R_50
+      - key: TRADE_AMOUNT
+        value: 0.40
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: RUN_MIGRATIONS
+        value: true
+    healthCheckPath: /health
     autoDeploy: true
-    port: 8000  # ← Add this explicitly
 
 databases:
-  - name: trading-db
-    databaseName: trading
-    user: trading_user
+  - name: deriv_trading_db
+    databaseName: deriv_trading_db
+    user: deriv_trading_db_user
     plan: free
