@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from src.config.settings import settings
 from src.db.session import SessionLocal
 from src.db.models.user import User, UserSession
+from src.db.repositories.user_settings_repo import UserSettingsRepo  # Add this import
 from src.utils.logger import logger
 from src.utils.security import create_access_token, decode_access_token
 
@@ -148,6 +149,7 @@ async def deriv_callback(
         # 3. Create / update user
         # ----------------------------
         user = db.query(User).filter(User.deriv_account_id == account_id).first()
+        is_new_user = False
 
         if not user:
             logger.info(f"Creating new user for account {account_id}")
@@ -159,6 +161,7 @@ async def deriv_callback(
             db.add(user)
             db.commit()
             db.refresh(user)
+            is_new_user = True
             logger.info(f"User created with ID: {user.id}")
         else:
             user.last_login = datetime.utcnow()
@@ -166,7 +169,20 @@ async def deriv_callback(
             logger.info(f"Existing user found: {user.id}")
 
         # ----------------------------
-        # 4. Create session
+        # 4. Create default settings for new users
+        # ----------------------------
+        if is_new_user:
+            try:
+                # Create default settings for the new user
+                settings = UserSettingsRepo.create_default_settings(user.id)
+                logger.info(f"Default settings created for user {user.id}")
+            except Exception as e:
+                logger.error(f"Failed to create default settings for user {user.id}: {e}")
+                # Don't fail the login if settings creation fails
+                # The user can still use the app with global defaults
+
+        # ----------------------------
+        # 5. Create session
         # ----------------------------
         expires_at = datetime.utcnow() + timedelta(hours=24)
 
@@ -183,7 +199,7 @@ async def deriv_callback(
         logger.info(f"Session created: {session_obj.id}")
 
         # ----------------------------
-        # 5. Create app JWT
+        # 6. Create app JWT
         # ----------------------------
         app_token = create_access_token(
             {
@@ -191,12 +207,13 @@ async def deriv_callback(
                 "session_id": session_obj.id,
                 "email": user.email,
                 "deriv_account_id": user.deriv_account_id,
+                "is_new_user": is_new_user,  # Include this flag for frontend
             }
         )
         logger.info(f"App JWT created for user {user.id}")
 
         # ----------------------------
-        # 6. Redirect back to frontend
+        # 7. Redirect back to frontend
         # ----------------------------
         from urllib.parse import quote
 
@@ -207,6 +224,7 @@ async def deriv_callback(
             f"&access_token={quote(access_token)}"
             f"&email={quote(user.email or '')}"
             f"&account_id={quote(user.deriv_account_id or '')}"
+            f"&is_new_user={'true' if is_new_user else 'false'}"
         )
 
         logger.info(f"Redirecting to: {frontend_redirect[:100]}...")
@@ -261,7 +279,7 @@ async def logout(
 
 
 # -------------------------------------------------------------------
-# CURRENT USER
+# CURRENT USER (ENHANCED WITH SETTINGS)
 # -------------------------------------------------------------------
 @router.get("/me")
 async def get_current_user(
@@ -290,11 +308,16 @@ async def get_current_user(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
+        # Get user settings
+        user_settings = UserSettingsRepo.get_dict(user_id)
+        
         return {
             "id": user.id,
             "email": user.email,
             "deriv_account_id": user.deriv_account_id,
             "is_active": user.is_active,
+            "settings": user_settings,  # Include settings in response
+            "has_settings": user_settings is not None,
         }
 
     except Exception as e:

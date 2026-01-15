@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from src.api.dependencies import get_current_user
 from src.db.repositories.user_settings_repo import UserSettingsRepo
 from src.db.models.user_settings import RecoveryMode
+from src.db.session import SessionLocal  # Add this at the top
 from src.utils.logger import logger
 
 router = APIRouter(prefix="/api/settings", tags=["User Settings"])

@@ -1,4 +1,4 @@
-# backend/src/db/models/user_settings.py
+# backend/src/db/models/UserSettings.py
 
 import uuid
 from datetime import datetime

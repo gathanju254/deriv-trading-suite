@@ -55,7 +55,6 @@ async def lifespan(app: FastAPI):
     # ---------- STARTUP ----------
     logger.info("🚀 Starting Deriv Trading Suite with Multi-User Support")
     logger.info(f"📊 App Markup: {deriv.app_markup_percentage}%")
-    logger.info(f"📊 Database: {settings.DATABASE_URL[:50]}...")
 
     logger.info("📦 Creating database tables (if not exist)...")
     try:

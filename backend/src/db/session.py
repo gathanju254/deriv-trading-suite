@@ -1,72 +1,62 @@
 # backend/src/db/session.py
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import OperationalError, ProgrammingError
-from src.config.settings import settings
+from sqlalchemy.exc import OperationalError
 import time
-import logging
+import os
+from src.utils.logger import logger
 
-logger = logging.getLogger(__name__)
+def get_database_url():
+    """Get database URL from environment or use default"""
+    return os.getenv("DATABASE_URL", "sqlite:///./trading.db")
 
-# Use DATABASE_URL from environment variables (Render provides this)
-DATABASE_URL = settings.DATABASE_URL
+DATABASE_URL = get_database_url()
 
-# PostgreSQL engine configuration with retry logic
-def create_engine_with_retry(url, retries=3, delay=2):
-    for attempt in range(retries):
+def create_engine_with_retry(url, max_retries=3, delay=2):
+    """
+    Create SQLAlchemy engine with retry logic for connection testing.
+    """
+    for attempt in range(1, max_retries + 1):
         try:
+            logger.info(f"Database connection attempt {attempt}/{max_retries}...")
+            
             engine = create_engine(
                 url,
-                pool_pre_ping=True,  # Check connection before using
-                pool_recycle=300,    # Recycle connections after 5 minutes
-                pool_size=10,        # Connection pool size
-                max_overflow=20,     # Maximum overflow connections
-                echo=False           # Set to True for SQL logging during development
+                connect_args={"check_same_thread": False} if url.startswith("sqlite") else {},
+                echo=False,
+                pool_pre_ping=True,  # Enable connection health checks
             )
             
-            # Test connection
+            # Test the connection
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                # Use text() for raw SQL statements in SQLAlchemy 2.0+
+                conn.execute(text("SELECT 1"))
             
-            logger.info(f"✅ Database connection established (attempt {attempt + 1}/{retries})")
+            logger.info("✅ Database connection established")
             return engine
             
-        except (OperationalError, ProgrammingError) as e:
-            if attempt < retries - 1:
-                logger.warning(f"⚠️ Database connection failed (attempt {attempt + 1}/{retries}): {e}")
-                logger.info(f"⏳ Retrying in {delay} seconds...")
+        except OperationalError as e:
+            logger.warning(f"⚠️ Database connection failed (attempt {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                logger.info(f"Retrying in {delay} seconds...")
                 time.sleep(delay)
-                delay *= 2  # Exponential backoff
             else:
-                logger.error(f"❌ Failed to connect to database after {retries} attempts")
+                logger.error(f"❌ Failed to connect to database after {max_retries} attempts")
                 raise
+        except Exception as e:
+            logger.error(f"❌ Unexpected database error: {e}")
+            raise
 
 try:
     engine = create_engine_with_retry(DATABASE_URL)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    logger.info("✅ Database session factory created")
 except Exception as e:
-    logger.error(f"❌ Failed to create database engine: {e}")
-    # Fallback to SQLite for development if PostgreSQL fails
-    if "postgresql" in DATABASE_URL:
-        logger.warning("⚠️ Falling back to SQLite for development")
-        engine = create_engine(
-            "sqlite:///./trading.db",
-            connect_args={"check_same_thread": False}
-        )
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    else:
-        raise
+    logger.critical(f"❌ Failed to create database engine: {e}")
+    # Create engine without connection test as fallback
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+        echo=False,
+    )
+    logger.warning("⚠️ Created database engine without connection test")
 
-# Add connection event listeners for better debugging
-@event.listens_for(engine, "connect")
-def receive_connect(dbapi_connection, connection_record):
-    logger.debug("🔌 Database connection established")
-
-@event.listens_for(engine, "checkout")
-def receive_checkout(dbapi_connection, connection_record, connection_proxy):
-    logger.debug("📤 Database connection checked out from pool")
-
-@event.listens_for(engine, "checkin")
-def receive_checkin(dbapi_connection, connection_record):
-    logger.debug("📥 Database connection returned to pool")
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
