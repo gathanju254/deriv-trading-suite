@@ -20,128 +20,75 @@ const OAuthCallback = () => {
   useEffect(() => {
     console.log('OAuthCallback: location', location.pathname, location.search);
     
-    // Check if we have the direct URL parameters from backend redirect
-    if (!location.search && window.location.hash) {
-      // Try to parse from hash if needed (some OAuth flows use hash fragments)
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      if (hashParams.has('user_id') || hashParams.has('access_token')) {
-        // Redirect to proper URL with query params
-        const newUrl = `${window.location.origin}/oauth/callback?${hashParams.toString()}`;
-        console.log('Redirecting from hash to query params:', newUrl);
-        window.location.replace(newUrl);
-        return;
-      }
-    }
-    
-    // Only run authentication once
     if (hasProcessed) return;
-    
-    const runAuth = async () => {
+    setHasProcessed(true);
+
+    const processCallback = async () => {
       try {
-        setHasProcessed(true);
+        setProgress(10);
         
+        // Parse URL parameters
         const params = new URLSearchParams(location.search);
-
-        const errorParam = params.get('error');
-        if (errorParam) {
-          throw new Error(decodeURIComponent(errorParam));
-        }
-
+        
         const user_id = params.get('user_id');
         const session_token = params.get('session_token');
         const access_token = params.get('access_token');
         const email = params.get('email');
-        const code = params.get('code'); // fallback
+        const account_id = params.get('account_id');
 
-        console.log('Auth params:', { 
-          user_id, 
-          hasSessionToken: !!session_token, 
-          hasAccessToken: !!access_token, 
+        console.log('OAuth params extracted:', {
+          user_id: user_id ? '***' : 'missing',
+          session_token: session_token ? '***' : 'missing',
+          access_token: access_token ? '***' : 'missing',
           email,
-          code: code ? '***' : null
+          account_id
         });
 
-        /**
-         * ✅ PRIMARY FLOW — backend already authenticated
-         */
-        if (user_id && session_token && access_token) {
-          const authData = {
-            user_id,
-            session_token,
-            access_token,
-            email,
-          };
-
-          console.log('Persisting auth data to localStorage');
-          
-          // Persist
-          localStorage.setItem('user_id', user_id);
-          localStorage.setItem('session_token', session_token);
-          localStorage.setItem('auth_token', session_token);
-          localStorage.setItem('deriv_access_token', access_token);
-          localStorage.setItem('email', email || '');
-
-          setProgress(50);
-          await login(authData);
+        if (!user_id || !session_token) {
+          throw new Error('Missing required authentication parameters from backend');
         }
 
-        /**
-         * 🔁 FALLBACK FLOW — OAuth code exchange
-         */
-        else if (code) {
-          setProgress(30);
-          await login(code);
-        }
+        setProgress(30);
 
-        else {
-          throw new Error('No authentication data received');
-        }
+        // Call login with the OAuth data from backend
+        await login({
+          user_id,
+          session_token,
+          access_token,
+          email,
+          deriv_account_id: account_id,
+        });
 
-        setProgress(100);
+        setProgress(60);
         setStatus('success');
-        addToast('Login successful 🎉', 'success');
+        setProgress(100);
 
+        addToast('Login successful! Redirecting...', 'success');
+
+        // Redirect after a short delay to show success state
         setTimeout(() => {
           navigate('/dashboard', { replace: true });
         }, 1500);
 
       } catch (err) {
-        console.error('OAuth callback failed:', err);
+        console.error('OAuth callback error:', err);
+        setError(err.message || 'Authentication failed. Please try again.');
         setStatus('error');
-        setError(err.message);
-        addToast(`Authentication failed: ${err.message}`, 'error');
-
-        setTimeout(() => {
-          navigate('/login', { replace: true });
-        }, 3000);
+        addToast(err.message || 'Authentication failed', 'error');
       }
     };
 
-    runAuth();
-  }, [location, navigate, login, addToast, hasProcessed]);
-
-  // Simulate progress animation
-  useEffect(() => {
-    if (status === 'processing') {
-      const interval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 90) return prev;
-          return prev + 10;
-        });
-      }, 300);
-      
-      return () => clearInterval(interval);
-    }
-  }, [status]);
+    processCallback();
+  }, [location.search, hasProcessed, login, navigate, addToast]);
 
   // Processing State
   if (status === 'processing') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Animated background */}
+        {/* Background effects */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/3 left-1/3 w-64 h-64 bg-primary-500/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/3 right-1/3 w-64 h-64 bg-accent-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl animate-pulse" />
         </div>
 
         <motion.div
@@ -166,22 +113,18 @@ const OAuthCallback = () => {
 
             {/* Progress Bar */}
             <div className="mb-8">
-              <div className="flex justify-between text-sm text-gray-400 mb-2">
-                <span>Processing...</span>
-                <span>{progress}%</span>
-              </div>
-              <div className="w-full h-2 bg-gray-800/50 rounded-full overflow-hidden">
+              <div className="w-full bg-gray-800/50 rounded-full h-1 overflow-hidden border border-gray-700/30">
                 <motion.div
-                  initial={{ width: "0%" }}
+                  className="h-full bg-gradient-to-r from-primary-500 to-primary-400"
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.3 }}
-                  className="h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full"
                 />
               </div>
+              <p className="text-xs text-gray-500 mt-2 text-center">{progress}%</p>
             </div>
 
             {/* Steps */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-900/50 border border-gray-800/50">
                 <div className="w-8 h-8 rounded-full bg-primary-500/20 flex items-center justify-center">
                   <Shield className="w-4 h-4 text-primary-400" />
@@ -232,7 +175,7 @@ const OAuthCallback = () => {
   if (status === 'success') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Success background effects */}
+        {/* Background effects */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-success-500/10 rounded-full blur-3xl animate-pulse" />
         </div>
@@ -251,12 +194,12 @@ const OAuthCallback = () => {
               transition={{ type: "spring", stiffness: 200, damping: 15 }}
               className="flex justify-center mb-6"
             >
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-success-500 to-emerald-600 flex items-center justify-center shadow-glow-success">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-success-500 to-emerald-600 flex items-center justify-center shadow-lg">
                 <CheckCircle className="w-12 h-12 text-white" />
               </div>
             </motion.div>
 
-            {/* Success Message */}
+            {/* Message */}
             <div className="text-center mb-8">
               <motion.h2
                 initial={{ opacity: 0, y: 10 }}
@@ -298,6 +241,8 @@ const OAuthCallback = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/dashboard', { replace: true })}
               className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-success-600 to-emerald-700 text-white font-semibold flex items-center justify-center gap-2 hover:shadow-glow-success transition-all duration-300"
             >
@@ -362,47 +307,35 @@ const OAuthCallback = () => {
                 transition={{ delay: 0.4 }}
                 className="text-sm text-gray-400"
               >
-                Redirecting to login page...
+                Please try logging in again or contact support if the issue persists.
               </motion.p>
             </div>
 
-            {/* Error Details */}
-            <div className="p-4 rounded-lg bg-gray-900/50 border border-gray-800/50 mb-6">
-              <div className="text-xs text-gray-400 font-mono">
-                <div className="flex justify-between mb-2">
-                  <span>Error Type:</span>
-                  <span className="text-secondary-400">Authentication Error</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span>Path:</span>
-                  <span>{location.pathname}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Time:</span>
-                  <span>{new Date().toLocaleTimeString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Retry Button */}
-            <div className="flex gap-3">
+            {/* Action Buttons */}
+            <div className="space-y-3">
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/login', { replace: true })}
-                className="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-gray-800 to-gray-900 text-white font-semibold hover:bg-gray-800 transition-all duration-300"
+                className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 text-white font-semibold flex items-center justify-center gap-2 hover:shadow-glow transition-all duration-300"
               >
-                Back to Login
+                Try Again
+                <ArrowRight className="w-4 h-4" />
               </motion.button>
+
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                onClick={() => window.location.reload()}
-                className="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-secondary-600 to-secondary-700 text-white font-semibold hover:shadow-lg transition-all duration-300"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate('/login', { replace: true })}
+                className="w-full py-3 px-6 rounded-xl bg-gray-800/50 border border-gray-700/50 text-white font-semibold flex items-center justify-center gap-2 hover:bg-gray-800 transition-all duration-300"
               >
-                Try Again
+                Back to Login
               </motion.button>
             </div>
           </div>
@@ -410,8 +343,6 @@ const OAuthCallback = () => {
       </div>
     );
   }
-
-  return null;
 };
 
 export default OAuthCallback;
