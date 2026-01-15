@@ -1,17 +1,30 @@
-// frontend/src/services/derivService.js
-import api from './api';
-import axios from 'axios';
-
-// Local helpers (boring but reliable)
-const getUserId = () => localStorage.getItem('user_id');
-const getAccessToken = () => localStorage.getItem('deriv_access_token');
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// frontend/src/services/derivService.js - UPDATED
+import { authApi, api } from './api';  // Use both instances
 
 export const derivService = {
   /* =========================
-     BOT CONTROL
+     OAUTH AUTH FLOW
+  ========================== */
+  async getOAuthRedirectUrl() {
+    try {
+      // Use authApi (no /api prefix) for /auth routes
+      const response = await authApi.get('/auth/login');
+      
+      console.log('✅ OAuth redirect URL response:', response.data);
+      
+      if (!response.data?.redirect_url) {
+        throw new Error('Missing redirect_url in response');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error getting OAuth redirect URL:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /* =========================
+     BOT CONTROL (use api with /api prefix)
   ========================== */
   async getBotStatus() {
     const { data } = await api.get('/status');
@@ -92,51 +105,9 @@ export const derivService = {
     return data;
   },
 
-  /* =========================
-     OAUTH AUTH FLOW (CLEAN)
-  ========================== */
-
-  // ✅ NEW: Fetch OAuth redirect URL from backend
-  async getOAuthRedirectUrl() {
-    try {
-      // Get the base URL (without /api)
-      const baseURL = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 
-        (import.meta.env.PROD 
-          ? 'https://deriv-trading-backend.onrender.com'
-          : 'http://localhost:8000');
-      
-      const response = await axios.get(`${baseURL}/auth/login`);
-      
-      console.log('OAuth redirect URL response:', response.data);
-      
-      if (!response.data?.redirect_url) {
-        throw new Error('Missing redirect_url in response');
-      }
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error getting OAuth redirect URL:', error.response?.data || error.message);
-      throw error;
-    }
-  },
-
-  // Called AFTER Deriv redirects back with ?code=
-  async handleOAuthCallback(code) {
-    const { data } = await api.post('/auth/callback', { code });
-
-    const { user_id, session_token, access_token } = data;
-
-    if (user_id) localStorage.setItem('user_id', user_id);
-    if (session_token) localStorage.setItem('session_token', session_token);
-    if (access_token)
-      localStorage.setItem('deriv_access_token', access_token);
-
-    return data;
-  },
-
   async logout() {
     try {
-      await api.post('/auth/logout');
+      await authApi.post('/auth/logout');  // Use authApi for logout
     } finally {
       localStorage.removeItem('user_id');
       localStorage.removeItem('session_token');
@@ -148,8 +119,8 @@ export const derivService = {
      USER BOT CONTROL
   ========================== */
   async startUserBot() {
-    const user_id = getUserId();
-    const access_token = getAccessToken();
+    const user_id = localStorage.getItem('user_id');
+    const access_token = localStorage.getItem('deriv_access_token');
 
     if (!user_id || !access_token) {
       throw new Error('User not authenticated');
@@ -164,7 +135,7 @@ export const derivService = {
   },
 
   async stopUserBot() {
-    const user_id = getUserId();
+    const user_id = localStorage.getItem('user_id');
 
     if (!user_id) {
       throw new Error('User not authenticated');
@@ -175,7 +146,7 @@ export const derivService = {
   },
 
   async getUserBotStatus() {
-    const user_id = getUserId();
+    const user_id = localStorage.getItem('user_id');
 
     if (!user_id) {
       throw new Error('User not authenticated');

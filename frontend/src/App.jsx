@@ -97,7 +97,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* The OAuthCallback route MUST be defined BEFORE protected routes */}
+      {/* ⚠️ CRITICAL: OAuth callback MUST come BEFORE protected routes */}
       <Route path="/oauth/callback" element={<OAuthCallback />} />
 
       {/* Protected routes with MainLayout */}
@@ -115,8 +115,8 @@ const AppRoutes = () => {
         <Route path="analytics" element={<Analytics />} />
         <Route path="settings" element={<Settings />} />
       </Route>
-      
-      {/* Catch-all route - redirect to login if not authenticated */}
+
+      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );

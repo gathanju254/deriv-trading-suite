@@ -1,82 +1,74 @@
-// frontend/src/services/api.js
+// frontend/src/services/api.js - UPDATED
 import axios from 'axios';
 
-// Use dynamic base URL - IMPORTANT: Always include /api
+// Use dynamic base URL - NO /api suffix for auth routes
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   (import.meta.env.PROD 
-    ? 'https://deriv-trading-backend.onrender.com/api'  // Render backend
-    : 'http://localhost:8000/api');
+    ? 'https://deriv-trading-backend.onrender.com'  // NO /api suffix
+    : 'http://localhost:8000');
 
-console.log('API Base URL:', API_BASE_URL); // Debug log
+console.log('✅ API Base URL:', API_BASE_URL);
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000, // Increase timeout to 30 seconds for Render free tier
+// Create two axios instances: one for auth (no /api prefix), one for api
+export const authApi = axios.create({
+  baseURL: API_BASE_URL,  // Direct to backend
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: false,
 });
 
-// ==========================
-// Request Interceptor
-// ==========================
-api.interceptors.request.use(
-  (config) => {
-    console.log('API Request:', config.method, config.url); // Debug log
-    
-    // Prefer session_token, fallback to auth_token if needed
-    const token = localStorage.getItem('session_token') || localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
+export const api = axios.create({
+  baseURL: `${API_BASE_URL}/api`,  // With /api prefix
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
   },
-  (error) => Promise.reject(error)
-);
+  withCredentials: false,
+});
 
-// ==========================
-// Response Interceptor
-// ==========================
-api.interceptors.response.use(
-  (response) => {
-    console.log('API Response:', response.status, response.config.url); // Debug log
-    return response;
-  },
-  (error) => {
-    console.error('API Error:', error.message, error.config?.url);
+// Request interceptor for both
+const setupInterceptor = (axiosInstance) => {
+  axiosInstance.interceptors.request.use(
+    (config) => {
+      console.log('API Request:', config.method, config.url);
+      const token = localStorage.getItem('session_token') || localStorage.getItem('auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
 
-    // Network / backend unreachable
-    if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-      error.message = 'Unable to connect to the server. The backend might be spinning up (Render free tier). Please wait a moment and try again.';
-      
-      // Try to ping the backend health endpoint
-      axios.get('https://deriv-trading-backend.onrender.com/')
-        .then(() => {
-          console.log('Backend is alive, retrying...');
-        })
-        .catch(() => {
-          console.log('Backend still not responding');
-        });
+  axiosInstance.interceptors.response.use(
+    (response) => {
+      console.log('API Response:', response.status, response.config.url);
+      return response;
+    },
+    (error) => {
+      console.error('API Error:', error.message, error.config?.url);
+
+      if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
+        error.message = 'Unable to connect to the server. Please wait a moment and try again.';
+      }
+
+      if (error.response?.status === 401) {
+        console.warn('Unauthorized - clearing session and redirecting to login.');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('session_token');
+        localStorage.removeItem('deriv_access_token');
+        localStorage.removeItem('email');
+        window.location.href = '/login';
+      }
+
+      return Promise.reject(error);
     }
+  );
+};
 
-    // 404 Not Found
-    if (error.response?.status === 404) {
-      error.message = `Requested endpoint not found: ${error.config?.url}`;
-    }
-
-    // 401 Unauthorized
-    if (error.response?.status === 401) {
-      console.warn('Unauthorized - clearing session and redirecting to login.');
-      localStorage.removeItem('user_id');
-      localStorage.removeItem('session_token');
-      localStorage.removeItem('deriv_access_token');
-      localStorage.removeItem('email');
-      window.location.href = '/login';
-    }
-
-    return Promise.reject(error);
-  }
-);
+setupInterceptor(authApi);
+setupInterceptor(api);
 
 export default api;

@@ -50,6 +50,17 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // Add this debug useEffect to AuthContext.jsx
+useEffect(() => {
+    console.log('🔍 AuthContext Debug:', {
+      hasUser: !!user,
+      userId: user?.id,
+      loading,
+      localStorageUserId: localStorage.getItem('user_id'),
+      localStorageToken: localStorage.getItem('session_token') ? 'present' : 'missing'
+    });
+  }, [user, loading]);
+
   /* -------------------------------------------
      LOGIN - Updated with useCallback
   -------------------------------------------- */
