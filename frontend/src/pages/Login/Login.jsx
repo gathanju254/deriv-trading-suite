@@ -20,18 +20,26 @@ const Login = () => {
         throw new Error('No redirect URL received from server');
       }
 
-      console.log('✅ Redirecting to Deriv OAuth...');
-      // HARD redirect to Deriv OAuth
+      console.log('✅ Redirecting to Deriv OAuth:', redirect_url.substring(0, 100) + '...');
+      
+      // HARD redirect to Deriv OAuth - this will close the current window
+      // Deriv will redirect back to your /auth/callback endpoint
       window.location.href = redirect_url;
       
     } catch (err) {
       console.error('❌ OAuth failed:', err);
       
-      const errorMsg = err.response?.status === 404 
-        ? 'Auth endpoint not found. Backend may be down.'
-        : err.message.includes('redirect_url')
-        ? 'Server returned invalid response.'
-        : 'Failed to initialize authentication.';
+      let errorMsg = 'Failed to initialize authentication.';
+      
+      if (err.response?.status === 404) {
+        errorMsg = 'Auth endpoint not found. Backend may be down.';
+      } else if (err.message.includes('redirect_url')) {
+        errorMsg = 'Server returned invalid response.';
+      } else if (err.message.includes('Network Error')) {
+        errorMsg = 'Cannot connect to backend server. Make sure it is running.';
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
       
       addToast(errorMsg, 'error');
       setLoading(false);
@@ -186,6 +194,9 @@ const Login = () => {
                 <p className="text-sm text-gray-400 text-center">
                   You'll be redirected to Deriv's secure authentication portal. 
                   We never store your login credentials.
+                </p>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  Backend URL: {window.location.origin}
                 </p>
               </div>
 

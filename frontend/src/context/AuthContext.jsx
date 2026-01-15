@@ -35,39 +35,63 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log('🔄 AuthProvider: Initializing session check...');
     
-    try {
-      const userId = localStorage.getItem('user_id');
-      const sessionToken = localStorage.getItem('session_token');
+    const restoreSession = async () => {
+      try {
+        const userId = localStorage.getItem('user_id');
+        const sessionToken = localStorage.getItem('session_token');
 
-      console.log('📦 AuthProvider: Found in localStorage:', {
-        user_id: userId ? '***' + userId.slice(-8) : 'NOT FOUND',
-        session_token: sessionToken ? '***' + sessionToken.slice(-8) : 'NOT FOUND'
-      });
-
-      if (userId && sessionToken) {
-        console.log('✅ AuthProvider: Restoring session from localStorage');
-        const user_obj = {
-          id: userId,
-          email: localStorage.getItem('email') || '',
-          accountId: localStorage.getItem('deriv_account_id') || '',
-        };
-        console.log('🔐 Setting user state:', {
-          id: user_obj.id ? '***' + user_obj.id.slice(-8) : 'missing',
-          email: user_obj.email,
-          accountId: user_obj.accountId
+        console.log('📦 AuthProvider: Found in localStorage:', {
+          user_id: userId ? '***' + userId.slice(-8) : 'NOT FOUND',
+          session_token: sessionToken ? '***' + sessionToken.slice(-8) : 'NOT FOUND'
         });
-        setUser(user_obj);
-      } else {
-        console.log('ℹ️  AuthProvider: No existing session in localStorage');
+
+        if (userId && sessionToken) {
+          console.log('✅ AuthProvider: Restoring session from localStorage');
+          
+          // Verify session with backend
+          try {
+            const userData = await derivService.getCurrentUser();
+            if (userData && userData.id === userId) {
+              const user_obj = {
+                id: userId,
+                email: localStorage.getItem('email') || userData.email || '',
+                accountId: localStorage.getItem('deriv_account_id') || userData.deriv_account_id || '',
+              };
+              console.log('🔐 Setting user state:', {
+                id: user_obj.id ? '***' + user_obj.id.slice(-8) : 'missing',
+                email: user_obj.email,
+                accountId: user_obj.accountId
+              });
+              setUser(user_obj);
+            } else {
+              console.warn('⚠️  Stored session invalid, clearing');
+              localStorage.clear();
+              setUser(null);
+            }
+          } catch (verifyErr) {
+            console.warn('⚠️  Session verification failed:', verifyErr.message);
+            // Keep the user logged in anyway (offline mode)
+            const user_obj = {
+              id: userId,
+              email: localStorage.getItem('email') || '',
+              accountId: localStorage.getItem('deriv_account_id') || '',
+            };
+            setUser(user_obj);
+          }
+        } else {
+          console.log('ℹ️  AuthProvider: No existing session in localStorage');
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('❌ AuthProvider: Error during initialization:', err);
         setUser(null);
+      } finally {
+        setLoading(false);
+        setInitialized(true);
       }
-    } catch (err) {
-      console.error('❌ AuthProvider: Error during initialization:', err);
-      setUser(null);
-    } finally {
-      setLoading(false);
-      setInitialized(true);
-    }
+    };
+
+    restoreSession();
   }, []);
 
   // Debug effect
@@ -118,6 +142,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('deriv_access_token', access_token);
       localStorage.setItem('email', email);
       localStorage.setItem('deriv_account_id', deriv_account_id);
+      localStorage.setItem('login_timestamp', Date.now().toString());
 
       // Immediately verify they were stored
       const verify = {
@@ -158,7 +183,7 @@ export const AuthProvider = ({ children }) => {
       });
       throw err;
     }
-  }, []); // Empty dependency array - derivService is imported
+  }, []);
 
   /* -------------------------------------------
      LOGOUT
@@ -166,14 +191,35 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(async () => {
     try {
       console.log('👋 AuthContext.logout() called');
-      await derivService.logout();
+      const token = localStorage.getItem('session_token');
+      if (token) {
+        await derivService.logout();
+      }
     } catch (err) {
       console.warn('⚠️  Backend logout warning:', err.message);
     }
 
-    localStorage.clear();
+    // Clear ALL auth-related items
+    const itemsToClear = [
+      'user_id', 'session_token', 'auth_token', 'deriv_access_token',
+      'email', 'deriv_account_id', 'login_timestamp'
+    ];
+    
+    itemsToClear.forEach(item => localStorage.removeItem(item));
+    
     setUser(null);
     console.log('✅ Logout complete');
+  }, []);
+
+  /* -------------------------------------------
+     Check if token is expired
+  -------------------------------------------- */
+  const checkTokenExpiry = useCallback(() => {
+    const loginTime = localStorage.getItem('login_timestamp');
+    if (!loginTime) return true;
+    
+    const hoursSinceLogin = (Date.now() - parseInt(loginTime)) / (1000 * 60 * 60);
+    return hoursSinceLogin > 23; // Tokens expire after 24 hours
   }, []);
 
   /* -------------------------------------------
@@ -182,9 +228,10 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !checkTokenExpiry(),
     login,
     logout,
+    checkTokenExpiry,
   };
 
   return (

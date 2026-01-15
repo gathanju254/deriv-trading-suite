@@ -16,26 +16,48 @@ const OAuthCallback = () => {
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    console.log('🔗 OAuthCallback mounted - URL Analysis:', {
-      fullUrl: window.location.href,
-      pathname: location.pathname,
-      search: location.search,
-      hash: location.hash,
-    });
-
-    const params = new URLSearchParams(location.search);
-    console.log('🔍 Extracted parameters:');
+  // Debug function to extract ALL parameters from URL
+  const extractUrlParams = () => {
+    console.log('🔗 OAuthCallback URL Analysis:');
+    console.log('  Full URL:', window.location.href);
+    
+    // Check for hash fragment (sometimes OAuth returns tokens in hash)
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+      console.log('  Found hash fragment:', hash);
+    }
+    
+    // Extract from hash fragment first (common for OAuth token flow)
+    let params = new URLSearchParams(location.search);
+    if (hash) {
+      // Sometimes tokens are in hash, sometimes in query
+      params = new URLSearchParams(hash);
+      console.log('  Using hash parameters');
+    } else if (location.search) {
+      params = new URLSearchParams(location.search);
+      console.log('  Using search parameters');
+    }
+    
     const allParams = {};
     for (const [key, value] of params.entries()) {
-      const displayValue = key.includes('token') || key.includes('session') 
-        ? (value ? '***' + value.slice(-8) : 'missing')
-        : value || 'missing';
-      allParams[key] = displayValue;
-      console.log(`  ${key}: ${displayValue}`);
+      allParams[key] = value;
     }
-    console.log('📋 All params:', allParams);
-  }, [location]);
+    
+    // Also check for fragment-style parameters (access_token=...)
+    if (hash && hash.includes('access_token')) {
+      const fragmentParams = hash.split('&');
+      fragmentParams.forEach(param => {
+        const [key, value] = param.split('=');
+        if (key && value) {
+          allParams[key] = decodeURIComponent(value);
+        }
+      });
+    }
+    
+    console.log('📋 All extracted parameters:', Object.keys(allParams).map(k => `${k}: ${k.includes('token') ? '***' + allParams[k]?.slice(-8) : allParams[k]}`));
+    
+    return allParams;
+  };
 
   useEffect(() => {
     const processCallback = async () => {
@@ -43,15 +65,16 @@ const OAuthCallback = () => {
         setProgress(10);
         console.log('🔐 OAuthCallback: Starting authentication processing...');
 
-        // Parse URL parameters
-        const params = new URLSearchParams(location.search);
+        // Extract parameters using our improved function
+        const allParams = extractUrlParams();
         
-        const user_id = params.get('user_id');
-        const session_token = params.get('session_token');
-        const access_token = params.get('access_token');
-        const email = params.get('email');
-        const account_id = params.get('account_id');
-        const error_param = params.get('error');
+        // Extract specific parameters (try multiple possible names)
+        const user_id = allParams.user_id || allParams.userId || allParams.sub;
+        const session_token = allParams.session_token || allParams.session_token || allParams.token || allParams.access_token;
+        const access_token = allParams.access_token || allParams.token1 || allParams.token2;
+        const email = allParams.email || allParams.email_address;
+        const account_id = allParams.account_id || allParams.deriv_account_id || allParams.acct1 || allParams.acct2;
+        const error_param = allParams.error || allParams.error_description;
 
         console.log('📦 Parsed from URL:', {
           user_id: user_id ? '***' + user_id.slice(-8) : 'MISSING',
@@ -69,7 +92,7 @@ const OAuthCallback = () => {
 
         // Validate required parameters
         if (!user_id || !session_token) {
-          throw new Error(`Missing critical params: user_id=${!!user_id}, session_token=${!!session_token}`);
+          throw new Error(`Missing critical params: user_id=${!!user_id}, session_token=${!!session_token}. Check your backend callback URL.`);
         }
 
         setProgress(30);
@@ -108,6 +131,9 @@ const OAuthCallback = () => {
 
         console.log('🎉 Authentication complete, redirecting to dashboard...');
         
+        // Clear the URL parameters to prevent re-processing on refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
         // Wait a bit to ensure state updates are processed
         await new Promise(resolve => setTimeout(resolve, 1500));
         navigate('/dashboard', { replace: true });
@@ -115,11 +141,7 @@ const OAuthCallback = () => {
       } catch (err) {
         console.error('❌ OAuthCallback error:', err);
         console.error('❌ Error stack:', err.stack);
-        console.error('❌ Error details:', {
-          message: err.message,
-          name: err.name,
-          cause: err.cause
-        });
+        console.error('❌ Full URL was:', window.location.href);
 
         setError(err.message || 'Authentication failed');
         setStatus('error');
@@ -133,13 +155,15 @@ const OAuthCallback = () => {
       }
     };
 
-    if (location.search) {
+    // Process callback if we have parameters OR if we're on this page (might have been redirected)
+    if (location.search || window.location.hash) {
       processCallback();
     } else {
-      console.warn('⚠️  No search params found, redirecting to login');
-      navigate('/login', { replace: true });
+      console.warn('⚠️  No auth parameters found, redirecting to login');
+      addToast('No authentication data found. Please try logging in again.', 'warning');
+      setTimeout(() => navigate('/login', { replace: true }), 2000);
     }
-  }, [location.search, login, navigate, addToast]);
+  }, [location.search, location.hash, login, navigate, addToast]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">

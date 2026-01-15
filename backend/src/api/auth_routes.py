@@ -1,5 +1,6 @@
 # backend/src/api/auth_routes.py
-from fastapi import APIRouter, HTTPException, Depends, Body, Header, Query, Request
+# backend/src/api/auth_routes.py
+from fastapi import APIRouter, HTTPException, Depends, Body, Header, Query, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from urllib.parse import urlencode, quote
 from typing import Optional
@@ -244,6 +245,19 @@ async def deriv_callback(
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}/login?error={quote(error_msg)}"
         )
+
+
+# -------------------------------------------------------------------
+# CALLBACK HEAD ROUTE → Deriv checks endpoint with HEAD requests
+# -------------------------------------------------------------------
+@router.head("/callback")
+async def head_callback():
+    """
+    Handle HEAD requests from Deriv (they check the endpoint).
+    Returns 200 OK to confirm the endpoint exists.
+    """
+    logger.debug("HEAD request received for /auth/callback")
+    return Response(status_code=200)
 
 
 # -------------------------------------------------------------------
