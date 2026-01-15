@@ -38,26 +38,16 @@ import src.db.models.proposal
 # ==========================================================
 class CustomJSONEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, (np.float32, np.float64)):
-            return float(obj)
-        if isinstance(obj, (np.int32, np.int64)):
-            return int(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
         if isinstance(obj, Decimal):
             return float(obj)
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        if isinstance(obj, float) and np.isnan(obj):
-            return None
-        if obj == float("inf"):
-            return "infinity"
-        if obj == float("-inf"):
-            return "-infinity"
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
         return super().default(obj)
 
 # ==========================================================
-#                APPLICATION LIFESPAN
+#                    LIFESPAN EVENTS
 # ==========================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -81,49 +71,40 @@ async def lifespan(app: FastAPI):
     logger.info("👋 Shutdown complete.")
 
 # ==========================================================
-#                FASTAPI INITIALIZATION
+#                  FASTAPI APP SETUP
 # ==========================================================
 app = FastAPI(
     title="Deriv Trading Suite",
+    description="Professional trading dashboard and automation suite",
     version="1.0.0",
-    description="Backend service for automated Deriv trading bot.",
-    json_encoder=CustomJSONEncoder,
     lifespan=lifespan,
 )
 
 # ==========================================================
-#                         CORS (DEBUG VERSION)
+#                    CORS MIDDLEWARE
 # ==========================================================
-# Allow all origins for now to debug - CHANGE TO SPECIFIC ORIGINS IN PRODUCTION
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for debugging
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],  # Expose all headers for debugging
 )
 
-# ==========================================================
-#                  TRUSTED HOSTS (DEBUG VERSION)
-# ==========================================================
-# Comment out TrustedHostMiddleware for debugging
-# app.add_middleware(
-#     TrustedHostMiddleware,
-#     allowed_hosts=[
-#         "deriv-trading-backend.onrender.com",
-#         "deriv-trading-suite.onrender.com",
-#         "http://localhost:5173",
-#         "http://localhost:3000",
-#     ],
-# )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 # ==========================================================
 #                     ROUTERS
 # ==========================================================
-app.include_router(api_router)
-app.include_router(auth_router)
-app.include_router(ws_router)
+# ⚠️ CRITICAL: auth_router MUST be included without prefix
+# so that @router.get("/callback") becomes /auth/callback
+app.include_router(auth_router)  # Routes: /auth/login, /auth/callback, /auth/logout, /auth/me
+
+# API routes with /api prefix
+app.include_router(api_router)   # Routes: /api/*
+
+# WebSocket routes
+app.include_router(ws_router)    # Routes: /ws
 
 # ==========================================================
 #                     ROOT ENDPOINT
@@ -147,10 +128,7 @@ async def health():
     return {
         "status": "healthy",
         "service": "Deriv Trading Backend",
-        "timestamp": datetime.utcnow().isoformat(),
-        "backend_url": settings.BACKEND_URL,
-        "frontend_url": settings.FRONTEND_URL,
-        "cors_enabled": True
+        "timestamp": datetime.utcnow().isoformat()
     }
 
 # ==========================================================
@@ -159,23 +137,28 @@ async def health():
 @app.get("/debug/cors-test")
 async def cors_test():
     """Endpoint to test CORS headers"""
-    return {
-        "message": "CORS test endpoint",
-        "headers_received": {
-            "origin": "Check browser console for Origin header"
-        },
-        "headers_sent": {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*"
-        }
-    }
+    return {"message": "CORS test endpoint"}
 
 @app.options("/debug/cors-test")
 async def cors_test_options():
     """Handle OPTIONS requests for CORS preflight"""
-    return {
-        "message": "CORS preflight successful",
-        "allowed_methods": ["GET", "OPTIONS", "POST", "PUT", "DELETE"],
-        "allowed_headers": ["*"]
-    }
+    return {}
+
+@app.head("/")
+async def root_head():
+    """Handle HEAD requests for health checks"""
+    return {}
+
+@app.head("/health")
+async def health_head():
+    """Handle HEAD requests for health checks"""
+    return {}
+
+# ==========================================================
+#                  JSON ENCODER CONFIGURATION
+# ==========================================================
+app.json_encoder_class = CustomJSONEncoder
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

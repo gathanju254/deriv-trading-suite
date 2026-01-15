@@ -29,84 +29,11 @@ router = APIRouter(prefix="/api", tags=["Trading API"])
 # AUTH ROUTES (ADD THESE TO YOUR EXISTING FILE)
 # ============================================================
 
+# DELETE THESE - they're now in auth_routes.py:
 @router.get("/auth/login")
-async def deriv_login():
-    """
-    Returns Deriv OAuth URL.
-    Frontend must redirect browser to this URL.
-    """
-    try:
-        state = secrets.token_urlsafe(32)
-
-        params = {
-            "app_id": settings.DERIV_APP_ID,
-            "redirect_uri": settings.DERIV_OAUTH_REDIRECT_URI,
-            "response_type": "token",  # Deriv prefers token flow
-            "scope": "read write trade",
-            "state": state,
-            "brand": "deriv",
-            "language": "EN",
-        }
-
-        auth_url = f"https://oauth.deriv.com/oauth2/authorize?{urlencode(params)}"
-        logger.info(f"Deriv OAuth URL generated: {auth_url[:100]}...")
-
-        return {"redirect_url": auth_url, "state": state}
-
-    except Exception as e:
-        logger.error(f"OAuth login generation failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to generate login URL")
-
 @router.get("/auth/callback")
-async def deriv_callback_custom(
-    request: Request,
-    acct1: Optional[str] = Query(None),
-    token1: Optional[str] = Query(None),
-    acct2: Optional[str] = Query(None),
-    token2: Optional[str] = Query(None),
-    code: Optional[str] = Query(None),
-    state: Optional[str] = Query(None),
-):
-    """
-    Forward to the main auth callback endpoint
-    """
-    # Import here to avoid circular imports
-    from src.api.auth_routes import deriv_callback
-    
-    # Get database session
-    db = SessionLocal()
-    try:
-        return await deriv_callback(request, acct1, token1, acct2, token2, code, state, db)
-    finally:
-        db.close()
-
 @router.post("/auth/logout")
-async def logout_custom(authorization: str = Header(None)):
-    """
-    Logout endpoint
-    """
-    # Import here to avoid circular imports
-    from src.api.auth_routes import logout
-    
-    db = SessionLocal()
-    try:
-        return await logout(authorization, db)
-    finally:
-        db.close()
-
 @router.get("/auth/me")
-async def get_current_user_custom(authorization: str = Header(None)):
-    """
-    Get current user info
-    """
-    # Import here to avoid circular imports
-    from src.api.auth_routes import get_current_user
-    
-    db = SessionLocal()
-    try:
-        return await get_current_user(authorization, db)
-    finally:
-        db.close()
 
 # ============================================================
 # BASIC BOT STATUS
