@@ -13,7 +13,8 @@ alembic==1.12.1
 psycopg2-binary==2.9.9
 
 # Networking
-websockets==12.0
+# Use websockets 10.3 to match python-deriv-api
+websockets==10.3
 aiohttp==3.9.1
 requests==2.31.0
 
@@ -31,6 +32,5 @@ passlib[bcrypt]==1.7.4
 # Scheduling
 schedule==1.2.1
 
-# Deriv API
-#python-deriv-api==2.1.7 # Temporarily use the GitHub version until the next release
+# Deriv API - specify compatible websockets version
 git+https://github.com/binary-com/python-deriv-api.git
