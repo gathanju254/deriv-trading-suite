@@ -198,17 +198,18 @@ async def deriv_callback(
         # ----------------------------
         # 6. Redirect back to frontend
         # ----------------------------
-        # URL encode all parameters
+        from urllib.parse import quote
+
         frontend_redirect = (
             f"{settings.FRONTEND_URL}/oauth/callback"
-            f"?user_id={user.id}"
+            f"?user_id={quote(user.id)}"
             f"&session_token={quote(app_token)}"
             f"&access_token={quote(access_token)}"
-            f"&email={quote(email)}"
-            f"&account_id={quote(account_id)}"
+            f"&email={quote(user.email or '')}"
+            f"&account_id={quote(user.deriv_account_id or '')}"
         )
 
-        logger.info(f"OAuth success → redirecting user {email} to frontend")
+        logger.info(f"Redirecting to: {frontend_redirect[:100]}...")
         return RedirectResponse(url=frontend_redirect)
 
     except HTTPException as he:
