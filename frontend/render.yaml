@@ -3,7 +3,7 @@ services:
   - type: static
     name: deriv-trading-suite
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+    staticPublishPath: ./build
     envVars:
       - key: VITE_API_BASE_URL
         value: https://deriv-trading-backend.onrender.com/api

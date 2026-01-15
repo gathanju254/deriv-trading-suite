@@ -8,26 +8,14 @@ const __dirname = path.dirname(__filename)
 
 export default defineConfig({
   plugins: [react()],
-
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
-    },
-  },
-
-  // Base path for static hosting
+  resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   base: '/',
-  
-  // For production build on Render Static
   build: {
-    outDir: 'dist',
+    outDir: 'build',  // ✅ Outputs to 'build' directory
     emptyOutDir: true,
     sourcemap: false,
-    // Optimize for static hosting
     rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
-      },
+      input: { main: path.resolve(__dirname, 'index.html') },
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
@@ -36,30 +24,14 @@ export default defineConfig({
       }
     },
   },
-
-  // For local development
   server: {
     port: 5173,
     host: true,
     proxy: {
-      '/auth': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/ws': {
-        target: 'http://localhost:8000',
-        ws: true,
-        changeOrigin: true,
-      },
+      '/auth': { target: 'http://localhost:8000', changeOrigin: true },
+      '/api': { target: 'http://localhost:8000', changeOrigin: true },
+      '/ws': { target: 'http://localhost:8000', ws: true, changeOrigin: true },
     },
-    hmr: {
-      port: 5173,
-    },
+    hmr: { port: 5173 },
   },
 })
