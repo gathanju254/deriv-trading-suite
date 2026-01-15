@@ -21,7 +21,7 @@ class User(Base):
     deriv_account_id = Column(String, unique=True, index=True, nullable=True)
 
     is_active = Column(Boolean, default=True)
-    app_markup_percentage = Column(Float, default=2.0)  # default user markup
+    app_markup_percentage = Column(Float, default=2.0)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
 
@@ -39,29 +39,26 @@ class User(Base):
         "Commission",
         back_populates="user"
     )
+    settings = relationship(
+        "UserSettings",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
 
 
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
     id = Column(String, primary_key=True, default=uuid_str)
-    user_id = Column(String, ForeignKey("users.id"), index=True, nullable=False)
-
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     access_token = Column(String, nullable=False)
     refresh_token = Column(String, nullable=True)
     expires_at = Column(DateTime, nullable=False)
-
     is_active = Column(Boolean, default=True)
-    ip_address = Column(String, nullable=True)
-    user_agent = Column(String, nullable=True)
-
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="sessions")
-
-    __table_args__ = (
-        Index("idx_user_active_session", "user_id", "is_active"),
-    )
 
 
 class Commission(Base):
@@ -72,7 +69,7 @@ class Commission(Base):
     trade_id = Column(String, ForeignKey("trades.id"), nullable=False)
 
     amount = Column(Float, nullable=False)
-    markup_percentage = Column(Float, nullable=False)  # snapshot at trade time
+    markup_percentage = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="commissions")

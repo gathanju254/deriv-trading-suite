@@ -13,6 +13,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from src.api.routes import router as api_router
 from src.api.auth_routes import router as auth_router
 from src.api.websocket import ws_router
+from src.api.settings_routes import router as settings_router
 from src.core.deriv_api import deriv
 from src.trading.multi_user_bot import bot_manager
 from src.utils.logger import logger
@@ -122,6 +123,9 @@ app.include_router(api_router)   # Routes: /api/*
 
 # WebSocket routes
 app.include_router(ws_router)    # Routes: /ws
+
+# User settings routes
+app.include_router(settings_router)  # User settings routes: /api/settings
 
 # ==========================================================
 #                     ROOT ENDPOINT
