@@ -1,5 +1,5 @@
-// frontend/src/services/derivService.js - UPDATED
-import { authApi, api } from './api';
+// frontend/src/services/derivService.js - FIXED
+import { authApi, api } from './api';  // ✅ Make sure authApi is imported
 
 export const derivService = {
   /* =========================
@@ -9,7 +9,7 @@ export const derivService = {
     try {
       console.log('🔗 Requesting OAuth URL from /auth/login...');
       
-      // Use authApi for /auth routes (no /api prefix)
+      // ✅ CRITICAL: Use authApi for /auth routes (NO /api prefix)
       const response = await authApi.get('/auth/login');
       
       console.log('✅ OAuth response received:', response.data);

@@ -9,10 +9,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
 
 console.log('✅ API Base URL:', API_BASE_URL);
 
-// ✅ CORRECT - Separate instances with explicit baseURL
-// Auth routes: NO /api prefix
+// ✅ Auth routes: NO /api prefix
 export const authApi = axios.create({
-  baseURL: `${API_BASE_URL}`,  // Direct to backend root
+  baseURL: `${API_BASE_URL}`,  // Direct to backend root (NO /api)
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -20,9 +19,9 @@ export const authApi = axios.create({
   withCredentials: false,
 });
 
-// Trading API routes: WITH /api prefix
+// ✅ Trading API routes: WITH /api prefix
 export const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,  // With /api prefix
+  baseURL: `${API_BASE_URL}/api`,  // WITH /api prefix
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
