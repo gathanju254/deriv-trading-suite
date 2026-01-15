@@ -1,6 +1,5 @@
 # backend/src/api/routes.py
 
-# Add these imports at the TOP of your routes.py file
 from urllib.parse import urlencode
 import secrets
 from fastapi import Request, Query, Header
@@ -26,17 +25,7 @@ from src.api.dependencies import get_current_user
 router = APIRouter(prefix="/api", tags=["Trading API"])
 
 # ============================================================
-# AUTH ROUTES (ADD THESE TO YOUR EXISTING FILE)
-# ============================================================
-
-# DELETE THESE - they're now in auth_routes.py:
-@router.get("/auth/login")
-@router.get("/auth/callback")
-@router.post("/auth/logout")
-@router.get("/auth/me")
-
-# ============================================================
-# BASIC BOT STATUS
+# BASIC BOT STATUS (FIRST ACTUAL ENDPOINT)
 # ============================================================
 @router.get("/status")
 async def status():
