@@ -16,35 +16,34 @@ const OAuthCallback = () => {
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
 
-  // Add this at the beginning of the component
   useEffect(() => {
-    console.log('🔗 OAuthCallback URL Analysis:', {
-      fullURL: window.location.href,
+    console.log('🔗 OAuthCallback mounted - URL Analysis:', {
+      fullUrl: window.location.href,
       pathname: location.pathname,
       search: location.search,
       hash: location.hash,
-      fullPath: location.pathname + location.search + location.hash
     });
-    
-    // Also log the parsed parameters for debugging
+
     const params = new URLSearchParams(location.search);
-    const paramEntries = {};
+    console.log('🔍 Extracted parameters:');
+    const allParams = {};
     for (const [key, value] of params.entries()) {
-      paramEntries[key] = key.includes('token') || key.includes('session') ? 
-        (value ? '***' + value.slice(-4) : 'missing') : 
-        value || 'missing';
+      const displayValue = key.includes('token') || key.includes('session') 
+        ? (value ? '***' + value.slice(-8) : 'missing')
+        : value || 'missing';
+      allParams[key] = displayValue;
+      console.log(`  ${key}: ${displayValue}`);
     }
-    console.log('📋 Parsed parameters:', paramEntries);
+    console.log('📋 All params:', allParams);
   }, [location]);
 
   useEffect(() => {
     const processCallback = async () => {
       try {
         setProgress(10);
-        console.log('🔐 OAuthCallback: Processing...');
-        console.log('Search params:', location.search);
+        console.log('🔐 OAuthCallback: Starting authentication processing...');
 
-        // Parse URL parameters from query string ONLY (backend sends as ?param=value)
+        // Parse URL parameters
         const params = new URLSearchParams(location.search);
         
         const user_id = params.get('user_id');
@@ -54,28 +53,33 @@ const OAuthCallback = () => {
         const account_id = params.get('account_id');
         const error_param = params.get('error');
 
-        // Check for error from backend redirect
-        if (error_param) {
-          throw new Error(`Backend authentication error: ${decodeURIComponent(error_param)}`);
-        }
-
-        console.log('✅ Extracted params:', {
-          user_id: user_id ? '***' + user_id.slice(-8) : 'missing',
-          session_token: session_token ? '***' + session_token.slice(-8) : 'missing',
-          access_token: access_token ? '***' + access_token.slice(-8) : 'missing',
-          email: email || 'missing',
-          account_id: account_id || 'missing'
+        console.log('📦 Parsed from URL:', {
+          user_id: user_id ? '***' + user_id.slice(-8) : 'MISSING',
+          session_token: session_token ? '***' + session_token.slice(-8) : 'MISSING',
+          access_token: access_token ? '***' + access_token.slice(-8) : 'MISSING',
+          email: email || 'MISSING',
+          account_id: account_id || 'MISSING',
+          error: error_param || 'none'
         });
 
+        // Check for backend error
+        if (error_param) {
+          throw new Error(`Backend error: ${decodeURIComponent(error_param)}`);
+        }
+
+        // Validate required parameters
         if (!user_id || !session_token) {
-          throw new Error(`Missing required params: user_id=${!!user_id}, session_token=${!!session_token}`);
+          throw new Error(`Missing critical params: user_id=${!!user_id}, session_token=${!!session_token}`);
         }
 
         setProgress(30);
+        console.log('✅ Parameters validated');
 
-        // Call login with OAuth data
-        console.log('🔐 Calling login with OAuth data...');
-        const loginResult = await login({
+        // Call login function
+        console.log('🔐 Calling login() with OAuth data...');
+        setProgress(45);
+        
+        const loginSuccess = await login({
           user_id,
           session_token,
           access_token: access_token || '',
@@ -83,38 +87,59 @@ const OAuthCallback = () => {
           deriv_account_id: account_id || '',
         });
 
-        console.log('✅ Login result:', loginResult);
-        setProgress(60);
+        console.log('✅ Login function returned:', loginSuccess);
+
+        // Verify localStorage
+        const storedUserId = localStorage.getItem('user_id');
+        const storedToken = localStorage.getItem('session_token');
+        console.log('✅ localStorage verification:', {
+          user_id_stored: storedUserId ? '***' + storedUserId.slice(-8) : 'NOT FOUND',
+          token_stored: storedToken ? 'YES' : 'NO',
+          token_length: storedToken ? storedToken.length : 0
+        });
+
+        if (!storedUserId || !storedToken) {
+          throw new Error('Login succeeded but localStorage not updated');
+        }
+
+        setProgress(75);
         setStatus('success');
         setProgress(100);
 
-        // Redirect to dashboard after short delay
-        setTimeout(() => {
-          console.log('➡️  Redirecting to dashboard...');
-          navigate('/dashboard', { replace: true });
-        }, 1000);
+        console.log('🎉 Authentication complete, redirecting to dashboard...');
+        
+        // Wait a bit to ensure state updates are processed
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        navigate('/dashboard', { replace: true });
 
       } catch (err) {
-        console.error('❌ OAuth callback error:', err);
+        console.error('❌ OAuthCallback error:', err);
+        console.error('❌ Error stack:', err.stack);
         console.error('❌ Error details:', {
           message: err.message,
-          stack: err.stack,
-          location: location
+          name: err.name,
+          cause: err.cause
         });
-        setError(err.message);
+
+        setError(err.message || 'Authentication failed');
         setStatus('error');
-        addToast(err.message, 'error');
+        addToast(err.message || 'Authentication failed', 'error');
         
-        // Redirect back to login after delay
+        // Redirect to login after showing error
         setTimeout(() => {
-          console.log('➡️  Redirecting to login...');
+          console.log('➡️  Redirecting to login due to error...');
           navigate('/login', { replace: true });
-        }, 3000);
+        }, 4000);
       }
     };
 
-    processCallback();
-  }, [location.search, login, navigate, addToast, location]);
+    if (location.search) {
+      processCallback();
+    } else {
+      console.warn('⚠️  No search params found, redirecting to login');
+      navigate('/login', { replace: true });
+    }
+  }, [location.search, login, navigate, addToast]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
@@ -125,7 +150,6 @@ const OAuthCallback = () => {
         className="w-full max-w-md"
       >
         <div className="p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-950/80 backdrop-blur-xl border border-gray-800/50 shadow-2xl">
-          {/* Header */}
           <div className="text-center mb-8">
             <motion.div
               animate={{ rotate: 360 }}
@@ -138,7 +162,6 @@ const OAuthCallback = () => {
             <p className="text-gray-400">Processing your Deriv credentials</p>
           </div>
 
-          {/* Progress Bar */}
           <div className="mb-8">
             <div className="w-full bg-gray-800/50 rounded-full h-1 overflow-hidden">
               <motion.div
@@ -151,10 +174,9 @@ const OAuthCallback = () => {
             <p className="text-xs text-gray-500 mt-2 text-center">{progress}%</p>
           </div>
 
-          {/* Status Message */}
           {status === 'processing' && (
             <div className="text-center">
-              <p className="text-gray-300 text-sm">Verifying your account...</p>
+              <p className="text-gray-300 text-sm">Verifying credentials...</p>
             </div>
           )}
 
@@ -164,7 +186,7 @@ const OAuthCallback = () => {
               animate={{ opacity: 1, y: 0 }}
               className="text-center"
             >
-              <div className="text-green-400 text-sm font-medium mb-2">✅ Authentication successful!</div>
+              <div className="text-green-400 text-sm font-medium mb-2">✅ Success!</div>
               <p className="text-gray-400 text-sm">Redirecting to dashboard...</p>
             </motion.div>
           )}
@@ -175,21 +197,10 @@ const OAuthCallback = () => {
               animate={{ opacity: 1, y: 0 }}
               className="text-center"
             >
-              <div className="text-red-400 text-sm font-medium mb-2">❌ Authentication failed</div>
-              <p className="text-gray-400 text-sm">{error}</p>
-              <p className="text-gray-500 text-xs mt-4">Redirecting to login...</p>
+              <div className="text-red-400 text-sm font-medium mb-2">❌ Authentication Failed</div>
+              <p className="text-gray-400 text-sm break-words">{error}</p>
+              <p className="text-gray-500 text-xs mt-4">Returning to login...</p>
             </motion.div>
-          )}
-
-          {/* Debug info (only in development) */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-              <p className="text-xs text-gray-400 font-mono break-all">
-                Path: {location.pathname}<br/>
-                Search: {location.search}<br/>
-                Hash: {location.hash}
-              </p>
-            </div>
           )}
         </div>
       </motion.div>

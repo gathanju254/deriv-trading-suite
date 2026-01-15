@@ -31,15 +31,31 @@ import OAuthCallback from './pages/OAuthCallback/OAuthCallback';
 -------------------------------------------- */
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  const localUserId = localStorage.getItem('user_id');
+  const localToken = localStorage.getItem('session_token');
+
+  console.log('🔒 ProtectedRoute check:', {
+    contextUser: !!user,
+    localStorageUser: !!localUserId,
+    localStorageToken: !!localToken,
+    loading,
+    userId: user?.id || localUserId ? '***' + (user?.id || localUserId).slice(-8) : 'none'
+  });
 
   if (loading) {
+    console.log('⏳ ProtectedRoute: Still loading auth state...');
     return <div className="app-loading">Loading…</div>;
   }
 
-  if (!user) {
+  // Accept if either context user OR localStorage tokens exist
+  const isAuthenticated = user || (localUserId && localToken);
+
+  if (!isAuthenticated) {
+    console.log('🚫 ProtectedRoute: No authentication found, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
+  console.log('✅ ProtectedRoute: User authenticated, rendering content');
   return children;
 };
 
@@ -53,7 +69,12 @@ const PublicRoute = ({ children }) => {
     return <div className="app-loading">Loading…</div>;
   }
 
-  return user ? <Navigate to="/dashboard" replace /> : children;
+  if (user) {
+    console.log('ℹ️  PublicRoute: User already authenticated, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
 };
 
 /* -------------------------------------------
@@ -72,17 +93,23 @@ const MainLayoutWrapper = () => {
 -------------------------------------------- */
 const AppRoutes = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
-  // Fix for OAuth callback from backend redirect
   useEffect(() => {
-    console.log('Current path:', location.pathname);
-    
-    // Check if we're coming from backend OAuth redirect
-    if (location.pathname === '/oauth/callback' && location.search) {
-      console.log('OAuth callback detected with params:', location.search);
-      // React Router should handle this automatically
-      // No need to manually redirect
-    }
+    console.log('📍 Route changed:', {
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash
+    });
+
+    // Log auth status
+    const userId = localStorage.getItem('user_id');
+    const token = localStorage.getItem('session_token');
+    console.log('🔍 Current auth status:', {
+      hasUserId: !!userId,
+      hasToken: !!token,
+      path: location.pathname
+    });
   }, [location]);
 
   return (
