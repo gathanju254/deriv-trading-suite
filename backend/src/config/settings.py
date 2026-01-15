@@ -22,7 +22,6 @@ class Settings:
 
     FRONTEND_URL: str = os.getenv(
         "FRONTEND_URL",
-        "https://deriv-trading-suite-67mv.onrender.com",
         "http://localhost:5173"
     )
 
