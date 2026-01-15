@@ -32,4 +32,5 @@ passlib[bcrypt]==1.7.4
 schedule==1.2.1
 
 # Deriv API
-python-deriv-api==2.1.7
+#python-deriv-api==2.1.7 # Temporarily use the GitHub version until the next release
+git+https://github.com/binary-com/python-deriv-api.git
