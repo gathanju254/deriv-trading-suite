@@ -70,7 +70,7 @@ const OAuthCallback = () => {
         
         // Extract specific parameters (try multiple possible names)
         const user_id = allParams.user_id || allParams.userId || allParams.sub;
-        const session_token = allParams.session_token || allParams.session_token || allParams.token || allParams.access_token;
+        const session_token = allParams.session_token || allParams.token || allParams.access_token;
         const access_token = allParams.access_token || allParams.token1 || allParams.token2;
         const email = allParams.email || allParams.email_address;
         const account_id = allParams.account_id || allParams.deriv_account_id || allParams.acct1 || allParams.acct2;
