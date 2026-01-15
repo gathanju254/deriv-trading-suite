@@ -1,5 +1,6 @@
 // frontend/src/services/derivService.js
 import api from './api';
+import axios from 'axios';
 
 // Local helpers (boring but reliable)
 const getUserId = () => localStorage.getItem('user_id');
@@ -98,8 +99,13 @@ export const derivService = {
   // ✅ NEW: Fetch OAuth redirect URL from backend
   async getOAuthRedirectUrl() {
     try {
-      const response = await api.get('/auth/login');
-      return response.data; // { redirect_url }
+      const baseURL = import.meta.env.VITE_API_BASE_URL || 
+        (import.meta.env.PROD 
+          ? 'https://deriv-trading-backend.onrender.com'
+          : 'http://localhost:8000');
+      
+      const response = await axios.get(`${baseURL}/auth/login`);
+      return response.data;
     } catch (error) {
       console.error('Error getting OAuth redirect URL:', error);
       throw error;

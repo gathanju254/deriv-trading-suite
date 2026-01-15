@@ -46,7 +46,7 @@ async def deriv_login():
         params = {
             "app_id": settings.DERIV_APP_ID,
             "redirect_uri": settings.DERIV_OAUTH_REDIRECT_URI,
-            "response_type": "token",  # Deriv prefers token flow
+            "response_type": "token",
             "scope": "read write trade",
             "state": state,
             "brand": "deriv",
