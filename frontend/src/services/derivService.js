@@ -1,5 +1,5 @@
 // frontend/src/services/derivService.js - UPDATED
-import { authApi, api } from './api';  // Use both instances
+import { authApi, api } from './api';
 
 export const derivService = {
   /* =========================
@@ -7,18 +7,27 @@ export const derivService = {
   ========================== */
   async getOAuthRedirectUrl() {
     try {
-      // Use authApi (no /api prefix) for /auth routes
+      console.log('🔗 Requesting OAuth URL from /auth/login...');
+      
+      // Use authApi for /auth routes (no /api prefix)
       const response = await authApi.get('/auth/login');
       
-      console.log('✅ OAuth redirect URL response:', response.data);
+      console.log('✅ OAuth response received:', response.data);
       
       if (!response.data?.redirect_url) {
-        throw new Error('Missing redirect_url in response');
+        throw new Error(
+          `Invalid OAuth response. Expected redirect_url, got: ${JSON.stringify(response.data)}`
+        );
       }
       
       return response.data;
     } catch (error) {
-      console.error('❌ Error getting OAuth redirect URL:', error.response?.data || error.message);
+      console.error('❌ OAuth request failed:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url
+      });
       throw error;
     }
   },
@@ -107,7 +116,8 @@ export const derivService = {
 
   async logout() {
     try {
-      await authApi.post('/auth/logout');  // Use authApi for logout
+      // Use authApi for logout (it's under /auth/logout)
+      await authApi.post('/auth/logout');
     } finally {
       localStorage.removeItem('user_id');
       localStorage.removeItem('session_token');

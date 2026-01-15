@@ -12,17 +12,28 @@ const Login = () => {
   const handleDerivLogin = async () => {
     setLoading(true);
     try {
+      console.log('🔐 Initiating OAuth login...');
+      
       const { redirect_url } = await derivService.getOAuthRedirectUrl();
 
       if (!redirect_url) {
-        throw new Error('Missing redirect URL');
+        throw new Error('No redirect URL received from server');
       }
 
+      console.log('✅ Redirecting to Deriv OAuth...');
       // HARD redirect to Deriv OAuth
       window.location.href = redirect_url;
+      
     } catch (err) {
-      console.error('OAuth redirect failed:', err);
-      addToast('Failed to redirect to Deriv. Try again.', 'error');
+      console.error('❌ OAuth failed:', err);
+      
+      const errorMsg = err.response?.status === 404 
+        ? 'Auth endpoint not found. Backend may be down.'
+        : err.message.includes('redirect_url')
+        ? 'Server returned invalid response.'
+        : 'Failed to initialize authentication.';
+      
+      addToast(errorMsg, 'error');
       setLoading(false);
     }
   };

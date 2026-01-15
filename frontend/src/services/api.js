@@ -9,9 +9,10 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ||
 
 console.log('✅ API Base URL:', API_BASE_URL);
 
-// Create two axios instances: one for auth (no /api prefix), one for api
+// ✅ CORRECT - Separate instances with explicit baseURL
+// Auth routes: NO /api prefix
 export const authApi = axios.create({
-  baseURL: API_BASE_URL,  // Direct to backend
+  baseURL: `${API_BASE_URL}`,  // Direct to backend root
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -19,6 +20,7 @@ export const authApi = axios.create({
   withCredentials: false,
 });
 
+// Trading API routes: WITH /api prefix
 export const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,  // With /api prefix
   timeout: 30000,
@@ -28,11 +30,13 @@ export const api = axios.create({
   withCredentials: false,
 });
 
-// Request interceptor for both
-const setupInterceptor = (axiosInstance) => {
+// Setup interceptors
+const setupInterceptor = (axiosInstance, isAuthApi = false) => {
   axiosInstance.interceptors.request.use(
     (config) => {
-      console.log('API Request:', config.method, config.url);
+      const routeType = isAuthApi ? 'AUTH' : 'API';
+      console.log(`[${routeType}] Request:`, config.method.toUpperCase(), config.url);
+      
       const token = localStorage.getItem('session_token') || localStorage.getItem('auth_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -44,18 +48,19 @@ const setupInterceptor = (axiosInstance) => {
 
   axiosInstance.interceptors.response.use(
     (response) => {
-      console.log('API Response:', response.status, response.config.url);
+      const routeType = isAuthApi ? 'AUTH' : 'API';
+      console.log(`[${routeType}] Response:`, response.status, response.config.url);
       return response;
     },
     (error) => {
       console.error('API Error:', error.message, error.config?.url);
 
       if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED') {
-        error.message = 'Unable to connect to the server. Please wait a moment and try again.';
+        error.message = 'Unable to connect to the server. Please check your connection.';
       }
 
       if (error.response?.status === 401) {
-        console.warn('Unauthorized - clearing session and redirecting to login.');
+        console.warn('Unauthorized - redirecting to login.');
         localStorage.removeItem('user_id');
         localStorage.removeItem('session_token');
         localStorage.removeItem('deriv_access_token');
@@ -68,7 +73,7 @@ const setupInterceptor = (axiosInstance) => {
   );
 };
 
-setupInterceptor(authApi);
-setupInterceptor(api);
+setupInterceptor(authApi, true);  // true = isAuthApi
+setupInterceptor(api, false);     // false = isApiRoute
 
 export default api;
