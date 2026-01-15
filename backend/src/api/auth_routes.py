@@ -220,7 +220,7 @@ async def deriv_callback(
 
         # ✅ FIX: `settings` here is still the config object (not shadowed)
         frontend_redirect = (
-            f"{settings.FRONTEND_URL}/auth/callback"
+            f"{settings.FRONTEND_URL}/oauth/callback"
             f"?user_id={quote(user.id)}"
             f"&session_token={quote(app_token)}"
             f"&access_token={quote(access_token)}"
