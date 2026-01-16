@@ -31,6 +31,10 @@ passlib[bcrypt]==1.7.4
 # Scheduling
 schedule==1.2.1
 
+# Caching
+redis>=4.5.0
+aioredis>=2.0.0  # Optional: async Redis
+
 # Deriv API
 #python-deriv-api==2.1.7 # Temporarily use the GitHub version until the next release
 #git+https://github.com/binary-com/python-deriv-api.git

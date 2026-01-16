@@ -1,4 +1,4 @@
-// frontend/src/context/AuthContext.jsx
+// frontend/src/context/AuthContext.jsx - SECURE OAUTH VERSION
 import React, {
   createContext,
   useContext,
@@ -48,14 +48,14 @@ export const AuthProvider = ({ children }) => {
         if (userId && sessionToken) {
           console.log('✅ AuthProvider: Restoring session from localStorage');
           
-          // Verify session with backend
+          // CHANGED: Verify session with backend (uses /auth/me)
           try {
             const userData = await derivService.getCurrentUser();
             if (userData && userData.id === userId) {
               const user_obj = {
                 id: userId,
-                email: localStorage.getItem('email') || userData.email || '',
-                accountId: localStorage.getItem('deriv_account_id') || userData.deriv_account_id || '',
+                email: userData.email || localStorage.getItem('email') || '',
+                accountId: userData.deriv_account_id || localStorage.getItem('deriv_account_id') || '',
               };
               console.log('🔐 Setting user state:', {
                 id: user_obj.id ? '***' + user_obj.id.slice(-8) : 'missing',
@@ -106,7 +106,7 @@ export const AuthProvider = ({ children }) => {
   }, [user, loading, initialized]);
 
   /* -------------------------------------------
-     LOGIN - Updated with useCallback
+     LOGIN
   -------------------------------------------- */
   const login = useCallback(async (payload) => {
     try {
@@ -135,7 +135,7 @@ export const AuthProvider = ({ children }) => {
 
       console.log('💾 Storing credentials in localStorage...');
       
-      // Store all values
+      // CHANGED: Store session token (backend sets HTTP-only cookie)
       localStorage.setItem('user_id', user_id);
       localStorage.setItem('session_token', session_token);
       localStorage.setItem('auth_token', session_token);
@@ -144,7 +144,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('deriv_account_id', deriv_account_id);
       localStorage.setItem('login_timestamp', Date.now().toString());
 
-      // Immediately verify they were stored
       const verify = {
         user_id_stored: localStorage.getItem('user_id') === user_id,
         session_token_stored: localStorage.getItem('session_token') === session_token,
@@ -157,7 +156,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Failed to store credentials in localStorage');
       }
 
-      // Update React state
       const userObj = {
         id: user_id,
         email,
@@ -177,10 +175,6 @@ export const AuthProvider = ({ children }) => {
 
     } catch (err) {
       console.error('❌ AuthContext.login() failed:', err.message);
-      console.error('❌ Error details:', {
-        message: err.message,
-        stack: err.stack
-      });
       throw err;
     }
   }, []);
@@ -191,15 +185,11 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(async () => {
     try {
       console.log('👋 AuthContext.logout() called');
-      const token = localStorage.getItem('session_token');
-      if (token) {
-        await derivService.logout();
-      }
+      await derivService.logout();
     } catch (err) {
       console.warn('⚠️  Backend logout warning:', err.message);
     }
 
-    // Clear ALL auth-related items
     const itemsToClear = [
       'user_id', 'session_token', 'auth_token', 'deriv_access_token',
       'email', 'deriv_account_id', 'login_timestamp'
@@ -228,6 +218,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     loading,
+    initialized,
     isAuthenticated: !!user && !checkTokenExpiry(),
     login,
     logout,

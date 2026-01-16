@@ -1,8 +1,9 @@
-// frontend/src/pages/OAuthCallback/OAuthCallback.jsx
+// frontend/src/pages/OAuthCallback/OAuthCallback.jsx - SECURE OAUTH FLOW
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { derivService } from '../../services/derivService';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -16,122 +17,88 @@ const OAuthCallback = () => {
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
 
-  // Debug function to extract ALL parameters from URL
-  const extractUrlParams = () => {
-    console.log('🔗 OAuthCallback URL Analysis:');
-    console.log('  Full URL:', window.location.href);
-    
-    // Check for hash fragment (sometimes OAuth returns tokens in hash)
-    const hash = window.location.hash.substring(1);
-    if (hash) {
-      console.log('  Found hash fragment:', hash);
-    }
-    
-    // Extract from hash fragment first (common for OAuth token flow)
-    let params = new URLSearchParams(location.search);
-    if (hash) {
-      // Sometimes tokens are in hash, sometimes in query
-      params = new URLSearchParams(hash);
-      console.log('  Using hash parameters');
-    } else if (location.search) {
-      params = new URLSearchParams(location.search);
-      console.log('  Using search parameters');
-    }
-    
-    const allParams = {};
-    for (const [key, value] of params.entries()) {
-      allParams[key] = value;
-    }
-    
-    // Also check for fragment-style parameters (access_token=...)
-    if (hash && hash.includes('access_token')) {
-      const fragmentParams = hash.split('&');
-      fragmentParams.forEach(param => {
-        const [key, value] = param.split('=');
-        if (key && value) {
-          allParams[key] = decodeURIComponent(value);
-        }
-      });
-    }
-    
-    console.log('📋 All extracted parameters:', Object.keys(allParams).map(k => `${k}: ${k.includes('token') ? '***' + allParams[k]?.slice(-8) : allParams[k]}`));
-    
-    return allParams;
-  };
-
   useEffect(() => {
     const processCallback = async () => {
       try {
         setProgress(10);
         console.log('🔐 OAuthCallback: Starting authentication processing...');
 
-        // Extract parameters using our improved function
-        const allParams = extractUrlParams();
+        // CHANGED: Extract from URL fragment (hash)
+        const hash = window.location.hash.substring(1);
+        const searchParams = new URLSearchParams(hash || window.location.search);
         
-        // Extract specific parameters (try multiple possible names)
-        const user_id = allParams.user_id || allParams.userId || allParams.sub;
-        const session_token = allParams.session_token || allParams.token || allParams.access_token;
-        const access_token = allParams.access_token || allParams.token1 || allParams.token2;
-        const email = allParams.email || allParams.email_address;
-        const account_id = allParams.account_id || allParams.deriv_account_id || allParams.acct1 || allParams.acct2;
-        const error_param = allParams.error || allParams.error_description;
+        const access_token = searchParams.get('access_token') || searchParams.get('token');
+        const state = searchParams.get('state');
+        const account_id = searchParams.get('account_id') || searchParams.get('acct1') || searchParams.get('acct2');
+        const error_param = searchParams.get('error') || searchParams.get('error_description');
 
         console.log('📦 Parsed from URL:', {
-          user_id: user_id ? '***' + user_id.slice(-8) : 'MISSING',
-          session_token: session_token ? '***' + session_token.slice(-8) : 'MISSING',
           access_token: access_token ? '***' + access_token.slice(-8) : 'MISSING',
-          email: email || 'MISSING',
+          state: state ? '***' + state.slice(-8) : 'MISSING',
           account_id: account_id || 'MISSING',
           error: error_param || 'none'
         });
 
-        // Check for backend error
         if (error_param) {
           throw new Error(`Backend error: ${decodeURIComponent(error_param)}`);
         }
 
-        // Validate required parameters
-        if (!user_id || !session_token) {
-          throw new Error(`Missing critical params: user_id=${!!user_id}, session_token=${!!session_token}. Check your backend callback URL.`);
+        if (!access_token) {
+          throw new Error('No access token in URL. Check your backend OAuth configuration.');
         }
 
         setProgress(30);
-        console.log('✅ Parameters validated');
+        console.log('✅ Parameters extracted from URL');
 
-        // Call login function
-        console.log('🔐 Calling login() with OAuth data...');
+        // CHANGED: POST token to secure backend endpoint
+        console.log('🔐 POSTing token to /auth/callback (secure)...');
         setProgress(45);
         
+        const callbackResponse = await derivService.handleOAuthCallback({
+          access_token,
+          state: state || '',
+          account_id: account_id || '',
+        });
+
+        console.log('✅ Callback response:', {
+          success: callbackResponse.success,
+          user_id: callbackResponse.user?.id ? '***' + callbackResponse.user.id.slice(-8) : 'MISSING',
+        });
+
+        if (!callbackResponse.success) {
+          throw new Error('Callback endpoint returned unsuccessful response');
+        }
+
+        setProgress(60);
+
+        // CHANGED: Extract data from callback response
+        const { user, session } = callbackResponse;
+        
+        if (!user?.id) {
+          throw new Error('No user ID in callback response');
+        }
+
+        // CHANGED: Call login with response data
+        console.log('🔐 Calling login() with callback data...');
+        setProgress(75);
+        
         const loginSuccess = await login({
-          user_id,
-          session_token,
-          access_token: access_token || '',
-          email: email || '',
-          deriv_account_id: account_id || '',
+          user_id: user.id,
+          session_token: session.id,  // CHANGED: Use session ID as token
+          access_token: '',  // Token is now stored securely in HTTP-only cookie
+          email: user.email || '',
+          deriv_account_id: user.deriv_account_id || '',
         });
 
         console.log('✅ Login function returned:', loginSuccess);
 
-        // Verify localStorage
-        const storedUserId = localStorage.getItem('user_id');
-        const storedToken = localStorage.getItem('session_token');
-        console.log('✅ localStorage verification:', {
-          user_id_stored: storedUserId ? '***' + storedUserId.slice(-8) : 'NOT FOUND',
-          token_stored: storedToken ? 'YES' : 'NO',
-          token_length: storedToken ? storedToken.length : 0
-        });
-
-        if (!storedUserId || !storedToken) {
-          throw new Error('Login succeeded but localStorage not updated');
-        }
-
-        setProgress(75);
+        setProgress(85);
         setStatus('success');
         setProgress(100);
 
         console.log('🎉 Authentication complete, redirecting to dashboard...');
         
-        // Clear the URL parameters to prevent re-processing on refresh
+        // CHANGED: Clear URL to prevent re-processing on refresh
         window.history.replaceState({}, document.title, window.location.pathname);
         
         // Wait a bit to ensure state updates are processed
@@ -140,7 +107,6 @@ const OAuthCallback = () => {
 
       } catch (err) {
         console.error('❌ OAuthCallback error:', err);
-        console.error('❌ Error stack:', err.stack);
         console.error('❌ Full URL was:', window.location.href);
 
         setError(err.message || 'Authentication failed');
@@ -155,15 +121,15 @@ const OAuthCallback = () => {
       }
     };
 
-    // Process callback if we have parameters OR if we're on this page (might have been redirected)
-    if (location.search || window.location.hash) {
+    // Process callback if we have parameters
+    if (location.hash || location.search) {
       processCallback();
     } else {
       console.warn('⚠️  No auth parameters found, redirecting to login');
       addToast('No authentication data found. Please try logging in again.', 'warning');
       setTimeout(() => navigate('/login', { replace: true }), 2000);
     }
-  }, [location.search, location.hash, login, navigate, addToast]);
+  }, [location.hash, location.search, login, navigate, addToast]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">

@@ -1,4 +1,4 @@
-// frontend/src/services/api.js - CORRECTED VERSION
+// frontend/src/services/api.js - SECURE OAUTH FLOW VERSION
 import axios from 'axios';
 
 // Get base URL from environment (WITHOUT /api suffix for auth routes)
@@ -18,7 +18,7 @@ export const authApi = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: false,
+  withCredentials: true,  // CHANGED: Include credentials for cookies
 });
 
 // ✅ Trading API routes: Use BASE_URL + /api
@@ -28,20 +28,30 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: false,
+  withCredentials: true,  // CHANGED: Include credentials for cookies
 });
 
-// Setup interceptors (keep your existing interceptor code)
+// Setup interceptors
 const setupInterceptor = (axiosInstance, isAuthApi = false) => {
   axiosInstance.interceptors.request.use(
     (config) => {
       const routeType = isAuthApi ? 'AUTH' : 'API';
       console.log(`[${routeType}] Request:`, config.method.toUpperCase(), config.url);
       
+      // CHANGED: Get token from localStorage OR cookies
       const token = localStorage.getItem('session_token') || localStorage.getItem('auth_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+      
+      // ADDED: Include CSRF token for state-changing requests
+      if (config.method !== 'get' && config.method !== 'head') {
+        const csrfToken = getCookie('csrf_token');
+        if (csrfToken) {
+          config.headers['X-CSRF-Token'] = csrfToken;
+        }
+      }
+      
       return config;
     },
     (error) => Promise.reject(error)
@@ -62,10 +72,7 @@ const setupInterceptor = (axiosInstance, isAuthApi = false) => {
 
       if (error.response?.status === 401) {
         console.warn('Unauthorized - redirecting to login.');
-        localStorage.removeItem('user_id');
-        localStorage.removeItem('session_token');
-        localStorage.removeItem('deriv_access_token');
-        localStorage.removeItem('email');
+        localStorage.clear();
         window.location.href = '/login';
       }
 
@@ -73,6 +80,13 @@ const setupInterceptor = (axiosInstance, isAuthApi = false) => {
     }
   );
 };
+
+// ADDED: Helper function to get cookies
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
 
 setupInterceptor(authApi, true);  // true = isAuthApi
 setupInterceptor(api, false);     // false = isApiRoute

@@ -1,9 +1,9 @@
-// frontend/src/services/derivService.js - FIXED
+// frontend/src/services/derivService.js - SECURE OAUTH VERSION
 import { authApi, api } from './api';
 
 export const derivService = {
   /* =========================
-     OAUTH AUTH FLOW
+     OAUTH AUTH FLOW (SECURE)
   ========================== */
   async getOAuthRedirectUrl() {
     try {
@@ -31,7 +31,6 @@ export const derivService = {
         url: error.config?.url
       });
       
-      // Better error messages
       if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
         throw new Error('Cannot connect to backend server. Make sure it is running.');
       }
@@ -44,15 +43,37 @@ export const derivService = {
   },
 
   /* =========================
+     SECURE CALLBACK HANDLER
+  ========================== */
+  async handleOAuthCallback(callbackData) {
+    try {
+      console.log('🔐 Posting OAuth callback data to backend...');
+      
+      const response = await authApi.post('/auth/callback', {
+        access_token: callbackData.access_token,
+        state: callbackData.state,
+        account_id: callbackData.account_id,
+      });
+      
+      console.log('✅ OAuth callback response:', response.data);
+      
+      if (!response.data?.success) {
+        throw new Error('OAuth callback failed');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('❌ OAuth callback failed:', error.message);
+      throw error;
+    }
+  },
+
+  /* =========================
      USER AUTHENTICATION
   ========================== */
   async getCurrentUser() {
     try {
-      const token = localStorage.getItem('session_token');
-      if (!token) throw new Error('No authentication token found');
-      
       const response = await authApi.get('/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
         timeout: 5000,
       });
       
@@ -66,14 +87,8 @@ export const derivService = {
 
   async logout() {
     try {
-      const token = localStorage.getItem('session_token');
-      if (token) {
-        // Use authApi for logout (it's under /auth/logout)
-        await authApi.post('/auth/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 5000,
-        });
-      }
+      // Use authApi for logout (it's under /auth/logout)
+      await authApi.post('/auth/logout', {});
     } catch (error) {
       console.warn('⚠️  Backend logout warning:', error.message);
       // Continue with local logout even if backend fails
@@ -227,9 +242,6 @@ export const derivService = {
     return data;
   },
 
-  /* =========================
-     MARKET DATA & BALANCE
-  ========================== */
   async getMarketData() {
     try {
       const { data } = await api.get('/market/data');
@@ -268,9 +280,6 @@ export const derivService = {
     }
   },
 
-  /* =========================
-     RECOVERY SYSTEM
-  ========================== */
   async getRecoveryStatus() {
     try {
       const { data } = await api.get('/recovery/status');
@@ -296,9 +305,6 @@ export const derivService = {
     return data;
   },
 
-  /* =========================
-     STRATEGIES & ML
-  ========================== */
   async getStrategiesPerformance() {
     try {
       const { data } = await api.get('/strategies/performance');
@@ -323,9 +329,6 @@ export const derivService = {
     }
   },
 
-  /* =========================
-     USER BOT CONTROL
-  ========================== */
   async startUserBot() {
     try {
       const user_id = localStorage.getItem('user_id');
@@ -394,9 +397,6 @@ export const derivService = {
     }
   },
 
-  /* =========================
-     DEBUG & UTILITIES
-  ========================== */
   async getDebugPositions() {
     try {
       const { data } = await api.get('/debug/positions');
@@ -427,9 +427,6 @@ export const derivService = {
     }
   },
 
-  /* =========================
-     MANUAL TRADE SETTLEMENT
-  ========================== */
   async manualSettleTrade(tradeId, result, payout) {
     const { data } = await api.post(`/trades/manual-settle/${tradeId}`, {
       result,
