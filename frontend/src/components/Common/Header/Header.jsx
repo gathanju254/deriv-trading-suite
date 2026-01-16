@@ -72,16 +72,30 @@ const Header = () => {
         bg-gray-900/95 backdrop-blur-xl border-b border-gray-800/50`}
       >
         <div className="h-full px-4 md:px-6 flex items-center justify-between">
-          {/* Menu Toggle */}
-          <button
-            onClick={() =>
-              window.innerWidth < 768 ? toggleMobileMenu() : toggleSidebar()
-            }
-            className="p-2 rounded-lg hover:bg-gray-800 transition-colors"
-            aria-label="Toggle menu"
-          >
-            <Menu size={22} className="text-gray-300" />
-          </button>
+          {/* Left: Menu + Brand */}
+          <div className="flex items-center gap-3">
+            {/* Menu Toggle */}
+            <button
+              onClick={() =>
+                window.innerWidth < 768 ? toggleMobileMenu() : toggleSidebar()
+              }
+              className="p-2 rounded-lg hover:bg-gray-800 transition-colors"
+              aria-label="Toggle menu"
+            >
+              <Menu size={22} className="text-gray-300" />
+            </button>
+
+            {/* Brand */}
+            <div className="flex items-center gap-2 select-none">
+              <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shadow-sm">
+                <Zap size={16} className="text-white" />
+              </div>
+              <span className="hidden sm:block font-semibold text-white tracking-tight">
+                Deriv Suite
+              </span>
+            </div>
+          </div>
+
 
           {/* Bot Controls */}
           <div className="flex items-center gap-3">
