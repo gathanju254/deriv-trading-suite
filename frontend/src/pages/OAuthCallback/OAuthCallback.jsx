@@ -1,4 +1,4 @@
-// frontend/src/pages/OAuthCallback/OAuthCallback.jsx - SECURE OAUTH FLOW
+// frontend/src/pages/OAuthCallback/OAuthCallback.jsx - UPDATED WITH FALLBACK
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -16,14 +16,16 @@ const OAuthCallback = () => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
+  const [flowType, setFlowType] = useState(''); // Track which flow succeeded
 
   useEffect(() => {
     const processCallback = async () => {
       try {
         setProgress(10);
         console.log('🔐 OAuthCallback: Starting authentication processing...');
-
-        // CHANGED: Extract from URL fragment (hash)
+        console.log('📍 Current URL:', window.location.href);
+        
+        // Extract from both hash (#) and query string (?)
         const hash = window.location.hash.substring(1);
         const searchParams = new URLSearchParams(hash || window.location.search);
         
@@ -32,101 +34,166 @@ const OAuthCallback = () => {
         const account_id = searchParams.get('account_id') || searchParams.get('acct1') || searchParams.get('acct2');
         const error_param = searchParams.get('error') || searchParams.get('error_description');
 
-        console.log('📦 Parsed from URL:', {
-          access_token: access_token ? '***' + access_token.slice(-8) : 'MISSING',
-          state: state ? '***' + state.slice(-8) : 'MISSING',
+        console.log('📦 Parsed OAuth parameters:', {
+          has_access_token: !!access_token,
+          token_length: access_token?.length,
+          has_state: !!state,
           account_id: account_id || 'MISSING',
           error: error_param || 'none'
         });
 
+        // Check for backend errors
         if (error_param) {
-          throw new Error(`Backend error: ${decodeURIComponent(error_param)}`);
+          throw new Error(`Authentication error: ${decodeURIComponent(error_param)}`);
         }
 
+        // Require access token
         if (!access_token) {
-          throw new Error('No access token in URL. Check your backend OAuth configuration.');
+          throw new Error('No access token received. Deriv OAuth may have been cancelled or failed.');
         }
 
         setProgress(30);
-        console.log('✅ Parameters extracted from URL');
+        console.log('✅ OAuth parameters validated');
 
-        // CHANGED: POST token to secure backend endpoint
-        console.log('🔐 POSTing token to /auth/callback (secure)...');
-        setProgress(45);
+        // ========================================
+        // ATTEMPT 1: Secure POST flow (preferred)
+        // ========================================
+        let loginSuccess = false;
+        let callbackUser = null;
         
-        const callbackResponse = await derivService.handleOAuthCallback({
-          access_token,
-          state: state || '',
-          account_id: account_id || '',
-        });
+        try {
+          console.log('🔐 Attempting secure POST flow to /auth/callback...');
+          setProgress(45);
+          
+          const callbackResponse = await derivService.handleOAuthCallback({
+            access_token,
+            state: state || '',
+            account_id: account_id || '',
+          });
 
-        console.log('✅ Callback response:', {
-          success: callbackResponse.success,
-          user_id: callbackResponse.user?.id ? '***' + callbackResponse.user.id.slice(-8) : 'MISSING',
-        });
+          console.log('✅ Secure POST response received:', {
+            success: callbackResponse.success,
+            has_user: !!callbackResponse.user,
+            has_session: !!callbackResponse.session,
+          });
 
-        if (!callbackResponse.success) {
-          throw new Error('Callback endpoint returned unsuccessful response');
+          if (!callbackResponse.success) {
+            throw new Error(callbackResponse.message || 'Callback endpoint returned unsuccessful response');
+          }
+
+          if (!callbackResponse.user?.id) {
+            throw new Error('No user ID in callback response');
+          }
+
+          const { user, session } = callbackResponse;
+          callbackUser = user;
+
+          console.log('🔐 Calling login() with POST response data...');
+          setProgress(75);
+          
+          loginSuccess = await login({
+            user_id: user.id,
+            session_token: session.id,
+            access_token: access_token,
+            email: user.email || '',
+            deriv_account_id: user.deriv_account_id || '',
+          });
+
+          setFlowType('secure_post');
+          console.log('✅ Secure POST flow succeeded');
+          
+        } catch (postError) {
+          console.warn('⚠️  Secure POST flow failed:', postError.message);
+          
+          // ========================================
+          // ATTEMPT 2: Fallback to legacy flow
+          // ========================================
+          if (!account_id) {
+            throw new Error('Cannot fallback: Missing account_id. POST flow: ' + postError.message);
+          }
+          
+          try {
+            console.log('🔄 Falling back to legacy direct auth flow...');
+            setProgress(50);
+            
+            // For legacy flow, use account_id as the basis for user identification
+            const legacy_user_id = `deriv_${account_id}`;
+            
+            loginSuccess = await login({
+              user_id: legacy_user_id,
+              session_token: access_token, // Use token as session in legacy mode
+              access_token: access_token,
+              email: `${account_id}@deriv.com`,
+              deriv_account_id: account_id,
+            });
+
+            setFlowType('legacy_fallback');
+            console.log('✅ Legacy fallback flow succeeded');
+            
+          } catch (legacyError) {
+            console.error('❌ Both flows failed:');
+            console.error('  POST flow:', postError.message);
+            console.error('  Legacy flow:', legacyError.message);
+            throw new Error(`Authentication failed: ${postError.message}`);
+          }
         }
 
-        setProgress(60);
-
-        // CHANGED: Extract data from callback response
-        const { user, session } = callbackResponse;
-        
-        if (!user?.id) {
-          throw new Error('No user ID in callback response');
+        if (!loginSuccess) {
+          throw new Error('Login function returned false');
         }
-
-        // CHANGED: Call login with response data
-        console.log('🔐 Calling login() with callback data...');
-        setProgress(75);
-        
-        const loginSuccess = await login({
-          user_id: user.id,
-          session_token: session.id,  // CHANGED: Use session ID as token
-          access_token: '',  // Token is now stored securely in HTTP-only cookie
-          email: user.email || '',
-          deriv_account_id: user.deriv_account_id || '',
-        });
-
-        console.log('✅ Login function returned:', loginSuccess);
 
         setProgress(85);
         setStatus('success');
         setProgress(100);
 
-        console.log('🎉 Authentication complete, redirecting to dashboard...');
+        console.log(`🎉 Authentication complete (${flowType})`, {
+          user_id: callbackUser?.id ? '***' + callbackUser.id.slice(-8) : 'unknown',
+          flow: flowType
+        });
         
-        // CHANGED: Clear URL to prevent re-processing on refresh
+        // ========================================
+        // CLEANUP & REDIRECT
+        // ========================================
+        
+        // Clear URL parameters to prevent re-processing on refresh
         window.history.replaceState({}, document.title, window.location.pathname);
         
-        // Wait a bit to ensure state updates are processed
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Wait for state updates to propagate
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Redirect to dashboard
+        console.log('➡️  Redirecting to dashboard...');
         navigate('/dashboard', { replace: true });
 
       } catch (err) {
-        console.error('❌ OAuthCallback error:', err);
-        console.error('❌ Full URL was:', window.location.href);
+        console.error('❌ OAuthCallback fatal error:', {
+          message: err.message,
+          url: window.location.href,
+          hash: window.location.hash,
+          search: window.location.search
+        });
 
-        setError(err.message || 'Authentication failed');
+        const errorMsg = err.message || 'Authentication failed. Please try again.';
+        setError(errorMsg);
         setStatus('error');
-        addToast(err.message || 'Authentication failed', 'error');
+        addToast(errorMsg, 'error');
         
         // Redirect to login after showing error
         setTimeout(() => {
           console.log('➡️  Redirecting to login due to error...');
           navigate('/login', { replace: true });
-        }, 4000);
+        }, 4500);
       }
     };
 
-    // Process callback if we have parameters
+    // Only process if we have URL parameters
     if (location.hash || location.search) {
       processCallback();
     } else {
-      console.warn('⚠️  No auth parameters found, redirecting to login');
-      addToast('No authentication data found. Please try logging in again.', 'warning');
+      console.warn('⚠️  No auth parameters in URL');
+      console.warn('   Hash:', location.hash);
+      console.warn('   Search:', location.search);
+      addToast('No authentication data found. Please log in again.', 'warning');
       setTimeout(() => navigate('/login', { replace: true }), 2000);
     }
   }, [location.hash, location.search, login, navigate, addToast]);
@@ -166,7 +233,10 @@ const OAuthCallback = () => {
 
           {status === 'processing' && (
             <div className="text-center">
-              <p className="text-gray-300 text-sm">Verifying credentials...</p>
+              <p className="text-gray-300 text-sm">Verifying credentials with backend...</p>
+              {flowType && (
+                <p className="text-xs text-gray-500 mt-2">Flow: {flowType}</p>
+              )}
             </div>
           )}
 
@@ -178,6 +248,9 @@ const OAuthCallback = () => {
             >
               <div className="text-green-400 text-sm font-medium mb-2">✅ Success!</div>
               <p className="text-gray-400 text-sm">Redirecting to dashboard...</p>
+              {flowType && (
+                <p className="text-xs text-gray-500 mt-2">{flowType === 'secure_post' ? 'Secure' : 'Legacy'} authentication</p>
+              )}
             </motion.div>
           )}
 
@@ -189,7 +262,7 @@ const OAuthCallback = () => {
             >
               <div className="text-red-400 text-sm font-medium mb-2">❌ Authentication Failed</div>
               <p className="text-gray-400 text-sm break-words">{error}</p>
-              <p className="text-gray-500 text-xs mt-4">Returning to login...</p>
+              <p className="text-gray-500 text-xs mt-4">Returning to login in a few seconds...</p>
             </motion.div>
           )}
         </div>
