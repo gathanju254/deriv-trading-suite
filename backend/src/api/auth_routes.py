@@ -504,7 +504,7 @@ async def deriv_callback_get(
         # Redirect to frontend with minimal data
         # Frontend will extract token from URL and POST to secure endpoint
         frontend_redirect = (
-            f"{settings.FRONTEND_URL}/oauth/callback"
+            f"{settings.FRONTEND_URL}"
             f"?token={quote(access_token)}"
             f"&account_id={quote(account_id)}"
             f"&state={quote(state or '')}"
