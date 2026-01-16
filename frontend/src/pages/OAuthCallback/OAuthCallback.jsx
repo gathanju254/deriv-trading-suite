@@ -16,25 +16,28 @@ const OAuthCallback = () => {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState(null);
-  const [flowType, setFlowType] = useState(''); // Track which flow succeeded
+  const [flowType, setFlowType] = useState('');
+  const [processed, setProcessed] = useState(false); // NEW: Prevent re-processing
 
   useEffect(() => {
+    // Prevent re-processing if already processed
+    if (processed) return;
+    
     const processCallback = async () => {
       try {
+        setProcessed(true); // Mark as processed
         setProgress(10);
         console.log('🔐 OAuthCallback: Starting authentication processing...');
-        console.log('📍 Current URL:', window.location.href);
         
-        // Extract from both hash (#) and query string (?)
-        const hash = window.location.hash.substring(1);
-        const searchParams = new URLSearchParams(hash || window.location.search);
+        // Use location.search directly (not window.location)
+        const searchParams = new URLSearchParams(location.search);
         
-        const access_token = searchParams.get('access_token') || searchParams.get('token');
+        const access_token = searchParams.get('token');
         const state = searchParams.get('state');
-        const account_id = searchParams.get('account_id') || searchParams.get('acct1') || searchParams.get('acct2');
-        const error_param = searchParams.get('error') || searchParams.get('error_description');
+        const account_id = searchParams.get('account_id');
+        const error_param = searchParams.get('error');
 
-        console.log('📦 Parsed OAuth parameters:', {
+        console.log('📦 Parsed OAuth parameters from React Router:', {
           has_access_token: !!access_token,
           token_length: access_token?.length,
           has_state: !!state,
@@ -59,7 +62,6 @@ const OAuthCallback = () => {
         // ATTEMPT 1: Secure POST flow (preferred)
         // ========================================
         let loginSuccess = false;
-        let callbackUser = null;
         
         try {
           console.log('🔐 Attempting secure POST flow to /auth/callback...');
@@ -86,7 +88,6 @@ const OAuthCallback = () => {
           }
 
           const { user, session } = callbackResponse;
-          callbackUser = user;
 
           console.log('🔐 Calling login() with POST response data...');
           setProgress(75);
@@ -146,31 +147,23 @@ const OAuthCallback = () => {
         setStatus('success');
         setProgress(100);
 
-        console.log(`🎉 Authentication complete (${flowType})`, {
-          user_id: callbackUser?.id ? '***' + callbackUser.id.slice(-8) : 'unknown',
-          flow: flowType
-        });
+        console.log(`🎉 Authentication complete (${flowType})`);
         
         // ========================================
         // CLEANUP & REDIRECT
         // ========================================
         
-        // Clear URL parameters to prevent re-processing on refresh
-        window.history.replaceState({}, document.title, window.location.pathname);
-        
         // Wait for state updates to propagate
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Redirect to dashboard
+        // Redirect to dashboard - use replace to prevent back navigation
         console.log('➡️  Redirecting to dashboard...');
         navigate('/dashboard', { replace: true });
 
       } catch (err) {
         console.error('❌ OAuthCallback fatal error:', {
           message: err.message,
-          url: window.location.href,
-          hash: window.location.hash,
-          search: window.location.search
+          location: location
         });
 
         const errorMsg = err.message || 'Authentication failed. Please try again.';
@@ -178,95 +171,93 @@ const OAuthCallback = () => {
         setStatus('error');
         addToast(errorMsg, 'error');
         
-        // Redirect to login after showing error
+        // Redirect to login after showing error - use replace
         setTimeout(() => {
           console.log('➡️  Redirecting to login due to error...');
           navigate('/login', { replace: true });
-        }, 4500);
+        }, 3000); // Shorter timeout
       }
     };
 
     // Only process if we have URL parameters
-    if (location.hash || location.search) {
+    if (location.search && !processed) {
       processCallback();
     } else {
-      console.warn('⚠️  No auth parameters in URL');
-      console.warn('   Hash:', location.hash);
+      console.warn('⚠️  No auth parameters or already processed');
       console.warn('   Search:', location.search);
-      addToast('No authentication data found. Please log in again.', 'warning');
-      setTimeout(() => navigate('/login', { replace: true }), 2000);
+      console.warn('   Processed:', processed);
+      
+      // If no parameters, redirect immediately to login
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 1000);
     }
-  }, [location.hash, location.search, login, navigate, addToast]);
+  }, [location.search, login, navigate, addToast, processed]);
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
-        className="w-full max-w-md"
-      >
-        <div className="p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-950/80 backdrop-blur-xl border border-gray-800/50 shadow-2xl">
-          <div className="text-center mb-8">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-600/20 to-primary-800/20 border border-primary-500/20 mb-6"
-            >
-              <Loader2 className="w-10 h-10 text-primary-400" />
-            </motion.div>
-            <h2 className="text-2xl font-bold text-white mb-2">Authenticating</h2>
-            <p className="text-gray-400">Processing your Deriv credentials</p>
-          </div>
-
-          <div className="mb-8">
-            <div className="w-full bg-gray-800/50 rounded-full h-1 overflow-hidden">
+  // Show loading while processing
+  if (status === 'processing' || !processed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="w-full max-w-md"
+        >
+          <div className="p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-950/80 backdrop-blur-xl border border-gray-800/50 shadow-2xl">
+            <div className="text-center mb-8">
               <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.5 }}
-                className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
-              />
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-600/20 to-primary-800/20 border border-primary-500/20 mb-6"
+              >
+                <Loader2 className="w-10 h-10 text-primary-400" />
+              </motion.div>
+              <h2 className="text-2xl font-bold text-white mb-2">Authenticating</h2>
+              <p className="text-gray-400">Processing your Deriv credentials</p>
             </div>
-            <p className="text-xs text-gray-500 mt-2 text-center">{progress}%</p>
-          </div>
 
-          {status === 'processing' && (
+            <div className="mb-8">
+              <div className="w-full bg-gray-800/50 rounded-full h-1 overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5 }}
+                  className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2 text-center">{progress}%</p>
+            </div>
+
             <div className="text-center">
               <p className="text-gray-300 text-sm">Verifying credentials with backend...</p>
               {flowType && (
                 <p className="text-xs text-gray-500 mt-2">Flow: {flowType}</p>
               )}
             </div>
-          )}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
-          {status === 'success' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center"
-            >
-              <div className="text-green-400 text-sm font-medium mb-2">✅ Success!</div>
-              <p className="text-gray-400 text-sm">Redirecting to dashboard...</p>
-              {flowType && (
-                <p className="text-xs text-gray-500 mt-2">{flowType === 'secure_post' ? 'Secure' : 'Legacy'} authentication</p>
-              )}
-            </motion.div>
-          )}
-
-          {status === 'error' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center"
-            >
-              <div className="text-red-400 text-sm font-medium mb-2">❌ Authentication Failed</div>
-              <p className="text-gray-400 text-sm break-words">{error}</p>
-              <p className="text-gray-500 text-xs mt-4">Returning to login in a few seconds...</p>
-            </motion.div>
-          )}
-        </div>
-      </motion.div>
+  // Error or success state
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+      <div className="p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-950/80 backdrop-blur-xl border border-gray-800/50 shadow-2xl">
+        {status === 'success' ? (
+          <div className="text-center">
+            <div className="text-green-400 text-sm font-medium mb-2">✅ Success!</div>
+            <p className="text-gray-400 text-sm">Redirecting to dashboard...</p>
+          </div>
+        ) : (
+          <div className="text-center">
+            <div className="text-red-400 text-sm font-medium mb-2">❌ Authentication Failed</div>
+            <p className="text-gray-400 text-sm break-words">{error}</p>
+            <p className="text-gray-500 text-xs mt-4">Returning to login...</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
