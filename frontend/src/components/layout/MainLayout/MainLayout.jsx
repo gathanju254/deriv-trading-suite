@@ -1,5 +1,4 @@
 // frontend/src/components/layout/MainLayout/MainLayout.jsx
-// frontend/src/components/layout/MainLayout/MainLayout.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar, Header, LoadingSpinner } from '../../Common';
@@ -48,14 +47,15 @@ const MainLayout = () => {
     return () => { mounted = false; };
   }, []);
 
-  // Track scroll for Back-to-Top button
+  // Back-to-top visibility
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 300);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  const scrollToTop = () =>
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
   const formatTimeSince = useCallback((timestamp) => {
     if (!timestamp) return '—';
@@ -67,7 +67,7 @@ const MainLayout = () => {
 
   return (
     <div className="relative isolate min-h-screen flex bg-gray-950 text-gray-100 overflow-hidden">
-      {/* Global Loading Overlay */}
+      {/* Global Loading */}
       {!isLoaded && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-950/95 backdrop-blur-xl">
           <LoadingSpinner
@@ -90,31 +90,37 @@ const MainLayout = () => {
       >
         <Header />
 
-        {/* Page Header */}
-        <div className="sticky top-0 z-30 px-4 md:px-6 py-3 md:py-4 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-            {/* Page title */}
-            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
-              {pageTitle}
-            </h1>
+        {/* 🔥 FIXED PAGE HEADER — ALWAYS ROW */}
+        <div className="sticky top-0 z-30 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50">
+          <div className="max-w-7xl mx-auto px-4 md:px-6 py-3">
+            <div className="flex flex-row items-center justify-between gap-3 flex-nowrap">
+              
+              {/* Title */}
+              <h1 className="text-lg md:text-2xl font-bold truncate bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                {pageTitle}
+              </h1>
 
-            {/* Status & Refresh */}
-            <div className="flex flex-col sm:flex-row items-center sm:gap-3 w-full sm:w-auto gap-2">
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
-                <Clock className="w-4 h-4 text-gray-400" />
-                <span className="text-sm font-medium text-gray-300">
-                  {formatTimeSince(lastUpdateTime)}
-                </span>
+              {/* Status + Refresh */}
+              <div className="flex flex-row items-center gap-2 shrink-0">
+                <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
+                  <Clock className="w-4 h-4 text-gray-400" />
+                  <span className="text-sm text-gray-300 whitespace-nowrap">
+                    {formatTimeSince(lastUpdateTime)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={refreshAllData}
+                  disabled={loading}
+                  className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700/50 transition disabled:opacity-50"
+                  aria-label="Refresh data"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+                  />
+                </button>
               </div>
 
-              <button
-                onClick={refreshAllData}
-                disabled={loading}
-                className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700/50 transition hover:scale-105 disabled:opacity-50"
-                aria-label="Refresh data"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
             </div>
           </div>
         </div>
@@ -129,10 +135,9 @@ const MainLayout = () => {
         <Footer />
       </div>
 
-      {/* Floating Contact */}
       {!mobileMenuOpen && <FloatingContact />}
 
-      {/* Back to Top Button */}
+      {/* Back to Top */}
       <AnimatePresence>
         {showTop && (
           <motion.button
@@ -143,7 +148,6 @@ const MainLayout = () => {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             className="fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full bg-primary-600 text-white flex items-center justify-center shadow-2xl"
-            aria-label="Back to top"
           >
             <ChevronUp size={24} />
           </motion.button>
@@ -155,7 +159,6 @@ const MainLayout = () => {
         <div
           className="fixed inset-0 z-40 md:hidden bg-black/70 backdrop-blur-sm"
           onClick={toggleMobileMenu}
-          aria-hidden="true"
         />
       )}
     </div>
