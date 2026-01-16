@@ -15,7 +15,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 const CONTACTS = [
   {
     label: 'WhatsApp',
-    href: 'https://wa.me/254756379737',
+    href: 'https://wa.me/+254756379737',
     icon: MessageCircle,
     className:
       'bg-gradient-to-br from-success-500 to-success-600 hover:from-success-600 hover:to-success-700',
