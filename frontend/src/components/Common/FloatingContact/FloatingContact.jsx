@@ -40,6 +40,7 @@ const FloatingContact = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [showIdlePulse, setShowIdlePulse] = useState(false);
   const idleTimer = useRef(null);
+  const containerRef = useRef(null);
 
   // Idle reminder after 30 seconds
   useEffect(() => {
@@ -59,7 +60,22 @@ const FloatingContact = () => {
     return () => clearTimeout(idleTimer.current);
   }, [isOpen]);
 
-  const handleToggle = () => {
+  // Close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  const handleToggle = (e) => {
+    e.stopPropagation(); // Prevent event from bubbling to document
     setShowIdlePulse(false);
     clearTimeout(idleTimer.current);
     setIsOpen(!isOpen);
@@ -71,7 +87,7 @@ const FloatingContact = () => {
       href={item.href}
       target={item.external ? '_blank' : undefined}
       rel={item.external ? 'noopener noreferrer' : undefined}
-      onClick={() => setIsOpen(false)}
+      onClick={(e) => e.stopPropagation()} // Prevent closing when clicking contact
       initial={{ opacity: 0, x: 20, scale: 0.95 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 20, scale: 0.95 }}
@@ -86,10 +102,17 @@ const FloatingContact = () => {
       className="group flex items-center gap-3 px-4 py-3 rounded-xl 
                  text-white shadow-lg hover:shadow-xl
                  transition-all duration-200 backdrop-blur-sm 
-                 border border-white/10 bg-gray-900/90"
-      style={{ backgroundColor: `${item.color}20` }}
+                 border border-white/10 cursor-pointer
+                 bg-gray-900/90 hover:bg-gray-900"
+      style={{ 
+        backgroundColor: `${item.color}20`,
+        backdropFilter: 'blur(8px)'
+      }}
     >
-      <div className="p-2 rounded-lg" style={{ backgroundColor: `${item.color}40` }}>
+      <div 
+        className="p-2 rounded-lg transition-colors duration-200 group-hover:bg-opacity-70"
+        style={{ backgroundColor: `${item.color}40` }}
+      >
         <item.icon size={18} className="text-white" />
       </div>
       
@@ -99,13 +122,13 @@ const FloatingContact = () => {
       </div>
       
       <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <div className="w-1 h-1 rounded-full bg-white" />
+        <div className="w-2 h-2 rounded-full bg-white" />
       </div>
     </motion.a>
   );
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div ref={containerRef} className="fixed bottom-6 right-6 z-50">
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -114,6 +137,7 @@ const FloatingContact = () => {
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.2 }}
             className="mb-3 flex flex-col items-end gap-2"
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking menu
           >
             {CONTACTS.map((item, index) => (
               <ContactItem key={item.label} item={item} index={index} />
@@ -130,7 +154,7 @@ const FloatingContact = () => {
         whileTap={{ scale: 0.95 }}
         className={`
           relative w-14 h-14 rounded-2xl flex items-center justify-center
-          shadow-xl transition-colors duration-200
+          shadow-xl transition-colors duration-200 cursor-pointer
           ${isOpen 
             ? 'bg-gradient-to-br from-primary-600 to-primary-800' 
             : 'bg-gradient-to-br from-primary-500 to-primary-700 hover:from-primary-600 hover:to-primary-800'
@@ -164,10 +188,13 @@ const FloatingContact = () => {
         )}
       </motion.button>
 
-      {/* Overlay to close */}
+      {/* Semi-transparent backdrop (only when open) */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 z-40 cursor-pointer"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         />
       )}
