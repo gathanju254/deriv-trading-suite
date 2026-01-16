@@ -4,9 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Deriv Trading Suite</title>
+    <script>
+      // Redirect all 404s to index.html for React Router
+      const path = window.location.pathname;
+      const search = window.location.search;
+      const hash = window.location.hash;
+      
+      // If it's an OAuth callback, preserve the full URL
+      if (path.includes('/oauth/callback')) {
+        window.location.href = '/#' + path + search + hash;
+      } else {
+        window.location.href = '/';
+      }
+    </script>
   </head>
   <body>
     <h1>Page not found</h1>
-    <p>This site is a single-page app. If you were redirected here after authentication, please return to the <a href="/">app</a>.</p>
+    <p>Redirecting to app...</p>
   </body>
 </html>

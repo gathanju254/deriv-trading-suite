@@ -11,7 +11,7 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
   base: '/',
   build: {
-    outDir: 'build',  // ✅ Outputs to 'build' directory
+    outDir: 'build',
     emptyOutDir: true,
     sourcemap: false,
     rollupOptions: {
@@ -26,7 +26,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    historyApiFallback: true,
+    historyApiFallback: {
+      // Specifically handle OAuth callback
+      rewrites: [
+        { from: /^\/oauth\/callback/, to: '/index.html' }
+      ]
+    },
     proxy: {
       '/auth': { target: 'http://localhost:8000', changeOrigin: true },
       '/api': { target: 'http://localhost:8000', changeOrigin: true },
