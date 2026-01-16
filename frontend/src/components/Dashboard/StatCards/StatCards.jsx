@@ -51,7 +51,7 @@ const StatCards = () => {
     for (const key in stats) {
       if (prev.current[key] !== stats[key]) {
         setHighlight(key);
-        setTimeout(() => setHighlight(null), 300);
+        setTimeout(() => setHighlight(null), 350);
         break;
       }
     }
@@ -99,10 +99,9 @@ const StatCards = () => {
   return (
     <div
       className="
-        grid gap-4
-        grid-cols-1
-        sm:grid-cols-2
-        lg:grid-cols-4
+        flex flex-col gap-4
+        sm:grid sm:grid-cols-2
+        lg:flex lg:flex-row lg:gap-4
       "
     >
       {cards.map(({ id, label, value, sub, icon: Icon, trend }) => {
@@ -113,28 +112,31 @@ const StatCards = () => {
           <div
             key={id}
             className={`
-              relative rounded-xl
-              border border-gray-800/70
-              bg-gray-900/60
-              px-4 py-5
+              flex-1 relative rounded-xl
+              border border-gray-800/60
+              bg-gradient-to-br from-gray-900/80 to-gray-900/40
+              px-5 py-6
               transition-all duration-200
-              hover:bg-gray-900/80
+              hover:border-gray-700
+              hover:shadow-lg hover:shadow-black/30
               ${highlight === id ? 'ring-1 ring-primary/40' : ''}
             `}
           >
             {/* Header */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gray-800/60">
-                  <Icon size={16} className="text-gray-300" />
+                <div className="p-2.5 rounded-lg bg-gray-800/70">
+                  <Icon size={16} className="text-gray-200" />
                 </div>
-                <span className="text-sm text-gray-400">{label}</span>
+                <span className="text-sm font-medium text-gray-400">
+                  {label}
+                </span>
               </div>
 
               {trend !== null && (
                 <div
                   className={`
-                    flex items-center gap-1 px-2 py-1 rounded-md text-xs
+                    flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
                     ${positive && 'bg-green-500/10 text-green-400'}
                     ${negative && 'bg-red-500/10 text-red-400'}
                   `}
@@ -149,7 +151,7 @@ const StatCards = () => {
             </div>
 
             {/* Main value */}
-            <div className="text-2xl md:text-3xl font-semibold text-white leading-none">
+            <div className="text-2xl md:text-3xl font-semibold text-white tracking-tight">
               {value}
             </div>
 
