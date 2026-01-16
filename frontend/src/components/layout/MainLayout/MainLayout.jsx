@@ -35,7 +35,6 @@ const MainLayout = () => {
   // Initial load
   useEffect(() => {
     let mounted = true;
-
     const load = async () => {
       try {
         await refreshAllData();
@@ -45,7 +44,6 @@ const MainLayout = () => {
         if (mounted) setTimeout(() => setIsLoaded(true), 700);
       }
     };
-
     load();
     return () => { mounted = false; };
   }, []);
@@ -95,11 +93,13 @@ const MainLayout = () => {
         {/* Page Header */}
         <div className="sticky top-0 z-30 px-4 md:px-6 py-3 md:py-4 bg-gray-900/90 backdrop-blur-xl border-b border-gray-800/50">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+            {/* Page title */}
             <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent tracking-tight">
               {pageTitle}
             </h1>
 
-            <div className="flex flex-wrap items-center gap-3">
+            {/* Status & Refresh */}
+            <div className="flex flex-col sm:flex-row items-center sm:gap-3 w-full sm:w-auto gap-2">
               <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
                 <Clock className="w-4 h-4 text-gray-400" />
                 <span className="text-sm font-medium text-gray-300">

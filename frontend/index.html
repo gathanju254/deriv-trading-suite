@@ -2,62 +2,129 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <!-- Core -->
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover"
     />
 
-    <!-- Primary Meta -->
+    <!-- Core Meta -->
     <title>Deriv Trading Suite</title>
     <meta
       name="description"
-      content="Deriv Trading Suite — a professional trading dashboard and automation platform powered by Deriv APIs."
+      content="Deriv Trading Suite — professional trading dashboard and automation platform powered by Deriv APIs. Monitor trades, analyze markets, and automate strategies seamlessly."
     />
     <meta name="author" content="Deriv Trading Suite" />
     <meta name="theme-color" content="#0f172a" />
-
-    <!-- SEO & Social (quietly powerful) -->
     <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Social Sharing -->
     <meta property="og:title" content="Deriv Trading Suite" />
     <meta
       property="og:description"
-      content="Professional trading dashboard and automation suite powered by Deriv APIs."
+      content="Professional trading dashboard and automation suite powered by Deriv APIs. Real-time data, strategy automation, and analytics."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="%PUBLIC_URL%/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Deriv Trading Suite Dashboard" />
+    <meta property="og:url" content="https://deriv-trading-suite.com" />
+    <meta property="og:site_name" content="Deriv Trading Suite" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:phone_number" content="+254724167076" />
+    <meta property="og:email" content="support@deriv-trading-suite.com" />
+    <meta property="og:street-address" content="Nairobi" />
+    <meta property="og:locality" content="Nairobi" />
+    <meta property="og:region" content="Kenya" />
+    <meta property="og:postal-code" content="" />
+    <meta property="og:country-name" content="Kenya" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Deriv Trading Suite" />
+    <meta
+      name="twitter:description"
+      content="Monitor trades, analyze markets, and automate strategies with Deriv Trading Suite."
+    />
+    <meta name="twitter:image" content="%PUBLIC_URL%/twitter-card.png" />
+    <meta name="twitter:image:alt" content="Deriv Trading Suite Dashboard" />
+    <meta name="twitter:site" content="@DerivTradingSuite" />
+    <meta name="twitter:creator" content="@DerivTradingSuite" />
+
+    <!-- Contact Info -->
+    <meta name="contact" content="support@deriv-trading-suite.com" />
+    <meta name="telephone" content="+254724167076" />
+    <meta name="format-detection" content="telephone=yes" />
+    <meta name="format-detection" content="email=yes" />
 
     <!-- PWA -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Deriv Trading Suite" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
     <!-- Icons -->
-    <link rel="icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
+    <link rel="mask-icon" href="%PUBLIC_URL%/safari-pinned-tab.svg" color="#0f172a" />
 
-    <!-- Performance -->
+    <!-- Performance / Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-    <!-- Optional fonts (only if used) -->
-    <!--
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    -->
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://deriv-trading-suite.com" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FinancialService",
+      "name": "Deriv Trading Suite",
+      "url": "https://deriv-trading-suite.com",
+      "logo": "%PUBLIC_URL%/logo512.png",
+      "telephone": "+254724167076",
+      "email": "support@deriv-trading-suite.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Nairobi",
+        "addressLocality": "Nairobi",
+        "addressRegion": "Kenya",
+        "postalCode": "",
+        "addressCountry": "KE"
+      },
+      "sameAs": [
+        "https://t.me/DerivTradingSuite",
+        "https://wa.me/254724167076"
+      ],
+      "description": "Deriv Trading Suite — professional trading dashboard and automation platform powered by Deriv APIs."
+    }
+    </script>
   </head>
 
   <body>
     <noscript>
-      <strong>
-        Deriv Trading Suite requires JavaScript to run. Please enable it to
-        continue.
-      </strong>
+      <div style="text-align:center; margin-top:50px; font-family:Arial, sans-serif;">
+        <strong>Deriv Trading Suite requires JavaScript to run. Please enable it to continue.</strong>
+        <p>Contact: <a href="tel:+254724167076">+254724167076</a> | Telegram: <a href="https://t.me/Deriv-trading-suite">Deriv-trading-suite</a></p>
+      </div>
     </noscript>
 
     <!-- React Mount -->
     <div id="root"></div>
+
+    <!-- Portals -->
+    <div id="toast-root"></div>
+    <div id="modal-root"></div>
+    <div id="dropdown-root"></div>
 
     <!-- Vite Entry -->
     <script type="module" src="/src/main.jsx"></script>

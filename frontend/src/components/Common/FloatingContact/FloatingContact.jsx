@@ -32,7 +32,7 @@ const CONTACTS = [
   },
   {
     label: 'Telegram',
-    href: 'https://t.me/yourusername',
+    href: 'https://t.me/Derivi-trading-suite',
     icon: Send,
     className:
       'bg-gradient-to-br from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700',
