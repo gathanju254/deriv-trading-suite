@@ -1,1 +1,5 @@
-/*    /index.html   200
+/* Serve index.html for all routes so SPA client-side routing works */
+# Netlify / static-hosting format:
+# Redirect all routes to index.html with a 200 (serve app)
+# (Keep this file in frontend/public so it is copied into build/)
+*    /index.html   200

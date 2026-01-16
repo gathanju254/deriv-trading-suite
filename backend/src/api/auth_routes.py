@@ -218,9 +218,9 @@ async def deriv_callback(
         # ----------------------------
         from urllib.parse import quote
 
-        # ✅ FIXED: Remove the duplicate /oauth/callback
+        # Use hash-fragment so static hosts serve index.html for SPA routes
         frontend_redirect = (
-            f"{settings.FRONTEND_URL}/oauth/callback"  # ✅ Just /oauth/callback (once)
+            f"{settings.FRONTEND_URL}/#/oauth/callback"
             f"?user_id={quote(user.id)}"
             f"&session_token={quote(app_token)}"
             f"&access_token={quote(access_token)}"
@@ -228,7 +228,6 @@ async def deriv_callback(
             f"&account_id={quote(user.deriv_account_id or '')}"
             f"&is_new_user={'true' if is_new_user else 'false'}"
         )
-
         logger.info(f"Redirecting to: {frontend_redirect[:100]}...")
         return RedirectResponse(url=frontend_redirect)
 
