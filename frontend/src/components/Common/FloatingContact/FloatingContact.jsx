@@ -15,7 +15,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 const CONTACTS = [
   {
     label: 'WhatsApp',
-    href: 'https://wa.me/254724167076',
+    href: 'https://wa.me/254756379737',
     icon: MessageCircle,
     className:
       'bg-gradient-to-br from-success-500 to-success-600 hover:from-success-600 hover:to-success-700',
@@ -24,7 +24,7 @@ const CONTACTS = [
   },
   {
     label: 'Call',
-    href: 'tel:+254724167076',
+    href: 'tel:+254756379737',
     icon: Phone,
     className:
       'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700',
@@ -32,7 +32,7 @@ const CONTACTS = [
   },
   {
     label: 'Telegram',
-    href: 'https://t.me/Derivi-trading-suite',
+    href: 'https://t.me/+g4YJByJPhs5jNzFk',
     icon: Send,
     className:
       'bg-gradient-to-br from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700',
