@@ -2,7 +2,7 @@
 services:
   - type: static
     name: deriv-trading-suite
-    buildCommand: npm install && npm run build  # ✅ Remove leading &&
+    buildCommand: npm install && npm run build 
     staticPublishPath: ./build
     envVars:
       - key: VITE_API_BASE_URL
