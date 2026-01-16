@@ -4,23 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Deriv Trading Suite</title>
-    <script>
-      // SPA 404 fallback - redirect all non-existent routes to index.html
-      const path = window.location.pathname;
-      
-      // Don't redirect if already on root or if path includes a file extension
-      if (path !== '/' && !path.includes('.')) {
-        // Preserve query parameters and hash
-        const fullPath = '/' + window.location.search + window.location.hash;
-        window.location.href = fullPath;
-      }
-    </script>
   </head>
   <body>
-    <noscript>
-      <h1>Deriv Trading Suite</h1>
-      <p>This application requires JavaScript to run. Please enable JavaScript and refresh the page.</p>
-    </noscript>
-    <p>Redirecting to application...</p>
+    <h1>Page not found</h1>
+    <p>This site is a single-page app. If you were redirected here after authentication, please return to the <a href="/">app</a>.</p>
   </body>
 </html>
