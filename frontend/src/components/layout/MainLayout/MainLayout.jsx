@@ -10,7 +10,8 @@ import { useApp } from '../../../context/AppContext';
 import { useTrading } from '../../../hooks/useTrading';
 import { useToast } from '../../../context/ToastContext';
 
-import { Clock, RefreshCw } from 'lucide-react';
+import { Clock, RefreshCw, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
@@ -26,8 +27,9 @@ const MainLayout = () => {
   const { addToast } = useToast();
 
   const [isLoaded, setIsLoaded] = useState(false);
-  const location = useLocation();
+  const [showTop, setShowTop] = useState(false);
 
+  const location = useLocation();
   const pageTitle = PAGE_TITLES[location.pathname] || 'Deriv Trading Suite';
 
   // Initial load
@@ -40,17 +42,22 @@ const MainLayout = () => {
       } catch {
         addToast('Failed to load data', 'error');
       } finally {
-        if (mounted) {
-          setTimeout(() => setIsLoaded(true), 700);
-        }
+        if (mounted) setTimeout(() => setIsLoaded(true), 700);
       }
     };
 
     load();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
+
+  // Track scroll for Back-to-Top button
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 300);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
   const formatTimeSince = useCallback((timestamp) => {
     if (!timestamp) return '—';
@@ -92,8 +99,8 @@ const MainLayout = () => {
               {pageTitle}
             </h1>
 
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
                 <Clock className="w-4 h-4 text-gray-400" />
                 <span className="text-sm font-medium text-gray-300">
                   {formatTimeSince(lastUpdateTime)}
@@ -122,8 +129,26 @@ const MainLayout = () => {
         <Footer />
       </div>
 
-      {/* Floating Contact (hidden when mobile menu is open) */}
+      {/* Floating Contact */}
       {!mobileMenuOpen && <FloatingContact />}
+
+      {/* Back to Top Button */}
+      <AnimatePresence>
+        {showTop && (
+          <motion.button
+            onClick={scrollToTop}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            className="fixed bottom-24 right-6 z-50 w-14 h-14 rounded-full bg-primary-600 text-white flex items-center justify-center shadow-2xl"
+            aria-label="Back to top"
+          >
+            <ChevronUp size={24} />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Mobile Backdrop */}
       {mobileMenuOpen && (
