@@ -4,6 +4,11 @@ services:
     name: deriv-trading-suite
     buildCommand: npm install && npm run build 
     staticPublishPath: ./build
+    # Add this section:
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
         value: https://deriv-trading-backend.onrender.com
