@@ -45,13 +45,13 @@ const StatCards = () => {
   );
 
   /* ---------------------------
-     Subtle update highlight
+     Highlight on update
   ---------------------------- */
   useEffect(() => {
     for (const key in stats) {
       if (prev.current[key] !== stats[key]) {
         setHighlight(key);
-        setTimeout(() => setHighlight(null), 350);
+        setTimeout(() => setHighlight(null), 400);
         break;
       }
     }
@@ -97,73 +97,78 @@ const StatCards = () => {
   ];
 
   return (
-    <div
-      className="
-        flex flex-col gap-4
-        sm:grid sm:grid-cols-2
-        lg:flex lg:flex-row lg:gap-4
-      "
-    >
-      {cards.map(({ id, label, value, sub, icon: Icon, trend }) => {
-        const positive = trend !== null && isPositive(trend);
-        const negative = trend !== null && !isPositive(trend);
+    <section className="w-full">
+      <div
+        className="
+          w-full
+          flex flex-col gap-4
+          sm:grid sm:grid-cols-2
+          lg:flex lg:flex-row
+        "
+      >
+        {cards.map(({ id, label, value, sub, icon: Icon, trend }) => {
+          const positive = trend !== null && isPositive(trend);
+          const negative = trend !== null && !isPositive(trend);
 
-        return (
-          <div
-            key={id}
-            className={`
-              flex-1 relative rounded-xl
-              border border-gray-800/60
-              bg-gradient-to-br from-gray-900/80 to-gray-900/40
-              px-5 py-6
-              transition-all duration-200
-              hover:border-gray-700
-              hover:shadow-lg hover:shadow-black/30
-              ${highlight === id ? 'ring-1 ring-primary/40' : ''}
-            `}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-gray-800/70">
-                  <Icon size={16} className="text-gray-200" />
+          return (
+            <div
+              key={id}
+              className={`
+                relative flex-1
+                rounded-2xl
+                border border-gray-800/70
+                bg-gradient-to-br from-gray-900/90 via-gray-900/60 to-gray-900/30
+                px-6 py-6
+                transition-all duration-300
+                hover:border-gray-700
+                hover:shadow-xl hover:shadow-black/40
+                ${highlight === id ? 'ring-1 ring-primary/40' : ''}
+              `}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-xl bg-gray-800/70">
+                    <Icon size={16} className="text-gray-200" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-400">
+                    {label}
+                  </span>
                 </div>
-                <span className="text-sm font-medium text-gray-400">
-                  {label}
-                </span>
+
+                {trend !== null && (
+                  <div
+                    className={`
+                      flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold
+                      ${positive && 'bg-green-500/10 text-green-400'}
+                      ${negative && 'bg-red-500/10 text-red-400'}
+                    `}
+                  >
+                    {positive ? (
+                      <TrendingUp size={12} />
+                    ) : (
+                      <TrendingDown size={12} />
+                    )}
+                  </div>
+                )}
               </div>
 
-              {trend !== null && (
-                <div
-                  className={`
-                    flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
-                    ${positive && 'bg-green-500/10 text-green-400'}
-                    ${negative && 'bg-red-500/10 text-red-400'}
-                  `}
-                >
-                  {positive ? (
-                    <TrendingUp size={12} />
-                  ) : (
-                    <TrendingDown size={12} />
-                  )}
-                </div>
-              )}
-            </div>
+              {/* Value */}
+              <div className="text-3xl font-semibold text-white tracking-tight">
+                {value}
+              </div>
 
-            {/* Main value */}
-            <div className="text-2xl md:text-3xl font-semibold text-white tracking-tight">
-              {value}
+              {/* Sub */}
+              <div className="mt-2 text-xs text-gray-500">
+                {sub}
+              </div>
             </div>
-
-            {/* Subtext */}
-            <div className="mt-2 text-xs text-gray-500">
-              {sub}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </section>
   );
 };
 
 export default StatCards;
+
