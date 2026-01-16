@@ -1,7 +1,8 @@
 // frontend/src/App.jsx - UPDATED VERSION
 import React, { useEffect } from 'react';
 import {
-  BrowserRouter as Router,
+  //BrowserRouter as Router,
+  HashRouter as Router,
   Routes,
   Route,
   Navigate,
