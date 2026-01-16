@@ -1,262 +1,304 @@
-// frontend/src/pages/OAuthCallback/OAuthCallback.jsx - UPDATED WITH FALLBACK
-import React, { useEffect, useState } from 'react';
+// frontend/src/pages/OAuthCallback/OAuthCallback.jsx
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { derivService } from '../../services/derivService';
-import { Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import LoadingSpinner from '../../components/Common/LoadingSpinner/LoadingSpinner';
+import { CheckCircle, XCircle, Shield, Lock } from 'lucide-react';
 
+// Constants
+const FLOW = {
+  SECURE_POST: 'secure_post',
+  LEGACY_FALLBACK: 'legacy_fallback',
+};
+
+const STATUS = {
+  PROCESSING: 'processing',
+  SUCCESS: 'success',
+  ERROR: 'error',
+};
+
+const PROGRESS_STEPS = {
+  PARSING: 10,
+  VALIDATING: 30,
+  POST_FLOW: 45,
+  FALLBACK: 60,
+  LOGGING_IN: 80,
+  COMPLETE: 100,
+};
+
+// Component
 const OAuthCallback = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
   const { addToast } = useToast();
-  
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState('processing');
-  const [error, setError] = useState(null);
+
+  const processedRef = useRef(false);
+  const [status, setStatus] = useState(STATUS.PROCESSING);
+  const [progress, setProgress] = useState(PROGRESS_STEPS.PARSING);
   const [flowType, setFlowType] = useState('');
-  const [processed, setProcessed] = useState(false); // NEW: Prevent re-processing
+  const [error, setError] = useState(null);
+  const [stepDescription, setStepDescription] = useState('Parsing authentication data...');
 
-  useEffect(() => {
-    // Prevent re-processing if already processed
-    if (processed) return;
+  // Extract and validate URL parameters
+  const parseAuthParams = () => {
+    const params = new URLSearchParams(location.search);
+    const hashParams = new URLSearchParams(location.hash.substring(1));
     
-    const processCallback = async () => {
-      try {
-        setProcessed(true); // Mark as processed
-        setProgress(10);
-        console.log('🔐 OAuthCallback: Starting authentication processing...');
-        
-        // Use location.search directly (not window.location)
-        const searchParams = new URLSearchParams(location.search);
-        
-        const access_token = searchParams.get('token');
-        const state = searchParams.get('state');
-        const account_id = searchParams.get('account_id');
-        const error_param = searchParams.get('error');
-
-        console.log('📦 Parsed OAuth parameters from React Router:', {
-          has_access_token: !!access_token,
-          token_length: access_token?.length,
-          has_state: !!state,
-          account_id: account_id || 'MISSING',
-          error: error_param || 'none'
-        });
-
-        // Check for backend errors
-        if (error_param) {
-          throw new Error(`Authentication error: ${decodeURIComponent(error_param)}`);
-        }
-
-        // Require access token
-        if (!access_token) {
-          throw new Error('No access token received. Deriv OAuth may have been cancelled or failed.');
-        }
-
-        setProgress(30);
-        console.log('✅ OAuth parameters validated');
-
-        // ========================================
-        // ATTEMPT 1: Secure POST flow (preferred)
-        // ========================================
-        let loginSuccess = false;
-        
-        try {
-          console.log('🔐 Attempting secure POST flow to /auth/callback...');
-          setProgress(45);
-          
-          const callbackResponse = await derivService.handleOAuthCallback({
-            access_token,
-            state: state || '',
-            account_id: account_id || '',
-          });
-
-          console.log('✅ Secure POST response received:', {
-            success: callbackResponse.success,
-            has_user: !!callbackResponse.user,
-            has_session: !!callbackResponse.session,
-          });
-
-          if (!callbackResponse.success) {
-            throw new Error(callbackResponse.message || 'Callback endpoint returned unsuccessful response');
-          }
-
-          if (!callbackResponse.user?.id) {
-            throw new Error('No user ID in callback response');
-          }
-
-          const { user, session } = callbackResponse;
-
-          console.log('🔐 Calling login() with POST response data...');
-          setProgress(75);
-          
-          loginSuccess = await login({
-            user_id: user.id,
-            session_token: session.id,
-            access_token: access_token,
-            email: user.email || '',
-            deriv_account_id: user.deriv_account_id || '',
-          });
-
-          setFlowType('secure_post');
-          console.log('✅ Secure POST flow succeeded');
-          
-        } catch (postError) {
-          console.warn('⚠️  Secure POST flow failed:', postError.message);
-          
-          // ========================================
-          // ATTEMPT 2: Fallback to legacy flow
-          // ========================================
-          if (!account_id) {
-            throw new Error('Cannot fallback: Missing account_id. POST flow: ' + postError.message);
-          }
-          
-          try {
-            console.log('🔄 Falling back to legacy direct auth flow...');
-            setProgress(50);
-            
-            // For legacy flow, use account_id as the basis for user identification
-            const legacy_user_id = `deriv_${account_id}`;
-            
-            loginSuccess = await login({
-              user_id: legacy_user_id,
-              session_token: access_token, // Use token as session in legacy mode
-              access_token: access_token,
-              email: `${account_id}@deriv.com`,
-              deriv_account_id: account_id,
-            });
-
-            setFlowType('legacy_fallback');
-            console.log('✅ Legacy fallback flow succeeded');
-            
-          } catch (legacyError) {
-            console.error('❌ Both flows failed:');
-            console.error('  POST flow:', postError.message);
-            console.error('  Legacy flow:', legacyError.message);
-            throw new Error(`Authentication failed: ${postError.message}`);
-          }
-        }
-
-        if (!loginSuccess) {
-          throw new Error('Login function returned false');
-        }
-
-        setProgress(85);
-        setStatus('success');
-        setProgress(100);
-
-        console.log(`🎉 Authentication complete (${flowType})`);
-        
-        // ========================================
-        // CLEANUP & REDIRECT
-        // ========================================
-        
-        // Wait for state updates to propagate
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Redirect to dashboard - use replace to prevent back navigation
-        console.log('➡️  Redirecting to dashboard...');
-        navigate('/dashboard', { replace: true });
-
-      } catch (err) {
-        console.error('❌ OAuthCallback fatal error:', {
-          message: err.message,
-          location: location
-        });
-
-        const errorMsg = err.message || 'Authentication failed. Please try again.';
-        setError(errorMsg);
-        setStatus('error');
-        addToast(errorMsg, 'error');
-        
-        // Redirect to login after showing error - use replace
-        setTimeout(() => {
-          console.log('➡️  Redirecting to login due to error...');
-          navigate('/login', { replace: true });
-        }, 3000); // Shorter timeout
-      }
+    return {
+      accessToken: params.get('token') || hashParams.get('access_token'),
+      state: params.get('state') || hashParams.get('state') || '',
+      accountId: params.get('account_id') || hashParams.get('account_id') || '',
+      errorParam: params.get('error') || hashParams.get('error'),
     };
+  };
 
-    // Only process if we have URL parameters
-    if (location.search && !processed) {
-      processCallback();
-    } else {
-      console.warn('⚠️  No auth parameters or already processed');
-      console.warn('   Search:', location.search);
-      console.warn('   Processed:', processed);
+  // Authentication flow
+  const authenticate = async () => {
+    try {
+      const { accessToken, state, accountId, errorParam } = parseAuthParams();
+
+      // Check for errors first
+      if (errorParam) {
+        throw new Error(decodeURIComponent(errorParam));
+      }
+
+      if (!accessToken) {
+        throw new Error('No authentication token received. Please try again.');
+      }
+
+      setStepDescription('Validating token...');
+      setProgress(PROGRESS_STEPS.VALIDATING);
+
+      let loginSuccessful = false;
+
+      // ============================
+      // FLOW 1: Secure POST to backend
+      // ============================
+      try {
+        setStepDescription('Securing connection...');
+        setProgress(PROGRESS_STEPS.POST_FLOW);
+
+        const response = await derivService.handleOAuthCallback({
+          access_token: accessToken,
+          state,
+          account_id: accountId,
+        });
+
+        if (!response?.success) {
+          throw new Error(response?.message || 'Authentication server error');
+        }
+
+        if (!response?.user?.id || !response?.session?.id) {
+          throw new Error('Incomplete authentication response');
+        }
+
+        setStepDescription('Creating secure session...');
+        setProgress(PROGRESS_STEPS.LOGGING_IN);
+
+        loginSuccessful = await login({
+          user_id: response.user.id,
+          session_token: response.session.id,
+          access_token: accessToken,
+          email: response.user.email || '',
+          deriv_account_id: response.user.deriv_account_id || '',
+        });
+
+        setFlowType(FLOW.SECURE_POST);
+      } catch (postError) {
+        console.warn('Secure flow failed:', postError.message);
+        
+        // ============================
+        // FLOW 2: Legacy fallback
+        // ============================
+        if (!accountId) {
+          throw new Error('Unable to authenticate. Please contact support.');
+        }
+
+        setStepDescription('Using fallback authentication...');
+        setProgress(PROGRESS_STEPS.FALLBACK);
+
+        loginSuccessful = await login({
+          user_id: `deriv_${accountId}`,
+          session_token: accessToken,
+          access_token: accessToken,
+          email: `${accountId}@deriv.com`,
+          deriv_account_id: accountId,
+        });
+
+        setFlowType(FLOW.LEGACY_FALLBACK);
+      }
+
+      if (!loginSuccessful) {
+        throw new Error('Failed to establish user session');
+      }
+
+      // Success
+      setStepDescription('Session established');
+      setProgress(PROGRESS_STEPS.COMPLETE);
+      setStatus(STATUS.SUCCESS);
+
+      // Short delay for UX before redirect
+      await new Promise(resolve => setTimeout(resolve, 800));
+      navigate('/dashboard', { replace: true });
+
+    } catch (err) {
+      console.error('Authentication error:', err);
       
-      // If no parameters, redirect immediately to login
+      const userMessage = err.message.includes('token') 
+        ? 'Authentication token is invalid or expired. Please log in again.'
+        : err.message || 'Authentication failed. Please try again.';
+
+      setError(userMessage);
+      setStatus(STATUS.ERROR);
+      addToast(userMessage, 'error');
+
+      // Redirect to login after showing error
       setTimeout(() => {
         navigate('/login', { replace: true });
-      }, 1000);
+      }, 3000);
     }
-  }, [location.search, login, navigate, addToast, processed]);
+  };
 
-  // Show loading while processing
-  if (status === 'processing' || !processed) {
+  // Effect to trigger authentication
+  useEffect(() => {
+    if (processedRef.current) return;
+    processedRef.current = true;
+
+    // If no authentication parameters, redirect immediately
+    if (!location.search && !location.hash) {
+      addToast('No authentication data found', 'error');
+      navigate('/login', { replace: true });
+      return;
+    }
+
+    authenticate();
+  }, [location.search, location.hash, login, navigate, addToast]);
+
+  // ============================
+  // RENDER STATES
+  // ============================
+
+  // Processing/loading state
+  if (status === STATUS.PROCESSING) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className="w-full max-w-md"
-        >
-          <div className="p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-950/80 backdrop-blur-xl border border-gray-800/50 shadow-2xl">
-            <div className="text-center mb-8">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-600/20 to-primary-800/20 border border-primary-500/20 mb-6"
-              >
-                <Loader2 className="w-10 h-10 text-primary-400" />
-              </motion.div>
-              <h2 className="text-2xl font-bold text-white mb-2">Authenticating</h2>
-              <p className="text-gray-400">Processing your Deriv credentials</p>
+        <div className="w-full max-w-md">
+          <LoadingSpinner
+            size="xl"
+            type="premium"
+            theme="blue"
+            text="Securing Your Connection"
+            subText={stepDescription}
+            showPercentage
+            currentProgress={progress}
+            showProgressRing
+            gradient
+            fullScreen={false}
+            className="mb-6"
+          />
+          
+          {/* Progress indicators */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">Authentication Progress</span>
+              <span className="font-medium text-primary-400">{progress}%</span>
             </div>
-
-            <div className="mb-8">
-              <div className="w-full bg-gray-800/50 rounded-full h-1 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.5 }}
-                  className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-2 text-center">{progress}%</p>
+            
+            <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-primary-500 to-primary-600 transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
             </div>
-
-            <div className="text-center">
-              <p className="text-gray-300 text-sm">Verifying credentials with backend...</p>
-              {flowType && (
-                <p className="text-xs text-gray-500 mt-2">Flow: {flowType}</p>
-              )}
+            
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+              <Shield className="w-3 h-3" />
+              <span>End-to-end encrypted</span>
+              <Lock className="w-3 h-3 ml-2" />
+              <span>Bank-grade security</span>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     );
   }
 
-  // Error or success state
+  // Success state
+  if (status === STATUS.SUCCESS) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm text-center">
+          <div className="mb-6">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-success-500/20 to-success-600/20 border border-success-500/30 mb-4">
+              <CheckCircle className="w-10 h-10 text-success-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Welcome Back!</h2>
+            <p className="text-gray-400">Authentication successful</p>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-gray-900/50 border border-gray-800/50">
+              <p className="text-sm text-gray-300">Redirecting to your dashboard...</p>
+              <div className="flex justify-center mt-3">
+                <div className="flex gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <div 
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-primary-500 animate-pulse"
+                      style={{ animationDelay: `${i * 0.2}s` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {flowType && (
+              <div className="text-xs text-gray-500">
+                Using {flowType === FLOW.SECURE_POST ? 'secure' : 'legacy'} authentication flow
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center p-4">
-      <div className="p-8 rounded-2xl bg-gradient-to-br from-gray-900/80 to-gray-950/80 backdrop-blur-xl border border-gray-800/50 shadow-2xl">
-        {status === 'success' ? (
-          <div className="text-center">
-            <div className="text-green-400 text-sm font-medium mb-2">✅ Success!</div>
-            <p className="text-gray-400 text-sm">Redirecting to dashboard...</p>
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30 mb-4">
+            <XCircle className="w-10 h-10 text-red-500" />
           </div>
-        ) : (
-          <div className="text-center">
-            <div className="text-red-400 text-sm font-medium mb-2">❌ Authentication Failed</div>
-            <p className="text-gray-400 text-sm break-words">{error}</p>
-            <p className="text-gray-500 text-xs mt-4">Returning to login...</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Authentication Failed</h2>
+          <p className="text-gray-400">We couldn't verify your credentials</p>
+        </div>
+        
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-gray-900/50 border border-red-900/30">
+            <p className="text-sm text-gray-300 text-center break-words">
+              {error || 'An unexpected error occurred'}
+            </p>
           </div>
-        )}
+          
+          <div className="text-center">
+            <p className="text-sm text-gray-500 mb-3">Redirecting to login...</p>
+            <div className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700/50">
+              <div className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
+              <span className="text-xs text-gray-400">Please wait</span>
+            </div>
+          </div>
+          
+          <div className="text-center pt-4 border-t border-gray-800/30">
+            <p className="text-xs text-gray-600">
+              Need help? Contact support@deriv-trading-suite.com
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

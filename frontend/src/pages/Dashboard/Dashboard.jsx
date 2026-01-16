@@ -1,4 +1,3 @@
-// frontend/src/pages/Dashboard.jsx
 // frontend/src/pages/Dashboard/Dashboard.jsx
 import React from 'react';
 import { useTrading } from '../../hooks/useTrading';
