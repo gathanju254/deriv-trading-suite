@@ -89,7 +89,27 @@ export default {
         'gradient-shift': {
           '0%, 100%': { backgroundPosition: '0% 50%' },
           '50%': { backgroundPosition: '100% 50%' },
-        }
+        },
+        // Floating Contact – Idle Attention
+        'soft-pulse-ring': {
+          '0%, 100%': {
+            boxShadow: '0 0 0 0 rgba(59,130,246,0.35)',
+          },
+          '50%': {
+            boxShadow: '0 0 0 10px rgba(59,130,246,0)',
+          },
+        },
+        // Floating Contact – Item reveal
+        'fade-slide-in': {
+          '0%': {
+            opacity: 0,
+            transform: 'translateY(6px) scale(0.96)',
+          },
+          '100%': {
+            opacity: 1,
+            transform: 'translateY(0) scale(1)',
+          },
+        },
       },
       animation: {
         'pulse-slow': 'pulse-slow 3s ease-in-out infinite',
@@ -97,6 +117,8 @@ export default {
         'slide-in-right': 'slide-in-right 0.3s ease-out forwards',
         'pulse-soft': 'pulse-soft 2s ease-in-out infinite',
         'gradient-shift': 'gradient-shift 3s ease infinite',
+        'soft-pulse-ring': 'soft-pulse-ring 2.5s ease-in-out infinite',
+        'fade-slide-in': 'fade-slide-in 220ms ease-out forwards',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
