@@ -1,204 +1,219 @@
 // frontend/src/components/Common/FloatingContact/FloatingContact.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, Phone, Mail, Send, X, MessageSquare } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import {
+  MessageCircle,
+  Phone,
+  Mail,
+  Send,
+  X,
+  MessageSquare,
+  Zap,
+  Sparkles
+} from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 
 const CONTACTS = [
   {
     label: 'WhatsApp',
     href: 'https://wa.me/254724167076',
     icon: MessageCircle,
-    color: '#10b981',
+    className:
+      'bg-gradient-to-br from-success-500 to-success-600 hover:from-success-600 hover:to-success-700',
+    description: 'Quick chat',
     external: true,
-    description: 'Quick chat'
   },
   {
     label: 'Call',
     href: 'tel:+254724167076',
     icon: Phone,
-    color: '#3b82f6',
-    description: 'Voice call'
+    className:
+      'bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700',
+    description: 'Voice call',
   },
   {
     label: 'Telegram',
     href: 'https://t.me/yourusername',
     icon: Send,
-    color: '#0ea5e9',
+    className:
+      'bg-gradient-to-br from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700',
+    description: 'Instant message',
     external: true,
-    description: 'Instant message'
   },
   {
     label: 'Email',
     href: 'mailto:delaircapital@gmail.com',
     icon: Mail,
-    color: '#6b7280',
-    description: 'Detailed inquiry'
+    className:
+      'bg-gradient-to-br from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900',
+    description: 'Detailed inquiry',
   },
 ];
 
-const FloatingContact = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [showIdlePulse, setShowIdlePulse] = useState(false);
-  const idleTimer = useRef(null);
-  const containerRef = useRef(null);
+const vibrate = (pattern = [20]) => {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* noop */
+  }
+};
 
-  // Idle reminder after 30 seconds
+const FloatingContact = () => {
+  const [open, setOpen] = useState(false);
+  const [idlePulse, setIdlePulse] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  const idleTimerRef = useRef(null);
+  const pulseTimerRef = useRef(null);
+
+  const clearTimers = useCallback(() => {
+    clearTimeout(idleTimerRef.current);
+    clearInterval(pulseTimerRef.current);
+    idleTimerRef.current = null;
+    pulseTimerRef.current = null;
+  }, []);
+
+  // Idle attention pulse (30s)
   useEffect(() => {
-    if (isOpen) {
-      setShowIdlePulse(false);
-      clearTimeout(idleTimer.current);
+    if (open) {
+      clearTimers();
+      setIdlePulse(false);
       return;
     }
 
-    idleTimer.current = setTimeout(() => {
-      setShowIdlePulse(true);
-      
-      // Auto-hide pulse after 5 seconds
-      setTimeout(() => setShowIdlePulse(false), 5000);
+    idleTimerRef.current = setTimeout(() => {
+      if (prefersReducedMotion) return;
+
+      setIdlePulse(true);
+      let pulses = 0;
+
+      pulseTimerRef.current = setInterval(() => {
+        pulses += 1;
+        if (pulses >= 3) {
+          clearTimers();
+          setIdlePulse(false);
+        }
+      }, 1000);
     }, 30000);
 
-    return () => clearTimeout(idleTimer.current);
-  }, [isOpen]);
+    return clearTimers;
+  }, [open, prefersReducedMotion, clearTimers]);
 
-  // Close when clicking outside
+  // ESC key closes
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
+    if (!open) return;
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isOpen]);
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
-  const handleToggle = (e) => {
-    e.stopPropagation(); // Prevent event from bubbling to document
-    setShowIdlePulse(false);
-    clearTimeout(idleTimer.current);
-    setIsOpen(!isOpen);
+  const toggle = () => {
+    vibrate([15, 25, 15]);
+    clearTimers();
+    setIdlePulse(false);
+    setOpen((v) => !v);
   };
 
-  const ContactItem = ({ item, index }) => (
-    <motion.a
-      key={item.label}
-      href={item.href}
-      target={item.external ? '_blank' : undefined}
-      rel={item.external ? 'noopener noreferrer' : undefined}
-      onClick={(e) => e.stopPropagation()} // Prevent closing when clicking contact
-      initial={{ opacity: 0, x: 20, scale: 0.95 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 20, scale: 0.95 }}
-      transition={{ 
-        duration: 0.2,
-        delay: index * 0.05,
-        type: "spring",
-        stiffness: 200
-      }}
-      whileHover={{ scale: 1.05, x: -2 }}
-      whileTap={{ scale: 0.95 }}
-      className="group flex items-center gap-3 px-4 py-3 rounded-xl 
-                 text-white shadow-lg hover:shadow-xl
-                 transition-all duration-200 backdrop-blur-sm 
-                 border border-white/10 cursor-pointer
-                 bg-gray-900/90 hover:bg-gray-900"
-      style={{ 
-        backgroundColor: `${item.color}20`,
-        backdropFilter: 'blur(8px)'
-      }}
-    >
-      <div 
-        className="p-2 rounded-lg transition-colors duration-200 group-hover:bg-opacity-70"
-        style={{ backgroundColor: `${item.color}40` }}
-      >
-        <item.icon size={18} className="text-white" />
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold truncate">{item.label}</div>
-        <div className="text-xs opacity-80 truncate">{item.description}</div>
-      </div>
-      
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <div className="w-2 h-2 rounded-full bg-white" />
-      </div>
-    </motion.a>
-  );
+  const handleContactClick = () => {
+    vibrate([30, 20]);
+    setOpen(false);
+  };
 
   return (
-    <div ref={containerRef} className="fixed bottom-6 right-6 z-50">
+    <>
+      {/* Backdrop – BELOW button, ABOVE app */}
       <AnimatePresence>
-        {isOpen && (
+        {open && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.2 }}
-            className="mb-3 flex flex-col items-end gap-2"
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking menu
-          >
-            {CONTACTS.map((item, index) => (
-              <ContactItem key={item.label} item={item} index={index} />
-            ))}
-          </motion.div>
+            className="fixed inset-0 z-40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpen(false)}
+          />
         )}
       </AnimatePresence>
 
-      {/* Main Button */}
-      <motion.button
-        onClick={handleToggle}
-        aria-label={isOpen ? "Close contact options" : "Open contact options"}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className={`
-          relative w-14 h-14 rounded-2xl flex items-center justify-center
-          shadow-xl transition-colors duration-200 cursor-pointer
-          ${isOpen 
-            ? 'bg-gradient-to-br from-primary-600 to-primary-800' 
-            : 'bg-gradient-to-br from-primary-500 to-primary-700 hover:from-primary-600 hover:to-primary-800'
-          }
-        `}
-      >
-        {/* Idle Pulse Ring */}
-        {showIdlePulse && (
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1.2, opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className="absolute inset-0 rounded-2xl border-2 border-primary-400/30 animate-soft-pulse-ring"
-          />
-        )}
+      <div className="fixed bottom-6 right-6 z-50 pointer-events-auto">
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              className="mb-3 flex flex-col items-end gap-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {CONTACTS.map((item, i) => (
+                <motion.a
+                  key={item.label}
+                  href={item.href}
+                  target={item.external ? '_blank' : undefined}
+                  rel={item.external ? 'noopener noreferrer' : undefined}
+                  onClick={handleContactClick}
+                  whileHover={{ scale: 1.05, x: -6 }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05, type: 'spring', stiffness: 220 }}
+                  className={`
+                    group flex items-center gap-3 px-4 py-3
+                    rounded-xl text-white shadow-2xl
+                    backdrop-blur-sm border border-white/10
+                    ${item.className}
+                  `}
+                >
+                  <div className="p-2 rounded-lg bg-white/20">
+                    <item.icon size={18} />
+                  </div>
 
-        {/* Icon */}
-        {isOpen ? (
-          <X size={20} className="text-white" />
-        ) : (
-          <MessageSquare size={20} className="text-white" />
-        )}
+                  <div>
+                    <div className="text-sm font-semibold">{item.label}</div>
+                    <div className="text-xs opacity-80">{item.description}</div>
+                  </div>
 
-        {/* Notification Dot */}
-        {showIdlePulse && !isOpen && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-success-500 border-2 border-gray-950"
-          />
-        )}
-      </motion.button>
+                  <Zap
+                    size={14}
+                    className="ml-2 opacity-0 group-hover:opacity-100 transition"
+                  />
+                </motion.a>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Semi-transparent backdrop (only when open) */}
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-    </div>
+        {/* Toggle Button */}
+        <motion.button
+          onClick={toggle}
+          aria-expanded={open}
+          aria-label="Contact support"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          className={`
+            relative w-16 h-16 rounded-2xl
+            flex items-center justify-center
+            shadow-2xl
+            bg-gradient-to-br
+            ${open
+              ? 'from-primary-600 to-primary-800'
+              : 'from-primary-500 to-primary-700'}
+          `}
+        >
+          {idlePulse && !open && !prefersReducedMotion && (
+            <div className="absolute inset-0 rounded-2xl border border-primary-400/40 animate-soft-pulse-ring" />
+          )}
+
+          {open ? <X size={24} /> : <MessageSquare size={24} />}
+
+          {idlePulse && !open && (
+            <Sparkles
+              size={12}
+              className="absolute -top-2 -right-2 text-primary-300 animate-pulse"
+            />
+          )}
+        </motion.button>
+      </div>
+    </>
   );
 };
 
