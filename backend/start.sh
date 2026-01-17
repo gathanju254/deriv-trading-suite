@@ -1,5 +1,5 @@
 #!/bin/bash
-# backend/start.sh - Enhanced version with better diagnostics
+# backend/start.sh - Enhanced version with better diagnostics and Alembic logging
 
 echo "===================================================================="
 echo "🚀 Starting Deriv Trading Backend"
@@ -76,7 +76,6 @@ from sqlalchemy import create_engine, text
 try:
     engine = create_engine('${DATABASE_URL}')
     with engine.connect() as conn:
-        # Check for our main tables
         tables = ['users', 'trades', 'contracts', 'proposals', 'commissions', 'user_sessions']
         for table in tables:
             result = conn.execute(text(f\"SELECT EXISTS(SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{table}');\"))
@@ -96,18 +95,33 @@ echo "--------------------------------------------------------------------"
 if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     echo "🔁 Running Alembic migrations..."
     if [ -f "alembic.ini" ]; then
-        python -c "
+        python - <<EOF
 import sys
 from alembic.config import Config
 from alembic import command
+from alembic.script import ScriptDirectory
+
 try:
     alembic_cfg = Config('alembic.ini')
-    command.upgrade(alembic_cfg, 'head')
-    print('✅ Migrations completed successfully')
+    script = ScriptDirectory.from_config(alembic_cfg)
+
+    # Show current and head revisions
+    current = command.current(alembic_cfg, verbose=True, head_only=False)
+    head = script.get_current_head()
+    print("🔹 Current DB revision:", current)
+    print("🔹 Latest revision (head):", head)
+
+    # Upgrade to head
+    command.upgrade(alembic_cfg, 'head', sql=False)
+
+    # List applied migrations after upgrade
+    print("✅ Applied migrations:")
+    for rev in script.walk_revisions(base='base', head='head'):
+        print(f"  - {rev.revision}: {rev.doc}")
+
 except Exception as e:
-    print(f'⚠️ Alembic migrations failed: {e}')
-    print('📝 Using SQLAlchemy create_all() instead')
-" 2>/dev/null
+    print(f'⚠️ Alembic migration failed: {e}')
+EOF
     else
         echo "⚠️ alembic.ini not found, skipping migrations"
     fi
