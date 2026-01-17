@@ -10,7 +10,7 @@ import {
   LogOut,
   User,
   Settings,
-  Zap
+  TrendingUp
 } from 'lucide-react';
 
 import { useApp } from '../../../context/AppContext';
@@ -71,9 +71,19 @@ const Header = () => {
         className={`fixed top-0 left-0 right-0 z-50 ${HEADER_HEIGHT} bg-gray-900/95 backdrop-blur-xl border-b border-gray-800/50`}
       >
         <div className="h-full px-4 md:px-6 flex items-center justify-between">
-          
-          {/* Left: Menu + Brand */}
+
+          {/* Left: Brand + Menu */}
           <div className="flex items-center gap-3">
+            {/* Brand */}
+            <div className="flex items-center gap-2 select-none">
+              <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shadow-sm">
+                <TrendingUp size={16} className="text-white" />
+              </div>
+              <span className="hidden sm:block font-semibold text-white tracking-tight">
+                Deriv Suite
+              </span>
+            </div>
+
             {/* Menu Toggle */}
             <button
               onClick={() =>
@@ -84,16 +94,6 @@ const Header = () => {
             >
               <Menu size={22} className="text-gray-300" />
             </button>
-
-            {/* Brand */}
-            <div className="flex items-center gap-2 select-none">
-              <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shadow-sm">
-                <Zap size={16} className="text-white" />
-              </div>
-              <span className="hidden sm:block font-semibold text-white tracking-tight">
-                Deriv Suite
-              </span>
-            </div>
           </div>
 
           {/* Bot Controls */}
