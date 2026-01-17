@@ -105,14 +105,14 @@ try:
     alembic_cfg = Config('alembic.ini')
     script = ScriptDirectory.from_config(alembic_cfg)
 
-    # Show current and head revisions
-    current = command.current(alembic_cfg, verbose=True, head_only=False)
+    # Show current revision and head
+    current = command.current(alembic_cfg, verbose=True)
     head = script.get_current_head()
     print("🔹 Current DB revision:", current)
     print("🔹 Latest revision (head):", head)
 
     # Upgrade to head
-    command.upgrade(alembic_cfg, 'head', sql=False)
+    command.upgrade(alembic_cfg, 'head')
 
     # List applied migrations after upgrade
     print("✅ Applied migrations:")
