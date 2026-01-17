@@ -1,5 +1,4 @@
 // frontend/src/components/Common/Header/Header.jsx
-// frontend/src/components/Common/Header/Header.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Bell,
@@ -10,7 +9,8 @@ import {
   LogOut,
   User,
   Settings,
-  TrendingUp
+  Zap,
+  Cpu
 } from 'lucide-react';
 
 import { useApp } from '../../../context/AppContext';
@@ -77,7 +77,7 @@ const Header = () => {
             {/* Brand */}
             <div className="flex items-center gap-2 select-none">
               <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shadow-sm">
-                <TrendingUp size={16} className="text-white" />
+                <Cpu size={16} className="text-white" />
               </div>
               <span className="hidden sm:block font-semibold text-white tracking-tight">
                 Deriv Suite
