@@ -52,13 +52,17 @@ class UserSession(Base):
     __tablename__ = "user_sessions"
 
     id = Column(String, primary_key=True, default=uuid_str)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    access_token = Column(String, nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), index=True, nullable=False)
+    access_token = Column(String, nullable=True)
     refresh_token = Column(String, nullable=True)
     expires_at = Column(DateTime, nullable=False)
+    refresh_expires_at = Column(DateTime, nullable=True)  # ADD THIS LINE
     is_active = Column(Boolean, default=True)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Relationships
     user = relationship("User", back_populates="sessions")
 
 

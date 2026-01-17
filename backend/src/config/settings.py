@@ -25,6 +25,11 @@ class Settings:
         "https://deriv-trading-suite-67mv.onrender.com"
     )
 
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite:///./trading.db"
+    )
+
     # =======================
     # Security / JWT
     # =======================
