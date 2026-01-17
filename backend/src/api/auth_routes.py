@@ -637,40 +637,38 @@ async def logout(
     elif session_token:
         token = session_token
     
-    if not token:
-        # Still clear cookies even if no token
-        clear_auth_cookies(response)
-        return {"message": "Logged out"}
-    
     try:
-        payload = decode_access_token(token)
-        session_id = payload.get("session_id")
-        
-        if session_id:
-            # Mark session as inactive
-            session = db.query(UserSession).filter(
-                UserSession.id == session_id,
-            ).first()
+        if token and token.count('.') == 2:  # Valid JWT format
+            payload = decode_access_token(token)
+            session_id = payload.get("session_id")
             
-            if session:
-                session.is_active = False
-                db.commit()
-                logger.info(f"Session {session_id} logged out")
-            
-            # Clear CSRF token from storage
-            if USE_REDIS:
-                redis_client.delete(f"csrf:{session_id}")
+            if session_id:
+                # Mark session as inactive
+                session = db.query(UserSession).filter(
+                    UserSession.id == session_id,
+                ).first()
+                
+                if session:
+                    session.is_active = False
+                    db.commit()
+                    logger.info(f"Session {session_id} logged out")
+                
+                # Clear CSRF token from storage
+                if USE_REDIS:
+                    redis_client.delete(f"csrf:{session_id}")
+        else:
+            logger.debug("No valid JWT token provided for logout")
         
-        # Clear all cookies
+        # Always clear cookies
         clear_auth_cookies(response)
         
         return {"message": "Logged out"}
 
     except Exception as e:
-        logger.error(f"Logout error: {e}", exc_info=True)
+        logger.error(f"Logout error: {e}")
         # Still clear cookies on error
         clear_auth_cookies(response)
-        raise HTTPException(status_code=500, detail="Logout failed")
+        return {"message": "Logged out"}  # CHANGED: Return 200 even on error
 
 # -------------------------------------------------------------------
 # CURRENT USER (ENHANCED)

@@ -38,10 +38,20 @@ const setupInterceptor = (axiosInstance, isAuthApi = false) => {
       const routeType = isAuthApi ? 'AUTH' : 'API';
       console.log(`[${routeType}] Request:`, config.method.toUpperCase(), config.url);
       
-      // CHANGED: Get token from localStorage OR cookies
-      const token = localStorage.getItem('session_token') || localStorage.getItem('auth_token');
+      // CHANGED: Get JWT token from localStorage (not session_token)
+      // After OAuth callback, store the app_token as auth_token
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('session_token');
+      
       if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+        // Only add Authorization header if it looks like a valid JWT
+        if (token.includes('.') && token.split('.').length === 3) {
+          config.headers.Authorization = `Bearer ${token}`;
+          console.log(`[${routeType}] Added Authorization header`);
+        } else {
+          console.warn(`[${routeType}] Token format invalid, skipping Authorization header`);
+        }
+      } else {
+        console.warn(`[${routeType}] No token found in localStorage`);
       }
       
       // ADDED: Include CSRF token for state-changing requests
